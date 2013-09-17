@@ -29,8 +29,13 @@ process.on('exit', function() {
   assert.equal(gotError, true);
 });
 
-// this should fail with an async EINVAL error, not throw an exception
+// This tests a corner case to ensure file descriptor 0 is treated
+// like any other file descriptor.
+// This should fail with an async error, not throw an exception.
 net.createServer(assert.fail).listen({fd:0}).on('error', function(e) {
-  assert.equal(e.code, 'EINVAL');
+  // On UNIX, the errno may be ENOTSOCK rather than EINVAL in the case 
+  // where fd 0 is a named or unnamed pipe
+  assert(e.code == 'EINVAL' || e.code == 'ENOTSOCK', 
+         e.code + " in ['EINVAL', 'ENOTSOCK']");
   gotError = true;
 });
