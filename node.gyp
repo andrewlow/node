@@ -88,16 +88,16 @@
       'lib/internal/v8_prof_polyfill.js',
       'lib/internal/v8_prof_processor.js',
       'lib/internal/streams/lazy_transform.js',
-      'deps/v8/tools/splaytree.js',
-      'deps/v8/tools/codemap.js',
-      'deps/v8/tools/consarray.js',
-      'deps/v8/tools/csvparser.js',
-      'deps/v8/tools/profile.js',
-      'deps/v8/tools/profile_view.js',
-      'deps/v8/tools/logreader.js',
-      'deps/v8/tools/tickprocessor.js',
-      'deps/v8/tools/SourceMap.js',
-      'deps/v8/tools/tickprocessor-driver.js',
+      '<(v8_parent_path)/tools/splaytree.js',
+      '<(v8_parent_path)/tools/codemap.js',
+      '<(v8_parent_path)/tools/consarray.js',
+      '<(v8_parent_path)/tools/csvparser.js',
+      '<(v8_parent_path)/tools/profile.js',
+      '<(v8_parent_path)/tools/profile_view.js',
+      '<(v8_parent_path)/tools/logreader.js',
+      '<(v8_parent_path)/tools/tickprocessor.js',
+      '<(v8_parent_path)/tools/SourceMap.js',
+      '<(v8_parent_path)/tools/tickprocessor-driver.js',
     ],
   },
 
@@ -108,8 +108,8 @@
 
       'dependencies': [
         'node_js2c#host',
-        'deps/v8/tools/gyp/v8.gyp:v8',
-        'deps/v8/tools/gyp/v8.gyp:v8_libplatform'
+        '<(v8_parent_path)/tools/gyp/v8.gyp:v8',
+        '<(v8_parent_path)/tools/gyp/v8.gyp:v8_libplatform'
       ],
 
       'include_dirs': [
@@ -117,7 +117,7 @@
         'tools/msvs/genfiles',
         'deps/uv/src/ares',
         '<(SHARED_INTERMEDIATE_DIR)', # for node_natives.h
-        'deps/v8' # include/v8_platform.h
+        '<(v8_parent_path)' # include/v8_platform.h
       ],
 
       'sources': [
@@ -195,8 +195,8 @@
         'src/util.cc',
         'src/string_search.cc',
         'deps/http_parser/http_parser.h',
-        'deps/v8/include/v8.h',
-        'deps/v8/include/v8-debug.h',
+        '<(v8_parent_path)/include/v8.h',
+        '<(v8_parent_path)/include/v8-debug.h',
         '<(SHARED_INTERMEDIATE_DIR)/node_natives.h',
         # javascript files to make for an even more pleasant IDE experience
         '<@(library_files)',
@@ -246,7 +246,7 @@
            target_arch=="ia32" or target_arch=="x32")', {
           'defines': [ 'NODE_ENABLE_VTUNE_PROFILING' ],
           'dependencies': [
-            'deps/v8/src/third_party/vtune/v8vtune.gyp:v8_vtune'
+            '<(v8_parent_path)/src/third_party/vtune/v8vtune.gyp:v8_vtune'
           ],
         }],
         [ 'node_use_openssl=="true"', {
@@ -371,7 +371,7 @@
           'defines': [ 'NODE_NO_BROWSER_GLOBALS' ],
         } ],
         [ 'v8_postmortem_support=="true"', {
-          'dependencies': [ 'deps/v8/tools/gyp/v8.gyp:postmortem-metadata' ],
+          'dependencies': [ '<(v8_parent_path)/tools/gyp/v8.gyp:postmortem-metadata' ],
           'conditions': [
             # -force_load is not applicable for the static library
             [ 'node_target_type!="static_library"', {
@@ -690,12 +690,12 @@
       'type': 'executable',
       'dependencies': [
         'deps/gtest/gtest.gyp:gtest',
-        'deps/v8/tools/gyp/v8.gyp:v8',
-        'deps/v8/tools/gyp/v8.gyp:v8_libplatform'
+        '<(v8_parent_path)/tools/gyp/v8.gyp:v8',
+        '<(v8_parent_path)/tools/gyp/v8.gyp:v8_libplatform'
       ],
       'include_dirs': [
         'src',
-        'deps/v8/include'
+        '<(v8_parent_path)/include'
       ],
       'defines': [
         # gtest's ASSERT macros conflict with our own.
@@ -722,7 +722,7 @@
 
           'include_dirs': [
             'src',
-            'deps/v8/include',
+            '<(v8_parent_path)/include',
           ],
 
           'sources': [

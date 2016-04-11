@@ -733,6 +733,11 @@ def configure_node(o):
   else:
     o['variables']['node_enable_v8_vtunejit'] = 'false'
 
+  if target_arch in ('s390', 's390x'):
+    o['variables']['v8_parent_path'] = 'deps/v8z'
+  else:
+    o['variables']['v8_parent_path'] = 'deps/v8'
+
   if flavor in ('solaris', 'mac', 'linux', 'freebsd'):
     use_dtrace = not options.without_dtrace
     # Don't enable by default on linux and freebsd
