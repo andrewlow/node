@@ -209,9 +209,16 @@ void MacroAssembler::Call(Handle<Code> code,
   DCHECK_EQ(expected_size, SizeOfCodeGeneratedSince(&start));
 }
 
+void MacroAssembler::RetC() {
+#ifdef V8_OS_ZOS
+    b(r7);
+#else
+    b(r14);
+#endif
+}
 
 void MacroAssembler::Ret() {
-  b(r14);
+    b(r14);
 }
 
 
@@ -2348,11 +2355,16 @@ void MacroAssembler::CallApiFunctionAndReturn(
 
   // Allocate HandleScope in callee-save registers.
   // r9 - next_address
-  // r6 - next_address->kNextOffset
+  // r6(linux) / r14(zOS) - next_address->kNextOffset
   // r7 - next_address->kLimitOffset
   // r8 - next_address->kLevelOffset
+#ifdef V8_OS_ZOS
+  Register prev_next_ = r14;
+#else
+  Register prev_next_ = r6;
+#endif
   mov(r9, Operand(next_address));
-  LoadP(r6, MemOperand(r9, kNextOffset));
+  LoadP(prev_next_, MemOperand(r9, kNextOffset));
   LoadP(r7, MemOperand(r9, kLimitOffset));
   LoadlW(r8, MemOperand(r9, kLevelOffset));
   AddP(r8, Operand(1));
@@ -2410,7 +2422,7 @@ void MacroAssembler::CallApiFunctionAndReturn(
   bind(&return_value_loaded);
   // No more valid handles (the result handle was the last one). Restore
   // previous handle scope.
-  StoreP(r6, MemOperand(r9, kNextOffset));
+  StoreP(prev_next_, MemOperand(r9, kNextOffset));
   if (emit_debug_code()) {
     LoadlW(r3, MemOperand(r9, kLevelOffset));
     CmpP(r3, r8);
@@ -2452,12 +2464,20 @@ void MacroAssembler::CallApiFunctionAndReturn(
   // HandleScope limit has changed. Delete allocated extensions.
   bind(&delete_allocated_handles);
   StoreP(r7, MemOperand(r9, kLimitOffset));
+#ifndef V8_OS_ZOS  
   LoadRR(r6, r2);
+#endif
   PrepareCallCFunction(1, r7);
+#ifdef V8_OS_ZOS
+  mov(r1, Operand(ExternalReference::isolate_address(isolate())));
+#else
   mov(r2, Operand(ExternalReference::isolate_address(isolate())));
+#endif 
   CallCFunction(
       ExternalReference::delete_handle_scope_extensions(isolate()), 1);
+#ifndef V8_OS_ZOS  
   LoadRR(r2, r6);
+#endif 
   b(&leave_exit_frame);
 }
 

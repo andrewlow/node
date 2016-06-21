@@ -210,13 +210,6 @@ class Runner(object):
     return 0
 
   def _RunSequential(self):
-      os.system("rm /tmp/cleanup_semaphores.sh | true")
-      os.system("touch /tmp/cleanup_semaphores.sh")
-      os.system("chmod a+rx /tmp/cleanup_semaphores.sh")
-      #os.system("echo '#!/bin/bash' >> /tmp/cleanup_semaphores.sh")
-      os.system("echo 'ME=`whoami`' >> /tmp/cleanup_semaphores.sh")
-      os.system("echo 'for u in `ipcs -s | grep $ME | tr -s'\" ' '\"'| cut -d'\"'"
-                " '\"' -f2` ; do ipcrm -s  $u; done'>>/tmp/cleanup_semaphores.sh")
       queue = [];
       for test in self.tests:
           assert test.id >= 0

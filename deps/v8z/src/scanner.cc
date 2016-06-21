@@ -968,12 +968,18 @@ bool Scanner::ScanEscape() {
     case 'u' : {
       c = ScanHexNumber(4);
       if (c < 0) return false;
+#ifdef V8_OS_ZOS
+      if (c <= 0x7F && c >= 0) c = ascii2ebcdic(c); 
+#endif
       break;
     }
     case 'v' : c = '\v'; break;
     case 'x' : {
       c = ScanHexNumber(2);
       if (c < 0) return false;
+#ifdef V8_OS_ZOS
+      if (c < 0x7F && c >= 0) c = ascii2ebcdic(c);
+#endif 
       break;
     }
     case '0' :  // fall through

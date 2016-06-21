@@ -6477,17 +6477,18 @@ static bool CheckFastEBCDICConvert(char * dst,
                                    bool changed,
                                    bool is_to_lower) {
   bool expected_changed = false;
+  bool is_char = false;
   for (int i = 0; i < length ; i++) {
     if (dst[i] == src[i] ) continue;
     expected_changed = true;
     if (is_to_lower) {
-      DCHECK('A' <= src[i] && src[i] <= 'I');
-      DCHECK('J' <= src[i] && src[i] <= 'R');
-      DCHECK('S' <= src[i] && src[i] <= 'Z');
+      DCHECK(('A' <= src[i] && src[i] <= 'I')||
+      ('J' <= src[i] && src[i] <= 'R') ||
+      ('S' <= src[i] && src[i] <= 'Z'));
     } else {
-      DCHECK('a' <= src[i] && src[i] <= 'i');
-      DCHECK('j' <= src[i] && src[i] <= 'r');
-      DCHECK('s' <= src[i] && src[i] <= 'z');
+      DCHECK(('a' <= src[i] && src[i] <= 'i')||
+      ('j' <= src[i] && src[i] <= 'r')||
+      ('s' <= src[i] && src[i] <= 'z'));
     }
     DCHECK(dst[i] == (src[i] ^ 0x40));
   }

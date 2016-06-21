@@ -989,7 +989,11 @@ void StoreBufferOverflowStub::Generate(MacroAssembler* masm) {
 
   AllowExternalCallThatCantCauseGC scope(masm);
   __ PrepareCallCFunction(argument_count, fp_argument_count, scratch);
+#ifdef V8_OS_ZOS
+  __ mov(r1, Operand(ExternalReference::isolate_address(isolate())));
+#else
   __ mov(r2, Operand(ExternalReference::isolate_address(isolate())));
+#endif
   __ CallCFunction(
       ExternalReference::store_buffer_overflow_function(isolate()),
       argument_count);
@@ -1418,14 +1422,13 @@ void CEntryStub::Generate(MacroAssembler* masm) {
   __ LoadRR(r8, r10);
   __ InitializeRootRegister();  // Rematerializing the root address in r10
 
-  // TODO(mcornac): XPLINK returns one value in r3, extended value in r1-r2.
   if (result_size_ == 1) {
     __ LoadRR(r2, r3);
   }
-//  else {
-//    __ LoadRR(r2, r1);
-//    __ LoadRR(r3, r2);
-//  }
+  else {
+    __ LoadRR(r3, r2);
+    __ LoadRR(r2, r1);
+  }
 #endif
 
   // roohack - do we need to (re)set FPU state?
@@ -4311,8 +4314,8 @@ void DirectCEntryStub::GenerateCall(MacroAssembler* masm,
 #ifdef V8_OS_ZOS
   intptr_t code =
       reinterpret_cast<intptr_t>(GetCode().location());
-  __ mov(r14, Operand(code, RelocInfo::CODE_TARGET));
-  __ CallC(r14);  // Call the stub.
+  __ mov(r7, Operand(code, RelocInfo::CODE_TARGET));
+  __ CallC(r7);  // Call the stub.
 #else
   intptr_t code =
       reinterpret_cast<intptr_t>(GetCode().location());
@@ -4684,6 +4687,11 @@ void RecordWriteStub::InformIncrementalMarker(MacroAssembler* masm) {
   __ mov(r4, Operand(ExternalReference::isolate_address(isolate())));
 
   AllowExternalCallThatCantCauseGC scope(masm);
+#ifdef V8_OS_ZOS
+  __ LoadRR(r1, r2);
+  __ LoadRR(r2, r3);
+  __ LoadRR(r3, r4);
+#endif
   __ CallCFunction(
       ExternalReference::incremental_marking_record_write_function(isolate()),
       argument_count);

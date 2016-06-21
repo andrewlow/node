@@ -144,24 +144,29 @@ void OS::ConvertToASCII(char * str) {
 
 
 const char* OS::LocalTimezone(double time, TimezoneCache* cache) {
+    
   if (isnan(time)) return "";
   time_t tv = static_cast<time_t>(std::floor(time/msPerSecond));
   struct tm* t = localtime(&tv);
   if (NULL == t) return "";
-  // TODO(mcornac):
-  // return t->tm_zone;
+  double offset_secs = LocalTimeOffset(cache);
+  int offset_hrs  = (int)offset_secs/3600;
+  if ( offset_hrs == 0)
+     return "GMT";
+  else if (offset_hrs > -6 && offset_hrs <= -5)
+          return "EST";
+  //Todo(muntasir) Add the rest of the timezones 
   return "";
 }
 
 
 double OS::LocalTimeOffset(TimezoneCache* cache) {
   time_t tv = time(NULL);
-  struct tm* t = localtime(&tv);
-  // tm_gmtoff includes any daylight savings offset, so subtract it.
-  // TODO(mcornac):
-  // return static_cast<double>(t->tm_gmtoff * msPerSecond -
-  //                           (t->tm_isdst > 0 ? 3600 * msPerSecond : 0));
-  return 0;
+  struct tm* gmt = gmtime(&tv);
+  double gm_secs    = gmt->tm_sec + (gmt->tm_min * 60) + (gmt->tm_hour * 3600);
+  struct tm* localt = localtime(&tv);
+  double local_secs = localt->tm_sec + (localt->tm_min * 60) + (localt->tm_hour * 3600);
+  return local_secs - gm_secs - (localt->tm_isdst > 0 ? 3600 : 0);
 }
 
 

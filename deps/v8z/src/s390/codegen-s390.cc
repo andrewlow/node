@@ -59,7 +59,7 @@ UnaryMathFunction CreateExpFunction() {
         temp1, temp2, temp3);
     __ Pop(temp3, temp2, temp1);
     __ ldr(d0, result);
-    __ Ret();
+    __ RetC();
   }
 
   CodeDesc desc;
@@ -99,8 +99,7 @@ UnaryMathFunction CreateSqrtFunction() {
   __ MovFromFloatParameter(d0);
   __ sqdbr(d0, d0);
   __ MovToFloatResult(d0);
-  __ Ret();
-
+  __ RetC();
   CodeDesc desc;
   masm.GetCode(&desc);
 #if !ABI_USES_FUNCTION_DESCRIPTORS
