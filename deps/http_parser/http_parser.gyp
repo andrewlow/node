@@ -12,7 +12,7 @@
       #       RuntimeLibrary MUST MATCH across the entire project
       'Debug': {
         'defines': [ 'DEBUG', '_DEBUG' ],
-        'cflags': [ '-Wall', '-Wextra', '-O0', '-g', '-ftrapv' ],
+        'cflags': [ '-O0', '-g', '-ftrapv' ],
         'msvs_settings': {
           'VCCLCompilerTool': {
             'RuntimeLibrary': 1, # static debug
@@ -21,7 +21,7 @@
       },
       'Release': {
         'defines': [ 'NDEBUG' ],
-        'cflags': [ '-Wall', '-Wextra', '-O3' ],
+        'cflags': [ '-O3' ],
         'msvs_settings': {
           'VCCLCompilerTool': {
             'RuntimeLibrary': 0, # static release
@@ -43,7 +43,13 @@
         'defines': [
           'WIN32'
         ],
-      }]
+      }],
+      ['OS != "os390"', {
+        'cflags': [ '-Wall', '-Wextra', ],
+      }],
+      #['OS == "os390"', {
+      #  'cflags': [ '-g', ],
+      #}],
     ],
   },
 

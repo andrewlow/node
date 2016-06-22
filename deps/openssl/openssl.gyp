@@ -1125,7 +1125,6 @@
           'ENGINESDIR="/dev/null"',
           'TERMIOS',
         ],
-        'cflags': ['-Wno-missing-field-initializers'],
         'conditions': [
           ['OS=="mac"', {
             'defines': [
@@ -1146,6 +1145,9 @@
       }],
       ['is_clang==1 or gcc_version>=43', {
         'cflags': ['-Wno-old-style-declaration'],
+      }],
+      ['OS not in "win os390"', {
+        'cflags': ['-Wno-missing-field-initializers'],
       }],
       ['OS=="solaris"', {
         'defines': ['__EXTENSIONS__'],
