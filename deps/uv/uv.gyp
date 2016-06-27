@@ -139,6 +139,7 @@
             }, {
               'cflags': [
                 '-g',
+                '-qCHARS=signed',
               ]},
             ]],
           'sources': [
