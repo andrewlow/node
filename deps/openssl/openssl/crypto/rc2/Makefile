@@ -84,7 +84,7 @@ rc2_cbc.o: rc2_cbc.c rc2_locl.h
 rc2_ecb.o: ../../include/openssl/opensslconf.h ../../include/openssl/opensslv.h
 rc2_ecb.o: ../../include/openssl/rc2.h rc2_ecb.c rc2_locl.h
 rc2_skey.o: ../../include/openssl/crypto.h ../../include/openssl/e_os2.h
-rc2_skey.o: ../../include/openssl/opensslconf.h
+rc2_skey.o: ../../include/openssl/ebcdic.h ../../include/openssl/opensslconf.h
 rc2_skey.o: ../../include/openssl/opensslv.h ../../include/openssl/ossl_typ.h
 rc2_skey.o: ../../include/openssl/rc2.h ../../include/openssl/safestack.h
 rc2_skey.o: ../../include/openssl/stack.h ../../include/openssl/symhacks.h
