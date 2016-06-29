@@ -19,10 +19,13 @@
     'conditions': [
       ['OS == "win"', {
         'os_posix': 0,
-        'v8_postmortem_support': 'false'
       }, {
         'os_posix': 1,
+      }],
+      ['OS != "win" and OS != "os390"', {
         'v8_postmortem_support': 'true'
+      }, {
+        'v8_postmortem_support': 'false'
       }],
       ['GENERATOR == "ninja" or OS== "mac"', {
         'OBJ_DIR': '<(PRODUCT_DIR)/obj',
@@ -101,6 +104,7 @@
           }],
           ['OS!="os390"', {
             'cflags': [ '-ffunction-sections', '-fdata-sections' ],
+            'ldflags': ['-qXPLINK', '-q64']
           }],
         ],
         'msvs_settings': {
