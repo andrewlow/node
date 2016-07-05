@@ -39,6 +39,7 @@
 #if defined(__ANDROID__) || \
     defined(__MINGW32__) || \
     defined(__OpenBSD__) || \
+    defined(__MVS__) || \
     defined(_MSC_VER)
 
 # include <nameser.h>

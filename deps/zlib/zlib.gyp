@@ -78,7 +78,7 @@
               # Mac, Android and the BSDs don't have fopen64, ftello64, or
               # fseeko64. We use fopen, ftell, and fseek instead on these
               # systems.
-              'cflags': [ '-D_XOPEN_SOURCE_EXTENDED=1', '-D_XOPEN_SOURCE=600' ],
+              'cflags': [ '-D_XOPEN_SOURCE_EXTENDED=1', '-D_XOPEN_SOURCE=600' ], 
             }]
           ],
         },
