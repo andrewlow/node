@@ -38,6 +38,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+
 
 #if defined(_MSC_VER)
 #define strcasecmp _stricmp
@@ -157,7 +159,10 @@ template int SSLWrap<TLSCallbacks>::TLSExtStatusCallback(SSL* s, void* arg);
 
 static void crypto_threadid_cb(CRYPTO_THREADID* tid) {
   assert(sizeof(uv_thread_t) <= sizeof(void*));  // NOLINT(runtime/sizeof)
-  CRYPTO_THREADID_set_pointer(tid, reinterpret_cast<void*>(uv_thread_self()));
+  uv_thread_t thread_self = uv_thread_self();
+  void* thread_pointer = reinterpret_cast<void*>(&(thread_self.__));
+
+  CRYPTO_THREADID_set_pointer(tid, reinterpret_cast<void*>(thread_pointer));
 }
 
 
@@ -836,7 +841,7 @@ void SecureContext::SetSessionIdContext(
     BIO_free_all(bio);
   }
 
-  args.GetIsolate()->ThrowException(Exception::TypeError(message));
+  args.GetIsolate()->ThrowException(v8::Exception::TypeError(message));
 }
 
 
@@ -1677,7 +1682,7 @@ void SSLWrap<Base>::VerifyError(const FunctionCallbackInfo<Value>& args) {
 
   Isolate* isolate = args.GetIsolate();
   Local<String> reason_string = OneByteString(isolate, reason);
-  Local<Value> exception_value = Exception::Error(reason_string);
+  Local<Value> exception_value = v8::Exception::Error(reason_string);
   Local<Object> exception_object = exception_value->ToObject();
   exception_object->Set(FIXED_ONE_BYTE_STRING(isolate, "code"),
                         OneByteString(isolate, code));
@@ -1930,7 +1935,7 @@ int Connection::HandleBIOError(BIO *bio, const char* func, int rv) {
 
     HandleScope scope(ssl_env()->isolate());
     Local<Value> exception =
-        Exception::Error(OneByteString(ssl_env()->isolate(), ssl_error_buf));
+        v8::Exception::Error(OneByteString(ssl_env()->isolate(), ssl_error_buf));
     object()->Set(ssl_env()->error_string(), exception);
 
     DEBUG_PRINT("[%p] BIO: %s failed: (%d) %s\n",
@@ -1975,7 +1980,7 @@ int Connection::HandleSSLError(const char* func,
     HandleScope scope(ssl_env()->isolate());
 
     Local<Value> exception =
-        Exception::Error(ssl_env()->zero_return_string());
+        v8::Exception::Error(ssl_env()->zero_return_string());
     object()->Set(ssl_env()->error_string(), exception);
     return rv;
 
@@ -1998,7 +2003,7 @@ int Connection::HandleSSLError(const char* func,
     if (bio != NULL) {
       ERR_print_errors(bio);
       BIO_get_mem_ptr(bio, &mem);
-      Local<Value> exception = Exception::Error(
+      Local<Value> exception = v8::Exception::Error(
           OneByteString(ssl_env()->isolate(),
             mem->data,
             mem->length));
@@ -4483,7 +4488,7 @@ void EIO_PBKDF2After(PBKDF2Request* req, Local<Value> argv[2]) {
     argv[1] = Encode(req->env()->isolate(), req->key(), req->keylen(), BUFFER);
     memset(req->key(), 0, req->keylen());
   } else {
-    argv[0] = Exception::Error(req->env()->pbkdf2_error_string());
+    argv[0] = v8::Exception::Error(req->env()->pbkdf2_error_string());
     argv[1] = Undefined(req->env()->isolate());
   }
 }
@@ -4714,7 +4719,7 @@ void RandomBytesCheck(RandomBytesRequest* req, Local<Value> argv[2]) {
     if (req->error() != static_cast<unsigned long>(-1))
       ERR_error_string_n(req->error(), errmsg, sizeof errmsg);
 
-    argv[0] = Exception::Error(OneByteString(req->env()->isolate(), errmsg));
+    argv[0] = v8::Exception::Error(OneByteString(req->env()->isolate(), errmsg));
     argv[1] = Null(req->env()->isolate());
     req->release();
   } else {

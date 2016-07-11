@@ -428,7 +428,7 @@ Local<Value> TLSCallbacks::GetSSLError(int status, int* err, const char** msg) {
 
         Local<String> message =
             OneByteString(env()->isolate(), buf, strlen(buf));
-        Local<Value> exception = Exception::Error(message);
+        Local<Value> exception = v8::Exception::Error(message);
 
         if (msg != NULL) {
           assert(*msg == NULL);
@@ -805,7 +805,7 @@ int TLSCallbacks::SelectSNIContextCallback(SSL* s, int* ad, void* arg) {
   Local<FunctionTemplate> cons = env->secure_context_constructor_template();
   if (!cons->HasInstance(ctx)) {
     // Failure: incorrect SNI context object
-    Local<Value> err = Exception::TypeError(env->sni_context_err_string());
+    Local<Value> err = v8::Exception::TypeError(env->sni_context_err_string());
     p->MakeCallback(env->onerror_string(), 1, &err);
     return SSL_TLSEXT_ERR_NOACK;
   }

@@ -1299,6 +1299,14 @@ void Isolate::SetCaptureStackTraceForUncaughtExceptions(
 }
 
 
+void Isolate::SetAbortOnUncaughtException(
+  v8::Isolate::abort_on_uncaught_exception_t callback) {
+  abort_on_uncaught_exception_callback_ = callback;
+}
+
+
+
+
 Handle<Context> Isolate::native_context() {
   return handle(context()->native_context());
 }

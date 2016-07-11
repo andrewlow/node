@@ -177,7 +177,7 @@
               ['OS=="solaris"', {
                 'ldflags': [ '-pthreads' ],
               }],
-              ['OS != "solaris" and OS != "android"', {
+              ['OS != "solaris" and OS != "android" and OS != "os390"', {
                 'ldflags': [ '-pthread' ],
               }],
             ],
