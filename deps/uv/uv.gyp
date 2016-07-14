@@ -253,6 +253,16 @@
             ],
           },
         }],
+        [ 'OS=="os390"', {
+          'sources': [
+            'src/unix/pthread-fixes.c',
+            'src/unix/os390-syscalls.c',
+            'src/unix/os390-syscalls.h',
+            'src/unix/os390-epoll.c',
+            'src/unix/os390-epoll.h',
+            'src/unix/os390.c',
+          ],
+        }],
         [ 'OS=="aix"', {
           'sources': [ 'src/unix/aix.c' ],
           'defines': [
