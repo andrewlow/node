@@ -223,7 +223,7 @@
                   ],
                 }],
                 [ 'OS=="os390"', {
-                    'ldflags': ['-qXPLINK, -q64']
+                    'ldflags': ['-qXPLINK', '-q64']
                 }],
 
               ],
@@ -413,7 +413,7 @@
             ],
         }],
         [ 'OS=="os390"', {
-          'ldflags': ['-qXPLINK, -q64']
+          'ldflags': ['-qXPLINK', '-q64']
         }],
 
       ],
@@ -736,7 +736,7 @@
             ],
         }],
         [ 'OS=="os390"', {
-          'ldflags': ['-qXPLINK, -q64']
+          'ldflags': ['-qXPLINK', '-q64']
         }],
 
       ],
@@ -766,7 +766,7 @@
           'ldflags': ['-Wl,-bE:<(PRODUCT_DIR)/node.exp']
         }],
         [ 'OS=="os390"', {
-          'ldflags': ['-qXPLINK, -q64']
+          'ldflags': ['-qXPLINK', '-q64']
         }],
 
       ],
