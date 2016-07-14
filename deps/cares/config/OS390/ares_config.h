@@ -125,7 +125,8 @@
 #define HAVE_IF_INDEXTONAME 1
 
 /* Define to 1 if you have the `inet_net_pton' function. */
-#define HAVE_INET_NET_PTON 1
+/* #define HAVE_INET_NET_PTON 1 */
+#undef HAVE_INET_NET_PTON
 
 /* Define to 1 if inet_net_pton supports IPv6. */
 /* #undef HAVE_INET_NET_PTON_IPV6 */
