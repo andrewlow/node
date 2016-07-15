@@ -1,0 +1,129 @@
+diff -ru v8z-pure/include/v8.h v8z/include/v8.h
+--- v8z-pure/include/v8.h	2016-07-15 10:35:29.403681805 -0400
++++ v8z/include/v8.h	2016-07-15 10:35:40.263681317 -0400
+@@ -943,6 +943,17 @@
+   Handle<Integer> script_id_;
+ };
+ 
++class V8_EXPORT SealHandleScope {
++ public:
++  SealHandleScope(Isolate* isolate);
++  ~SealHandleScope();
++
++ private:
++  internal::Isolate* isolate_;
++  int prev_level_;
++  internal::Object** prev_limit_;
++};
++
+ 
+ /**
+  * A compiled JavaScript script, not yet tied to a Context.
+@@ -4187,6 +4198,17 @@
+   static Isolate* GetCurrent();
+ 
+   /**
++   * Custom callback used by embedders to help V8 determine if it should abort
++   * when it throws and no internal handler can catch the exception.
++   * If FLAG_abort_on_uncaught_exception is true, then V8 will abort if either:
++   * - no custom callback is set.
++   * - the custom callback set returns true.
++   * Otherwise it won't abort.
++   */
++  typedef bool (*abort_on_uncaught_exception_t)(Isolate*);
++  void SetAbortOnUncaughtException(abort_on_uncaught_exception_t callback);
++
++  /**
+    * Methods below this point require holding a lock (using Locker) in
+    * a multi-threaded environment.
+    */
+diff -ru v8z-pure/src/api.cc v8z/src/api.cc
+--- v8z-pure/src/api.cc	2016-07-15 10:35:29.403681805 -0400
++++ v8z/src/api.cc	2016-07-15 10:35:40.263681317 -0400
+@@ -637,6 +637,29 @@
+ }
+ 
+ 
++SealHandleScope::SealHandleScope(Isolate* isolate) {
++  i::Isolate* internal_isolate = reinterpret_cast<i::Isolate*>(isolate);
++
++  isolate_ = internal_isolate;
++  i::HandleScopeData* current = internal_isolate->handle_scope_data();
++  prev_limit_ = current->limit;
++  current->limit = current->next;
++  prev_level_ = current->level;
++  current->level = 0;
++}
++
++
++SealHandleScope::~SealHandleScope() {
++  i::HandleScopeData* current = isolate_->handle_scope_data();
++  DCHECK_EQ(0, current->level);
++  current->level = prev_level_;
++  DCHECK_EQ(current->next, current->limit);
++  current->limit = prev_limit_;
++}
++   
++   
++
++
+ void Context::Enter() {
+   i::Handle<i::Context> env = Utils::OpenHandle(this);
+   i::Isolate* isolate = env->GetIsolate();
+@@ -648,6 +671,15 @@
+ }
+ 
+ 
++void Isolate::SetAbortOnUncaughtException(
++  abort_on_uncaught_exception_t callback) {
++  i::Isolate* isolate = reinterpret_cast<i::Isolate*>(this);
++  isolate->SetAbortOnUncaughtException(callback);
++}
++
++
++
++
+ void Context::Exit() {
+   i::Handle<i::Context> env = Utils::OpenHandle(this);
+   i::Isolate* isolate = env->GetIsolate();
+diff -ru v8z-pure/src/isolate.cc v8z/src/isolate.cc
+--- v8z-pure/src/isolate.cc	2016-07-15 10:35:29.403681805 -0400
++++ v8z/src/isolate.cc	2016-07-15 10:35:40.263681317 -0400
+@@ -1299,6 +1299,14 @@
+ }
+ 
+ 
++void Isolate::SetAbortOnUncaughtException(
++  v8::Isolate::abort_on_uncaught_exception_t callback) {
++  abort_on_uncaught_exception_callback_ = callback;
++}
++
++
++
++
+ Handle<Context> Isolate::native_context() {
+   return handle(context()->native_context());
+ }
+diff -ru v8z-pure/src/isolate.h v8z/src/isolate.h
+--- v8z-pure/src/isolate.h	2016-07-15 10:35:29.407681805 -0400
++++ v8z/src/isolate.h	2016-07-15 10:35:40.263681317 -0400
+@@ -717,6 +717,9 @@
+       int frame_limit,
+       StackTrace::StackTraceOptions options);
+ 
++  typedef bool (*abort_on_uncaught_exception_t)(v8::Isolate*);
++  void SetAbortOnUncaughtException(abort_on_uncaught_exception_t callback);
++
+   void PrintCurrentStackTrace(FILE* out);
+   void PrintStack(StringStream* accumulator);
+   void PrintStack(FILE* out);
+@@ -1341,6 +1344,8 @@
+ 
+   v8::Isolate::UseCounterCallback use_counter_callback_;
+ 
++  abort_on_uncaught_exception_t abort_on_uncaught_exception_callback_;
++
+   friend class ExecutionAccess;
+   friend class HandleScopeImplementer;
+   friend class IsolateInitializer;
+
