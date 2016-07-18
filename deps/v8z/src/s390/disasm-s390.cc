@@ -776,11 +776,7 @@ bool Decoder::DecodeFourByte(Instruction* instr) {
 bool Decoder::DecodeSixByte(Instruction* instr) {
   // Print the Instruction bits.
   out_buffer_pos_ += SNPrintF(out_buffer_ + out_buffer_pos_,
-#ifdef V8_OS_ZOS
-                                  "%012" V8PRIx64 "   ",
-#else
                                   "%012" PRIx64 "   ",
-#endif
                                   instr->InstructionBits<SixByteInstr>());
 
   Opcode opcode = instr->S390OpcodeValue();
@@ -858,6 +854,7 @@ bool Decoder::DecodeSixByte(Instruction* instr) {
     case CLY: Format(instr, "cly\t'r1,'d2('r2d,'r3)"); break;
     case CLIY: Format(instr, "cliy\t'd2('r3),'i8"); break;
     case TMY: Format(instr, "tmy\t'd2('r3),'i8"); break;
+    case TR:  Format(instr, "tr\t'd3('r3),'d4('r7)"); break;
     case CLG: Format(instr, "clg\t'r1,'d2('r2d,'r3)"); break;
     case BCTG: Format(instr, "bctg\t'r1,'d2('r2d,'r3)"); break;
     case STY: Format(instr, "sty\t'r1,'d2('r2d,'r3)"); break;

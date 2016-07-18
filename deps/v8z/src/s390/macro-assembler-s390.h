@@ -803,6 +803,7 @@ class MacroAssembler: public Assembler {
   void LoadMultipleW(Register dst1, Register dst2, const MemOperand& mem);
   void StoreMultipleW(Register dst1, Register dst2, const MemOperand& mem);
 
+  void Translate(Register target, const MemOperand& table, Length len);
   // Cleanse pointer address on 31bit by zero out top  bit.
   // This is a NOP on 64-bit.
   void CleanseP(Register src) {

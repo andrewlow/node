@@ -15,31 +15,19 @@ namespace internal {
 // Else, return something outside of 'A'-'Z' and 'a'-'z'.
 // Note: it ignores LOCALE.
 inline int AsciiAlphaToLower(uc32 c) {
-#ifdef V8_OS_ZOS
-  uc32 ascii_c = (uc32)ebcdic2ascii((const char)c);
-#else
-  uc32 ascii_c = c;
-#endif
+  uc32 ascii_c = (uc32)GET_ASCII_CODE((const char)c);
   return ascii_c | 0x20;
 }
 
 
 inline bool IsCarriageReturn(uc32 c) {
-#ifdef V8_OS_ZOS
-  uc32 ascii_c = (uc32)ebcdic2ascii((const char)c);
-#else
-  uc32 ascii_c = c;
-#endif
+  uc32 ascii_c = (uc32)GET_ASCII_CODE((const char)c);
   return ascii_c == 0x000D;
 }
 
 
 inline bool IsLineFeed(uc32 c) {
-#ifdef V8_OS_ZOS
-  return ebcdic2ascii(c) == 0x000A;
-#else
-  return c == 0x000A;
-#endif
+  return GET_ASCII_CODE(c) == 0x000A;
 }
 
 
@@ -52,32 +40,20 @@ inline bool IsInRange(int value, int lower_limit, int higher_limit) {
 
 inline bool IsDecimalDigit(uc32 c) {
   // ECMA-262, 3rd, 7.8.3 (p 16)
-#ifdef V8_OS_ZOS
-  return IsInRange(ebcdic2ascii(c), ebcdic2ascii('0'), ebcdic2ascii('9'));
-#else
-  return IsInRange(c, '0', '9');
-#endif
+  return IsInRange(GET_ASCII_CODE(c), GET_ASCII_CODE('0'), GET_ASCII_CODE('9'));
 }
 
 
 inline bool IsHexDigit(uc32 c) {
   // ECMA-262, 3rd, 7.6 (p 15)
-#ifdef V8_OS_ZOS
   return IsDecimalDigit(c) ||
-         IsInRange(AsciiAlphaToLower(c), ebcdic2ascii('a'), ebcdic2ascii('f'));
-#else
-  return IsDecimalDigit(c) || IsInRange(AsciiAlphaToLower(c), 'a', 'f');
-#endif
+         IsInRange(AsciiAlphaToLower(c), GET_ASCII_CODE('a'), GET_ASCII_CODE('f'));
 }
 
 
 inline bool IsOctalDigit(uc32 c) {
   // ECMA-262, 6th, 7.8.3
-#ifdef V8_OS_ZOS
-  return IsInRange(ebcdic2ascii(c), ebcdic2ascii('0'), ebcdic2ascii('7'));
-#else
-  return IsInRange(c, '0', '7');
-#endif
+  return IsInRange(GET_ASCII_CODE(c), GET_ASCII_CODE('0'), GET_ASCII_CODE('7'));
 }
 
 
@@ -88,24 +64,14 @@ inline bool IsBinaryDigit(uc32 c) {
 
 
 inline bool IsRegExpWord(uc16 c) {
-#ifdef V8_OS_ZOS
-  return IsInRange(AsciiAlphaToLower(c), ebcdic2ascii('a'), ebcdic2ascii('z'))
+  return IsInRange(AsciiAlphaToLower(c), GET_ASCII_CODE('a'), GET_ASCII_CODE('z'))
       || IsDecimalDigit(c)
       || (c == '_');
-#else
-  return IsInRange(AsciiAlphaToLower(c), 'a', 'z')
-      || IsDecimalDigit(c)
-      || (c == '_');
-#endif
 }
 
 
 inline bool IsRegExpNewline(uc16 c) {
-#ifdef V8_OS_ZOS
-  uc16 ascii_c = (uc16)ebcdic2ascii((const char)c);
-#else
-  uc16 ascii_c = c;
-#endif
+  uc16 ascii_c = (uc16)GET_ASCII_CODE((const char)c);
   switch (ascii_c) {
     //   CR           LF           LS           PS
     case 0x000A: case 0x000D: case 0x2028: case 0x2029:

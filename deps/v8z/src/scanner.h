@@ -29,20 +29,11 @@ class ParserRecorder;
 // Returns the value (0 .. 15) of a hexadecimal character c.
 // If c is not a legal hexadecimal character, returns a value < 0.
 inline int HexValue(uc32 c) {
-#ifdef V8_OS_ZOS
-  uc32 ascii_c = (uc32)ebcdic2ascii((const char)c);
-  ascii_c -= ebcdic2ascii('0');
-#else
-  uc32 ascii_c = c;
-  ascii_c -= '0';
-#endif
+  uc32 ascii_c = (uc32)GET_ASCII_CODE((const char)c);
+  ascii_c -= GET_ASCII_CODE('0');
   if (static_cast<unsigned>(ascii_c) <= 9) return ascii_c;
   // Detect 0x11..0x16 and 0x31..0x36.
-#ifdef V8_OS_ZOS
-  ascii_c = (ascii_c | 0x20) - (ebcdic2ascii('a') - ebcdic2ascii('0'));
-#else
-  ascii_c = (ascii_c | 0x20) - ('a' - '0');
-#endif
+  ascii_c = (ascii_c | 0x20) - (GET_ASCII_CODE('a') - GET_ASCII_CODE('0'));
   if (static_cast<unsigned>(ascii_c) <= 5) return ascii_c + 10;
   return -1;
 

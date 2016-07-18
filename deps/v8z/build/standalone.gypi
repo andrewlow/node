@@ -238,6 +238,7 @@
                     '-D_ISOC99_SOURCE','-D_UNIX03_SOURCE',
                     '-D_XOPEN_SOURCE_EXTENDED=1',
                     '-D_XOPEN_SOURCE=500',
+                    '-D__IBMCPP_TR1__',   # To support PRIx64
                     '-D_OPEN_SYS_SOCK_IPV6',
                     '-D_UNIX03_THREADS',
                     '-D__BIG_ENDIAN=4321','-D__BYTE_ORDER=__BIG_ENDIAN',

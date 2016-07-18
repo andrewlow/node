@@ -6086,6 +6086,11 @@ void MacroAssembler::TruncatingDiv(Register result,
   ExtractBit(r0, dividend, 31);
   AddP(result, r0);
 }
+void MacroAssembler::Translate(Register result,
+                               const MemOperand & lookup_table,
+                               Length len) {
+  tr(MemOperand(result,0),lookup_table,len);     
+}
 
 } }  // namespace v8::internal
 #endif  // V8_TARGET_ARCH_S390

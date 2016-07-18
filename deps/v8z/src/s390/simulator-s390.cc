@@ -1321,8 +1321,11 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
 #if V8_TARGET_ARCH_S390X && !ABI_RETURNS_OBJECT_PAIRS_IN_REGS
       intptr_t result_buffer = 0;
       if (redirection->type() == ExternalReference::BUILTIN_OBJECTPAIR_CALL) {
-        // TODO(mcornac): z/OS ?
+#ifdef V8_OS_ZOS
+        result_buffer = get_register(r1);
+#else
         result_buffer = get_register(r2);
+#endif
         arg0_regnum++;
       }
 #endif
@@ -1551,8 +1554,13 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
         if (::v8::internal::FLAG_trace_sim) {
           PrintF("Returned %08x\n", hi_res);
         }
+#ifdef V8_OS_ZOS
+        set_register(r1, hi_res);
+        set_register(r2, lo_res);
+#else
         set_register(r2, hi_res);
         set_register(r3, lo_res);
+#endif
 #else
         if (::v8::internal::FLAG_trace_sim) {
           PrintF("Returned %08x\n", lo_res);
@@ -1582,8 +1590,13 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
                    result.x, result.y);
           }
 #if ABI_RETURNS_OBJECT_PAIRS_IN_REGS
+#ifdef V8_OS_ZOS
+          set_register(r1, result.x);
+          set_register(r2, result.y);
+#else
           set_register(r2, result.x);
           set_register(r3, result.y);
+#endif
 #else
           memcpy(reinterpret_cast<void *>(result_buffer), &result,
                       sizeof(struct ObjectPair));
@@ -3341,6 +3354,26 @@ bool Simulator::DecodeSixByte(Instruction* instr) {
       uint8_t imm_val = siyInstr->I2Value();
       SetS390ConditionCode<uint8_t>(mem_val, imm_val);
       break;
+    }
+    case TR: {
+     //Translate (Mem - Mem)
+      SSInstruction *ssinst = reinterpret_cast<SSInstruction *>(instr);
+      int b1 = ssinst->B1Value();
+      int b2 = ssinst->B2Value();
+      int length = ssinst->Length() + 1;
+      int64_t  b1_val = (b1 == 0) ? 0 : get_register(b1);
+      int64_t  b2_val = (b2 == 0) ? 0 : get_register(b2);
+      intptr_t d1_val = ssinst->D1Value();
+      intptr_t d2_val = ssinst->D2Value();
+      intptr_t target = b1_val + d1_val;
+      intptr_t translation_table = b2_val + d2_val;
+      while(length > 0) {
+        intptr_t table_index   = ReadBU(target);
+        uint8_t  translate_val = ReadBU(translation_table + table_index);
+        WriteB(target, translate_val); 
+        length--;
+      }
+      break;           
     }
     case TMY: {
       // Test Under Mask (Mem - Imm) (8)

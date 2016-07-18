@@ -1196,11 +1196,7 @@ void String::StringShortPrint(StringStream* accumulator) {
   for (int i = 0; i < len; i++) {
     uint16_t c = stream.GetNext();
 
-#ifdef V8_OS_ZOS
-    if (ebcdic2ascii(c) < 32 || ebcdic2ascii(c) >= 127) {
-#else
-    if (c < 32 || c >= 127) {
-#endif
+    if (GET_ASCII_CODE(c) < 32 || GET_ASCII_CODE(c) >= 127) {
       ascii = false;
     }
   }
@@ -1223,11 +1219,7 @@ void String::StringShortPrint(StringStream* accumulator) {
         accumulator->Add("\\r");
       } else if (c == '\\') {
         accumulator->Add("\\\\");
-#ifdef V8_OS_ZOS
-      } else if (ebcdic2ascii(c) < 32 || ebcdic2ascii(c) > 126) {
-#else
-      } else if (c < 32 || c > 126) {
-#endif
+      } else if (GET_ASCII_CODE(c) < 32 || GET_ASCII_CODE(c) > 126) {
         accumulator->Add("\\x%02x", c);
       } else {
         accumulator->Put(static_cast<char>(c));
@@ -9345,11 +9337,7 @@ bool String::IsUtf8EqualTo(Vector<const char> str, bool allow_prefix_match) {
       if (Get(i++) != unibrow::Utf16::LeadSurrogate(r)) return false;
       if (Get(i) != unibrow::Utf16::TrailSurrogate(r)) return false;
     } else {
-#ifdef V8_OS_ZOS
-      if (ebcdic2ascii(Get(i)) != r) return false;
-#else
-      if (Get(i) != r) return false;
-#endif
+      if (GET_ASCII_CODE(Get(i)) != r) return false;
     }
     utf8_data += cursor;
     remaining_in_str -= cursor;
@@ -9507,15 +9495,9 @@ uint32_t StringHasher::ComputeUtf8Hash(Vector<const char> chars,
   int vector_length = chars.length();
   // Handle some edge cases
   if (vector_length <= 1) {
-#ifdef V8_OS_ZOS
     DCHECK(vector_length == 0 ||
-           ebcdic2ascii(chars[0]) <=
+           GET_ASCII_CODE(chars[0]) <=
                unibrow::Utf8::kMaxOneByteChar);
-#else
-    DCHECK(vector_length == 0 ||
-           static_cast<uint8_t>(chars.start()[0]) <=
-               unibrow::Utf8::kMaxOneByteChar);
-#endif
     *utf16_length_out = vector_length;
     return HashSequentialString(chars.start(), vector_length, seed);
   }

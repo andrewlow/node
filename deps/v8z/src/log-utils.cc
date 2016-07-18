@@ -186,17 +186,10 @@ void Log::MessageBuilder::AppendDetailed(String* str, bool show_impl_info) {
   }
   for (int i = 0; i < len; i++) {
     uc32 c = str->Get(i);
-#ifdef V8_OS_ZOS
-    if (ebcdic2ascii(c) > 0xff) {
+    if (GET_ASCII_CODE(c) > 0xff) {
       Append("\\u%04x", c);
-    } else if (ebcdic2ascii(c) < 32 || ebcdic2ascii(c) > 126) {
+    } else if (GET_ASCII_CODE(c) < 32 || GET_ASCII_CODE(c) > 126) {
       Append("\\x%02x", c);
-#else
-    if (c > 0xff) {
-      Append("\\u%04x", c);
-    } else if  (c < 32 || c > 126) {
-      Append("\\x%02x", c);
-#endif
     } else if (c == ',') {
       Append("\\,");
     } else if (c == '\\') {

@@ -722,7 +722,7 @@ OStream& operator<<(OStream& os, const Constant& constant);
 
 typedef std::deque<Constant, zone_allocator<Constant> > ConstantDeque;
 typedef std::map<int, Constant, std::less<int>,
-                 zone_allocator<std::pair<int, Constant> > > ConstantMap;
+                 zone_allocator<std::pair<const int, Constant> > > ConstantMap;
 
 
 typedef std::deque<Instruction*, zone_allocator<Instruction*> >

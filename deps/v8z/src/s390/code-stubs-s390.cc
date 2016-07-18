@@ -3313,6 +3313,11 @@ void CallICStub::GenerateMiss(MacroAssembler* masm, IC::UtilityId id) {
 
 // StringCharCodeAtGenerator
 void StringCharCodeAtGenerator::GenerateFast(MacroAssembler* masm) {
+#ifdef V8_OS_ZOS
+  bool native_ascii_encoding = false;
+#else
+  bool native_ascii_encoding = true;
+#endif
   // If the receiver is a smi trigger the non-string case.
   __ JumpIfSmi(object_, receiver_not_string_);
 
@@ -3339,7 +3344,8 @@ void StringCharCodeAtGenerator::GenerateFast(MacroAssembler* masm) {
                                     object_,
                                     index_,
                                     result_,
-                                    &call_runtime_);
+                                    &call_runtime_,
+                                    !native_ascii_encoding);
 
   __ SmiTag(result_);
   __ bind(&exit_);
@@ -3410,9 +3416,18 @@ void StringCharCodeAtGenerator::GenerateSlow(
   __ CmpP(r0, Operand::Zero());
   __ bne(&slow_case_);
 
-  __ LoadRoot(result_, Heap::kSingleCharacterStringCacheRootIndex);
   // At this point code register contains smi tagged ASCII char code.
   __ LoadRR(r0, code_);
+#ifdef V8_OS_ZOS
+  __ mov(result_, Operand(ExternalReference::ascii_to_ebcdic_table()));
+  __ lay(sp, MemOperand(sp, -kPointerSize));
+  __ SmiUntag(code_);
+  __ StoreByte(code_ , MemOperand(sp, 0));
+  __ Translate(sp, MemOperand(result_, 0), 0);
+  __ LoadlB(code_ , MemOperand(sp, 0));
+  __ SmiTag(code_);
+#endif
+  __ LoadRoot(result_, Heap::kSingleCharacterStringCacheRootIndex);
   __ SmiToPtrArrayOffset(code_, code_);
   __ AddP(result_, code_);
   __ LoadRR(code_, r0);
@@ -3430,6 +3445,15 @@ void StringCharFromCodeGenerator::GenerateSlow(
 
   __ bind(&slow_case_);
   call_helper.BeforeCall(masm);
+#ifdef V8_OS_ZOS
+  __ mov(result_, Operand(ExternalReference::ascii_to_ebcdic_table()));
+  __ lay(sp, MemOperand(sp, -kPointerSize));
+  __ SmiUntag(code_);
+  __ StoreByte(code_ , MemOperand(sp, 0));
+  __ Translate(sp, MemOperand(result_, 0), 0);
+  __ LoadlB(code_ , MemOperand(sp, 0));
+  __ SmiTag(code_);
+#endif
   __ push(code_);
   __ CallRuntime(Runtime::kCharFromCode, 1);
   __ Move(result_, r2);
@@ -4290,8 +4314,12 @@ void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
 
 // This stub is paired with DirectCEntryStub::GenerateCall
 void DirectCEntryStub::Generate(MacroAssembler* masm) {
+#ifndef V8_OS_ZOS
   __ CleanseP(r14);
-
+#else
+  __ CleanseP(r7);
+  __ StoreP(r7, MemOperand(sp, kStackFrameRASlot * kPointerSize));
+#endif
   // Statement positions are expected to be recorded when the target
   // address is loaded.
   __ positions_recorder()->WriteRecordedPositions();

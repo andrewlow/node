@@ -10,7 +10,7 @@
 
 // If xlc is being used to compile then the implementation for some atomic
 // functions must be supplemented.
-#if defined(__IBMCPP__)
+#if defined(__IBMCPP__) && !defined(__clang__)
 #include "src/base/atomicops_internals_s390_xlc.h"
 #endif
 

@@ -494,7 +494,8 @@ void StringCharLoadGenerator::Generate(MacroAssembler* masm,
                                        Register string,
                                        Register index,
                                        Register result,
-                                       Label* call_runtime) {
+                                       Label* call_runtime,
+                                       bool translate_to_ascii) {
   // Fetch the instance type of the receiver into result register.
   __ LoadP(result, FieldMemOperand(string, HeapObject::kMapOffset));
   __ LoadlB(result, FieldMemOperand(result, Map::kInstanceTypeOffset));
@@ -581,6 +582,15 @@ void StringCharLoadGenerator::Generate(MacroAssembler* masm,
   __ bind(&ascii);
   // Ascii string.
   __ LoadlB(result, MemOperand(string, index));
+  
+  if (translate_to_ascii) {
+    __ lay(sp, MemOperand(sp, -kPointerSize));
+    __ StoreByte(result, MemOperand(sp, 0)); 
+    __ mov(result, Operand(ExternalReference::ebcdic_to_ascii_table()));
+    __ Translate(sp, MemOperand(result, 0), 0);
+    __ LoadlB(result, MemOperand(sp, 0));
+    __ pop();
+  }
   __ bind(&done);
 }
 

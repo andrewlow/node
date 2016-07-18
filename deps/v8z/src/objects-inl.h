@@ -6557,12 +6557,9 @@ template <typename Char>
 void StringHasher::AddCharacter(Char c) {
   // Use the Jenkins one-at-a-time hash function to update the hash
   // for the given character.
-#if V8_OS_ZOS
   if (sizeof(Char) == 1) {
-      c = ebcdic2ascii(c);
+      c = GET_ASCII_CODE(c);
   }
-#endif
-
   raw_running_hash_ = AddCharacterCore(raw_running_hash_, c);
 }
 
@@ -6570,37 +6567,22 @@ template <typename Char>
 bool StringHasher::UpdateIndex(Char c) {
   DCHECK(is_array_index_);
 
-#if V8_OS_ZOS
   if (sizeof(Char) == 1) {
-      c = ebcdic2ascii(c);
+      c = GET_ASCII_CODE(c);
   }
 
-  if (c < ebcdic2ascii('0') || c > ebcdic2ascii('9')) {
+  if (c < GET_ASCII_CODE('0') || c > GET_ASCII_CODE('9')) {
     is_array_index_ = false;
     return false;
   }
-  int d = c - ebcdic2ascii('0');
+  int d = c - GET_ASCII_CODE('0');
   if (is_first_char_) {
     is_first_char_ = false;
-    if (c == ebcdic2ascii('0') && length_ > 1) {
+    if (c == GET_ASCII_CODE('0') && length_ > 1) {
       is_array_index_ = false;
       return false;
     }
   }
-#else
-  if (c < '0' || c > '9') {
-    is_array_index_ = false;
-    return false;
-  }
-  int d = c - '0';
-  if (is_first_char_) {
-    is_first_char_ = false;
-    if (c == '0' && length_ > 1) {
-      is_array_index_ = false;
-      return false;
-    }
-  }
-#endif
 
   if (array_index_ > 429496729U - ((d + 2) >> 3)) {
     is_array_index_ = false;

@@ -969,7 +969,7 @@ bool Scanner::ScanEscape() {
       c = ScanHexNumber(4);
       if (c < 0) return false;
 #ifdef V8_OS_ZOS
-      if (c <= 0x7F && c >= 0) c = ascii2ebcdic(c); 
+      if (c <= 0x7F && c >= 0) c = Ascii2Ebcdic(c); 
 #endif
       break;
     }
@@ -978,7 +978,7 @@ bool Scanner::ScanEscape() {
       c = ScanHexNumber(2);
       if (c < 0) return false;
 #ifdef V8_OS_ZOS
-      if (c < 0x7F && c >= 0) c = ascii2ebcdic(c);
+      if (c < 0x7F && c >= 0) c = Ascii2Ebcdic(c);
 #endif 
       break;
     }
