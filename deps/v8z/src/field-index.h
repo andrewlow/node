@@ -8,6 +8,8 @@
 #include "src/property-details.h"
 #include "src/utils.h"
 
+#undef index
+
 namespace v8 {
 namespace internal {
 

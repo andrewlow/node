@@ -214,7 +214,7 @@ DEFINE_BOOL(unbox_double_arrays, true, "automatically unbox arrays of doubles")
 DEFINE_BOOL(string_slices, true, "use string slices")
 
 // Flags for Crankshaft.
-DEFINE_BOOL(crankshaft, true, "use crankshaft")
+DEFINE_BOOL(crankshaft, false, "use crankshaft")
 DEFINE_STRING(hydrogen_filter, "*", "optimization filter")
 DEFINE_BOOL(use_gvn, true, "use hydrogen global value numbering")
 DEFINE_INT(gvn_iterations, 3, "maximum number of GVN fix-point iterations")

@@ -32,6 +32,7 @@
 #include "src/s390/constants-s390.h" // NOLINT
 #endif
 
+#undef index
 
 //
 // Most object types in the V8 JavaScript are described in this file.
@@ -8924,9 +8925,11 @@ class StringHasher {
 
  private:
   // Add a character to the hash.
-  inline void AddCharacter(uint16_t c);
+  template<typename Char>
+  inline void AddCharacter(Char c);
   // Update index. Returns true if string is still an index.
-  inline bool UpdateIndex(uint16_t c);
+  template<typename Char>
+  inline bool UpdateIndex(Char c);
 
   int length_;
   uint32_t raw_running_hash_;
@@ -9192,7 +9195,7 @@ class String: public Name {
     uc16 Get(int i) {
       DCHECK(i < length_);
       DCHECK(state_ != NON_FLAT);
-      if (state_ == ASCII) return onebyte_start[i];
+      if (state_ == ASCII) return GET_ASCII_CODE(onebyte_start[i]);
       return twobyte_start[i];
     }
 
@@ -9382,35 +9385,24 @@ class String: public Name {
   // first non-ascii character, rather than directly to the non-ascii character.
   // If the return value is >= the passed length, the entire string was ASCII.
   static inline int NonAsciiStart(const char* chars, int length) {
-    const char* start = chars;
+    const char* start = (const char *)GET_ASCII_CODE(*chars);
     const char* limit = chars + length;
-
-    if (length >= kIntptrSize) {
-      // Check unaligned bytes.
-      while (!IsAligned(reinterpret_cast<intptr_t>(chars), sizeof(uintptr_t))) {
-        if (static_cast<uint8_t>(*chars) > unibrow::Utf8::kMaxOneByteChar) {
-          return static_cast<int>(chars - start);
-        }
-        ++chars;
+#ifdef V8_HOST_CAN_READ_UNALIGNED
+    DCHECK(unibrow::Utf8::kMaxOneByteChar == 0x7F);
+    const uintptr_t non_ascii_mask = kUintptrAllBitsSet / 0xFF * 0x80;
+    while (chars + sizeof(uintptr_t) <= limit) {
+      if (*reinterpret_cast<const uintptr_t*>(chars) & non_ascii_mask) {
+        return static_cast<int>(chars - start);
       }
-      // Check aligned words.
-      DCHECK(unibrow::Utf8::kMaxOneByteChar == 0x7F);
-      const uintptr_t non_ascii_mask = kUintptrAllBitsSet / 0xFF * 0x80;
-      while (chars + sizeof(uintptr_t) <= limit) {
-        if (*reinterpret_cast<const uintptr_t*>(chars) & non_ascii_mask) {
-          return static_cast<int>(chars - start);
-        }
-        chars += sizeof(uintptr_t);
-      }
+      chars += sizeof(uintptr_t);
     }
-    // Check remaining unaligned bytes.
+#endif
     while (chars < limit) {
       if (static_cast<uint8_t>(*chars) > unibrow::Utf8::kMaxOneByteChar) {
         return static_cast<int>(chars - start);
       }
       ++chars;
     }
-
     return static_cast<int>(chars - start);
   }
 

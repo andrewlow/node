@@ -87,7 +87,7 @@ DSO_METHOD *DSO_METHOD_dlfcn(void)
      defined(__SCO_VERSION__) || defined(_SCO_ELF) || \
      (defined(__osf__) && !defined(RTLD_NEXT))     || \
      (defined(__OpenBSD__) && !defined(RTLD_SELF)) || \
-        defined(__ANDROID__)
+        defined(__ANDROID__) || defined(__MVS__)
 #   undef HAVE_DLINFO
 #  endif
 # endif

@@ -86,6 +86,11 @@ typedef int mode_t;
 #include <grp.h>  // getgrnam()
 #endif
 
+#ifdef __MVS__
+#include "v8.h"
+#include <strings.h>
+#endif
+
 #ifdef __APPLE__
 #include <crt_externs.h>
 #define environ (*_NSGetEnviron())
@@ -759,9 +764,9 @@ Local<Value> ErrnoException(Isolate* isolate,
         String::Concat(cons3, String::NewFromUtf8(env->isolate(), path));
     Local<String> cons5 =
         String::Concat(cons4, FIXED_ONE_BYTE_STRING(env->isolate(), "'"));
-    e = Exception::Error(cons5);
+    e = v8::Exception::Error(cons5);
   } else {
-    e = Exception::Error(cons2);
+    e = v8::Exception::Error(cons2);
   }
 
   Local<Object> obj = e->ToObject();
@@ -821,9 +826,9 @@ Local<Value> UVException(Isolate* isolate,
         String::Concat(cons3, path_str);
     Local<String> cons5 =
         String::Concat(cons4, FIXED_ONE_BYTE_STRING(env->isolate(), "'"));
-    e = Exception::Error(cons5);
+    e = v8::Exception::Error(cons5);
   } else {
-    e = Exception::Error(cons2);
+    e = v8::Exception::Error(cons2);
   }
 
   Local<Object> obj = e->ToObject();
@@ -891,9 +896,9 @@ Local<Value> WinapiErrnoException(Isolate* isolate,
         String::Concat(cons1, String::NewFromUtf8(isolate, path));
     Local<String> cons3 =
         String::Concat(cons2, FIXED_ONE_BYTE_STRING(isolate, "'"));
-    e = Exception::Error(cons3);
+    e = v8::Exception::Error(cons3);
   } else {
-    e = Exception::Error(message);
+    e = v8::Exception::Error(message);
   }
 
   Local<Object> obj = e->ToObject();
@@ -2078,7 +2083,7 @@ void DLOpen(const FunctionCallbackInfo<Value>& args) {
     // Windows needs to add the filename into the error message
     errmsg = String::Concat(errmsg, args[1]->ToString());
 #endif  // _WIN32
-    env->isolate()->ThrowException(Exception::Error(errmsg));
+    env->isolate()->ThrowException(v8::Exception::Error(errmsg));
     return;
   }
 

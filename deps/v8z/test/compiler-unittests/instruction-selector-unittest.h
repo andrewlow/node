@@ -10,6 +10,7 @@
 #include "src/compiler/instruction-selector.h"
 #include "src/compiler/raw-machine-assembler.h"
 #include "test/compiler-unittests/compiler-unittests.h"
+#undef index
 
 namespace v8 {
 namespace internal {

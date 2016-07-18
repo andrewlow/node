@@ -75,7 +75,7 @@ uint16_t Latin1::ConvertNonLatin1ToLatin1(uint16_t c) {
 
 unsigned Utf8::EncodeOneByte(char* str, uint8_t c) {
   static const int kMask = ~(1 << 6);
-  if (c <= kMaxOneByteChar) {
+  if (GET_ASCII_CODE(c) <= kMaxOneByteChar) {
     str[0] = c;
     return 1;
   }
@@ -93,7 +93,7 @@ unsigned Utf8::Encode(char* str,
                       int previous,
                       bool replace_invalid) {
   static const int kMask = ~(1 << 6);
-  if (c <= kMaxOneByteChar) {
+  if (GET_ASCII_CODE(c) <=  kMaxOneByteChar) {
     str[0] = c;
     return 1;
   } else if (c <= kMaxTwoByteChar) {
@@ -129,6 +129,11 @@ unsigned Utf8::Encode(char* str,
 uchar Utf8::ValueOf(const byte* bytes, unsigned length, unsigned* cursor) {
   if (length <= 0) return kBadChar;
   byte first = bytes[0];
+
+#ifdef V8_OS_ZOS
+  v8::base::OS::ConvertToASCII(reinterpret_cast<char *>(&first));
+#endif
+
   // Characters between 0000 and 0007F are encoded as a single character
   if (first <= kMaxOneByteChar) {
     *cursor += 1;
@@ -138,7 +143,7 @@ uchar Utf8::ValueOf(const byte* bytes, unsigned length, unsigned* cursor) {
 }
 
 unsigned Utf8::Length(uchar c, int previous) {
-  if (c <= kMaxOneByteChar) {
+  if (GET_ASCII_CODE(c) <= kMaxOneByteChar) {
     return 1;
   } else if (c <= kMaxTwoByteChar) {
     return 2;

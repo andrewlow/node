@@ -9,7 +9,7 @@
 namespace v8 {
 namespace base {
 
-#if V8_OS_POSIX
+#if V8_OS_POSIX || V8_OS_ZOS
 
 static V8_INLINE void InitializeNativeHandle(pthread_mutex_t* mutex) {
   int result;

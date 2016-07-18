@@ -4,7 +4,7 @@
 
 #include "src/sampler.h"
 
-#if V8_OS_POSIX && !V8_OS_CYGWIN
+#if (V8_OS_POSIX || V8_OS_ZOS) && !V8_OS_CYGWIN
 
 #define USE_SIGNALS
 
@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <sys/time.h>
 
-#if !(V8_OS_QNX || V8_OS_AIX)
+#if !(V8_OS_QNX || V8_OS_AIX || V8_OS_ZOS)
 #include <sys/syscall.h>  // NOLINT
 #endif
 
@@ -359,14 +359,6 @@ void SignalHandler::HandleProfilerSignal(int signal, siginfo_t* info,
     // We require a fully initialized and entered isolate.
     return;
   }
-
-  // ISSUE-14576: To avoid deadlock, return if there is a thread lock
-  if (Isolate::GetProcessWideMutexPointer()->TryLock()) {
-    Isolate::GetProcessWideMutexPointer()->Unlock();
-  } else {
-    return;
-  }
-
   if (v8::Locker::IsActive() &&
       !isolate->thread_manager()->IsLockedByCurrentThread()) {
     return;
@@ -594,7 +586,7 @@ class SamplerThread : public base::Thread {
           sampler->DoSample();
         }
       }
-      base::OS::Sleep(base::TimeDelta::FromMilliseconds(interval_));
+      base::OS::Sleep(interval_);
     }
   }
 

@@ -184,7 +184,7 @@ TEST(HeapObjects) {
 
   // nan oddball checks
   CHECK(factory->nan_value()->IsNumber());
-  CHECK(std::isnan(factory->nan_value()->Number()));
+  CHECK(isnan(factory->nan_value()->Number()));
 
   Handle<String> s = factory->NewStringFromStaticAscii("fisk hest ");
   CHECK(s->IsString());
@@ -4306,7 +4306,7 @@ TEST(Regress357137) {
   CcTest::InitializeVM();
   v8::Isolate* isolate = CcTest::isolate();
   v8::HandleScope hscope(isolate);
-  v8::Handle<v8::ObjectTemplate> global =v8::ObjectTemplate::New(isolate);
+  v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate);
   global->Set(v8::String::NewFromUtf8(isolate, "interrupt"),
               v8::FunctionTemplate::New(isolate, RequestInterrupt));
   v8::Local<v8::Context> context = v8::Context::New(isolate, NULL, global);

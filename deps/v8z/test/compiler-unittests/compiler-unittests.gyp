@@ -14,6 +14,7 @@
       'dependencies': [
         '../../testing/gmock.gyp:gmock',
         '../../testing/gtest.gyp:gtest',
+        '../../tools/gyp/v8.gyp:v8',
         '../../tools/gyp/v8.gyp:v8_libplatform',
       ],
       'include_dirs': [
@@ -47,8 +48,6 @@
               ],
             }],
           ],
-        }, {
-          'dependencies': ['../../tools/gyp/v8.gyp:v8'],
         }],
         ['os_posix == 1', {
           # TODO(svenpanne): This is a temporary work-around to fix the warnings

@@ -1200,6 +1200,24 @@
             ],
           }
         ],
+        ['OS=="os390"', {
+            'link_settings': {
+              'conditions': [
+                ['v8_compress_startup_data=="bz2"', {
+                  'libraries': [
+                    '-lbz2',
+                  ]
+                }],
+              ],
+            },
+            'sources': [
+              '../../src/s390/semaphore-zos.cc',
+              '../../src/s390/semaphore-zos.h',
+              '../../src/base/platform/platform-zos.cc',
+              '../../src/base/platform/platform-posix.cc'
+            ],
+          }
+        ],
         ['OS=="android"', {
             'sources': [
               '../../src/base/platform/platform-posix.cc'

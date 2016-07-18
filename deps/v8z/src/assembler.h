@@ -968,6 +968,11 @@ class ExternalReference BASE_EMBEDDED {
 
   static ExternalReference stress_deopt_count(Isolate* isolate);
 
+  //EBCDIC<->ASCII conversion lookup tables
+  static ExternalReference ebcdic_to_ascii_table();
+  
+  static ExternalReference ascii_to_ebcdic_table();
+  
   bool operator==(const ExternalReference& other) const {
     return address_ == other.address_;
   }

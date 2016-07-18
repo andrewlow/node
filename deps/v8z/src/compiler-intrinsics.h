@@ -37,6 +37,40 @@ int CompilerIntrinsics::CountSetBits(uint32_t value) {
   return __builtin_popcount(value);
 }
 
+#elif __IBMCPP__
+// TODO(mcornac): Replace these implementations with xlc builtins?
+int CompilerIntrinsics::CountTrailingZeros(uint32_t x) {
+   int n;
+
+   if (x == 0) return(32);
+   n = 1;
+   if ((x & 0x0000FFFF) == 0) {n = n +16; x = x >>16;}
+   if ((x & 0x000000FF) == 0) {n = n + 8; x = x >> 8;}
+   if ((x & 0x0000000F) == 0) {n = n + 4; x = x >> 4;}
+   if ((x & 0x00000003) == 0) {n = n + 2; x = x >> 2;}
+   return n - (x & 1);
+}
+
+int CompilerIntrinsics::CountLeadingZeros(uint32_t x) {
+   int n;
+
+   if (x == 0) return(32);
+   n = 0;
+   if (x <= 0x0000FFFF) {n = n +16; x = x <<16;}
+   if (x <= 0x00FFFFFF) {n = n + 8; x = x << 8;}
+   if (x <= 0x0FFFFFFF) {n = n + 4; x = x << 4;}
+   if (x <= 0x3FFFFFFF) {n = n + 2; x = x << 2;}
+   if (x <= 0x7FFFFFFF) {n = n + 1;}
+   return n;
+}
+
+int CompilerIntrinsics::CountSetBits(uint32_t i) {
+  i = i - ((i >> 1) & 0x55555555);
+  i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+  return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
+
 #elif defined(_MSC_VER)
 
 #pragma intrinsic(_BitScanForward)

@@ -424,7 +424,7 @@ class Parser : public BaseObject {
     if (!parser->parser_.upgrade && nparsed != buffer_len) {
       enum http_errno err = HTTP_PARSER_ERRNO(&parser->parser_);
 
-      Local<Value> e = Exception::Error(env->parse_error_string());
+      Local<Value> e = v8::Exception::Error(env->parse_error_string());
       Local<Object> obj = e->ToObject();
       obj->Set(env->bytes_parsed_string(), nparsed_obj);
       obj->Set(env->code_string(),

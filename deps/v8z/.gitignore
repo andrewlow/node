@@ -38,7 +38,6 @@ shell
 shell_g
 /_*
 /build/Debug
-/build/gyp
 /build/ipch/
 /build/Release
 /buildtools
@@ -62,8 +61,6 @@ shell_g
 /test/test262/data
 /test/test262/data.old
 /test/test262/tc39-test262-*
-/testing/gmock
-/testing/gtest
 /third_party/icu
 /third_party/llvm
 /tools/jsfunfuzz

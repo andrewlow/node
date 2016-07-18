@@ -212,7 +212,7 @@ class HandleScope {
   HandleScope(const HandleScope&);
   void operator=(const HandleScope&);
   void* operator new(size_t size);
-  void operator delete(void* size_t);
+  void operator delete(void*, size_t) {}
 
   Isolate* isolate_;
   Object** prev_next_;

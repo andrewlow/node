@@ -775,6 +775,9 @@ void CodeGenerator::AssembleArchBoolean(Instruction* instr,
 void CodeGenerator::AssemblePrologue() {
   CallDescriptor* descriptor = linkage()->GetIncomingDescriptor();
   if (descriptor->kind() == CallDescriptor::kCallAddress) {
+#if ABI_USES_FUNCTION_DESCRIPTORS
+    __function_descriptor();
+#endif
     int register_save_area_size = 0;
     RegList saves = descriptor->CalleeSavedRegisters();
     __ Push(r14, fp);

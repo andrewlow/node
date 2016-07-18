@@ -121,13 +121,18 @@
           # Not Windows i.e. POSIX
           'cflags': [
             '-g',
+          ],
+        }],
+        [ 'OS!="os390"', {
+          # Not Windows i.e. POSIX
+          'cflags': [
             '-pedantic',
             '-Wall',
             '-Wextra',
             '-Wno-unused-parameter'
           ],
         }],
-        [ 'OS not in "win android"', {
+        [ 'OS not in "win android os390"', {
           'cflags': [
             '--std=gnu89'
           ],

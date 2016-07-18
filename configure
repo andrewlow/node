@@ -446,6 +446,8 @@ def host_arch_cc():
   # in case of cross-compilation
   if sys.platform.startswith('aix'):
     k = cc_macros('gcc')
+  elif sys.platform.startswith('os390'):
+    return 's390x'
   else:
     k = cc_macros('cc')
 
@@ -462,7 +464,7 @@ def host_arch_cc():
   }
 
   rtn = 'ia32' # default
-
+  print k;
   for i in matchup:
     if i in k and k[i] != '0':
       rtn = matchup[i]
@@ -494,7 +496,7 @@ def compiler_version():
   try:
     proc = subprocess.Popen(shlex.split(CC) + ['--version'],
                             stdout=subprocess.PIPE)
-  except WindowsError:
+  except OSError:
     return (0, False)
 
   is_clang = 'clang' in proc.communicate()[0].split('\n')[0]

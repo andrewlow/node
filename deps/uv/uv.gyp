@@ -10,15 +10,19 @@
           ['OS=="solaris"', {
             'cflags': [ '-pthreads' ],
           }],
-          ['OS not in "solaris android"', {
+          ['OS not in "solaris android os390"', {
             'cflags': [ '-pthread' ],
           }],
         ],
       }],
     ],
     'xcode_settings': {
-      'WARNING_CFLAGS': [ '-Wall', '-Wextra', '-Wno-unused-parameter' ],
-      'OTHER_CFLAGS': [ '-g', '--std=gnu89', '-pedantic' ],
+      'conditions':[
+        ['OS!="os390"', {
+          'WARNING_CFLAGS': [ '-Wall', '-Wextra', '-Wno-unused-parameter' ],
+          'OTHER_CFLAGS': [ '-g', '--std=gnu89', '-pedantic' ],
+        }],
+      ]
     }
   },
 
@@ -121,14 +125,23 @@
             ],
           },
         }, { # Not Windows i.e. POSIX
-          'cflags': [
-            '-g',
-            '--std=gnu89',
-            '-pedantic',
-            '-Wall',
-            '-Wextra',
-            '-Wno-unused-parameter',
-          ],
+          'conditions': [
+            ['OS!="os390"', {
+              'cflags': [
+                '-g',
+                '--std=gnu89',
+                '-pedantic',
+                '-Wall',
+                '-Wextra',
+                '-Wno-unused-parameter',
+              ],
+
+            }, {
+              'cflags': [
+                '-g',
+                '-qCHARS=signed',
+              ]},
+            ]],
           'sources': [
             'include/uv-unix.h',
             'include/uv-linux.h',
@@ -164,7 +177,7 @@
               ['OS=="solaris"', {
                 'ldflags': [ '-pthreads' ],
               }],
-              ['OS != "solaris" and OS != "android"', {
+              ['OS != "solaris" and OS != "android" and OS != "os390"', {
                 'ldflags': [ '-pthread' ],
               }],
             ],
@@ -195,7 +208,7 @@
             '_DARWIN_UNLIMITED_SELECT=1',
           ]
         }],
-        [ 'OS!="mac"', {
+        [ 'OS not in "mac os390"', {
           # Enable on all platforms except OS X. The antique gcc/clang that
           # ships with Xcode emits waaaay too many false positives.
           'cflags': [ '-Wstrict-aliasing' ],
@@ -239,6 +252,16 @@
               '-lsocket',
             ],
           },
+        }],
+        [ 'OS=="os390"', {
+          'sources': [
+            'src/unix/pthread-fixes.c',
+            'src/unix/os390-syscalls.c',
+            'src/unix/os390-syscalls.h',
+            'src/unix/os390-epoll.c',
+            'src/unix/os390-epoll.h',
+            'src/unix/os390.c',
+          ],
         }],
         [ 'OS=="aix"', {
           'sources': [ 'src/unix/aix.c' ],

@@ -2241,7 +2241,11 @@ void LCodeGen::DoMathMinMax(LMathMinMax* instr) {
       // For min we want logical-or of sign bit: -(-L + -R)
       __ lcdbr(left_reg, left_reg);
       __ ldr(result_reg, left_reg);
-      __ sdbr(result_reg, right_reg);
+      if (left_reg.is(right_reg)) {
+        __ adbr(result_reg, right_reg);
+      } else {
+        __ sdbr(result_reg, right_reg);
+      }
       __ lcdbr(result_reg, result_reg);
     } else {
       // For max we want logical-and of sign bit: (L + R)
@@ -3592,7 +3596,23 @@ void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
     if (hinstr->key()->representation().IsSmi()) {
       __ SmiToPtrArrayOffset(scratch, key);
     } else {
-      __ ShiftLeftP(scratch, key, Operand(kPointerSizeLog2));
+     if (instr->hydrogen()->IsDehoisted() ||
+         !CpuFeatures::IsSupported(GENERAL_INSTR_EXT)) {
+#if V8_TARGET_ARCH_S390X
+        // If array access is dehoisted, the key, being an int32, can contain
+        // a negative value, as needs to be sign-extended to 64-bit for
+        // memory access.
+        __ lgfr(key, key);
+#endif
+        __ ShiftLeftP(scratch, key, Operand(kPointerSizeLog2));
+      } else {
+        // Small optimization to reduce pathlength.  After Bounds Check,
+        // the key is guaranteed to be non-negative.  Leverage RISBG,
+        // which also performs zero-extension.
+        __ risbg(scratch, key, Operand(32 - kPointerSizeLog2),
+                 Operand(63 - kPointerSizeLog2), Operand(kPointerSizeLog2),
+                 true);
+      }
     }
   }
 
@@ -4946,7 +4966,11 @@ void LCodeGen::DoStringCharCodeAt(LStringCharCodeAt* instr) {
    private:
     LStringCharCodeAt* instr_;
   };
-
+#ifdef V8_OS_ZOS
+  bool native_ascii = false;
+#else
+  bool native_ascii = true;
+#endif
   DeferredStringCharCodeAt* deferred =
       new(zone()) DeferredStringCharCodeAt(this, instr);
 
@@ -4954,7 +4978,8 @@ void LCodeGen::DoStringCharCodeAt(LStringCharCodeAt* instr) {
                                     ToRegister(instr->string()),
                                     ToRegister(instr->index()),
                                     ToRegister(instr->result()),
-                                    deferred->entry());
+                                    deferred->entry(),
+                                    !native_ascii);
   __ bind(deferred->exit());
 }
 

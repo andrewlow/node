@@ -9,6 +9,8 @@
 #include "src/handles.h"
 #include "src/safepoint-table.h"
 
+#undef index
+
 namespace v8 {
 namespace internal {
 

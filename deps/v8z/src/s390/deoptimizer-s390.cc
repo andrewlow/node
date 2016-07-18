@@ -165,8 +165,11 @@ void Deoptimizer::EntryGenerator::Generate() {
       (kNumberOfRegisters * kPointerSize) + kDoubleRegsSize;
 
   // Get the bailout id from the stack.
+#ifdef V8_OS_ZOS
+  __ LoadP(r3, MemOperand(sp, kSavedRegistersAreaSize));
+#else
   __ LoadP(r4, MemOperand(sp, kSavedRegistersAreaSize));
-
+#endif
   // Cleanse the Return address for 31-bit
   __ CleanseP(r14);
 
@@ -180,23 +183,39 @@ void Deoptimizer::EntryGenerator::Generate() {
   // Allocate a new deoptimizer object.
   // Pass six arguments in r2 to r7.
   __ PrepareCallCFunction(6, r7);
+#ifdef V8_OS_ZOS
+  __ LoadP(r1, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
+  __ LoadImmP(r2, Operand(type()));  // bailout type,
+#else
   __ LoadP(r2, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
   __ LoadImmP(r3, Operand(type()));  // bailout type,
+#endif
+
+  __ mov(r7, Operand(ExternalReference::isolate_address(isolate())));
+#ifdef V8_OS_ZOS
+  // XPLINK linkage requires the remaining args
+  // to be passed on the stack
+  __ StoreMultipleP(r5, r7,
+                    MemOperand(r4, kStackPointerBias + 19 * kPointerSize));
+#else
   // r4: bailout id already loaded.
   // r5: code address or 0 already loaded.
   // r6: Fp-to-sp delta.
   // Parm6: isolate is passed on the stack.
-  __ mov(r7, Operand(ExternalReference::isolate_address(isolate())));
   __ StoreP(r7, MemOperand(sp, kStackFrameExtraParamSlot * kPointerSize));
+#endif
 
   // Call Deoptimizer::New().
   {
     AllowExternalCallThatCantCauseGC scope(masm());
     __ CallCFunction(ExternalReference::new_deoptimizer_function(isolate()), 6);
   }
-
   // Preserve "deoptimizer" object in register r2 and get the input
   // frame descriptor pointer to r3 (deoptimizer->input_);
+#ifdef V8_OS_ZOS
+  __ LoadRR(r2, r3);
+#endif
+
   __ LoadP(r3, MemOperand(r2, Deoptimizer::input_offset()));
 
   // Copy core registers into FrameDescription::registers_[kNumRegisters].
@@ -236,6 +255,10 @@ void Deoptimizer::EntryGenerator::Generate() {
 
   // Compute the output frame in the deoptimizer.
   __ push(r2);  // Preserve deoptimizer object across call.
+#ifdef V8_OS_ZOS
+  __ LoadRR(r1, r2);
+  __ LoadRR(r13, r4);
+#endif
   // r2: deoptimizer object; r3: scratch.
   __ PrepareCallCFunction(1, r3);
   // Call Deoptimizer::ComputeOutputFrames().
@@ -245,7 +268,9 @@ void Deoptimizer::EntryGenerator::Generate() {
       ExternalReference::compute_output_frames_function(isolate()), 1);
   }
   __ pop(r2);  // Restore deoptimizer object (class Deoptimizer).
-
+#ifdef V8_OS_ZOS
+  __ LoadRR(r4, r13);
+#endif
   // Replace the current (input) frame with the output frames.
   Label outer_push_loop, inner_push_loop,
     outer_loop_header, inner_loop_header;
@@ -294,12 +319,11 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ push(r8);
 
   // Restore the registers from the last output frame.
-  DCHECK(!(ip.bit() & restored_regs));
-  __ LoadRR(ip, r4);
-  for (int i = kNumberOfRegisters - 1; i >= 0; i--) {
+  __ LoadRR(r1, r4);
+  for (int i = kNumberOfRegisters - 1; i > 0; i--) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
     if ((restored_regs & (1 << i)) != 0) {
-      __ LoadP(ToRegister(i), MemOperand(ip, offset));
+      __ LoadP(ToRegister(i), MemOperand(r1, offset));
     }
   }
 

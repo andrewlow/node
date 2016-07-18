@@ -53,6 +53,14 @@ static inline bool IsStart(int32_t entry) {
 static bool LookupPredicate(const int32_t* table, uint16_t size, uchar chr) {
   static const int kEntryDist = 1;
   uint16_t value = chr & (kChunkBits - 1);
+#if defined(V8_OS_ZOS)
+  if (value >= 0 && value <= 0xff) {
+     char c  = static_cast<char>(value);
+     v8::base::OS::ConvertToASCII(&c);
+     DCHECK(c <= 0x7f && c>= 0);
+     value = c;
+  }
+#endif
   unsigned int low = 0;
   unsigned int high = size - 1;
   while (high != low) {
@@ -314,11 +322,11 @@ void Utf8DecoderBase::WriteUtf16Slow(const uint8_t* stream,
                                      unsigned data_length) {
   while (data_length != 0) {
     unsigned cursor = 0;
-
     uint32_t character = Utf8::ValueOf(stream, stream_length, &cursor);
     // There's a total lack of bounds checking for stream
     // as it was already done in Reset.
     stream += cursor;
+    DCHECK(stream_length >= cursor);
     stream_length -= cursor;
     if (character > unibrow::Utf16::kMaxNonSurrogateCharCode) {
       *data++ = Utf16::LeadSurrogate(character);
@@ -330,7 +338,6 @@ void Utf8DecoderBase::WriteUtf16Slow(const uint8_t* stream,
       data_length -= 1;
     }
   }
-  DCHECK(stream_length >= 0);
 }
 
 

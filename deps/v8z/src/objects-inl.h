@@ -1087,7 +1087,7 @@ double Object::Number() {
 
 
 bool Object::IsNaN() const {
-  return this->IsHeapNumber() && std::isnan(HeapNumber::cast(this)->value());
+  return this->IsHeapNumber() && isnan(HeapNumber::cast(this)->value());
 }
 
 
@@ -2263,7 +2263,7 @@ void FixedDoubleArray::set(int index, double value) {
   DCHECK(map() != GetHeap()->fixed_cow_array_map() &&
          map() != GetHeap()->fixed_array_map());
   int offset = kHeaderSize + index * kDoubleSize;
-  if (std::isnan(value)) value = canonical_not_the_hole_nan_as_double();
+  if (isnan(value)) value = canonical_not_the_hole_nan_as_double();
   WRITE_DOUBLE_FIELD(this, offset, value);
 }
 
@@ -6346,7 +6346,7 @@ JSRegExp::Flags JSRegExp::GetFlags() {
 String* JSRegExp::Pattern() {
   DCHECK(this->data()->IsFixedArray());
   Object* data = this->data();
-  String* pattern= String::cast(FixedArray::cast(data)->get(kSourceIndex));
+  String* pattern = String::cast(FixedArray::cast(data)->get(kSourceIndex));
   return pattern;
 }
 
@@ -6553,28 +6553,37 @@ uint32_t StringHasher::GetHashCore(uint32_t running_hash) {
   return running_hash;
 }
 
-
-void StringHasher::AddCharacter(uint16_t c) {
+template <typename Char>
+void StringHasher::AddCharacter(Char c) {
   // Use the Jenkins one-at-a-time hash function to update the hash
   // for the given character.
+  if (sizeof(Char) == 1) {
+      c = GET_ASCII_CODE(c);
+  }
   raw_running_hash_ = AddCharacterCore(raw_running_hash_, c);
 }
 
-
-bool StringHasher::UpdateIndex(uint16_t c) {
+template <typename Char>
+bool StringHasher::UpdateIndex(Char c) {
   DCHECK(is_array_index_);
-  if (c < '0' || c > '9') {
+
+  if (sizeof(Char) == 1) {
+      c = GET_ASCII_CODE(c);
+  }
+
+  if (c < GET_ASCII_CODE('0') || c > GET_ASCII_CODE('9')) {
     is_array_index_ = false;
     return false;
   }
-  int d = c - '0';
+  int d = c - GET_ASCII_CODE('0');
   if (is_first_char_) {
     is_first_char_ = false;
-    if (c == '0' && length_ > 1) {
+    if (c == GET_ASCII_CODE('0') && length_ > 1) {
       is_array_index_ = false;
       return false;
     }
   }
+
   if (array_index_ > 429496729U - ((d + 2) >> 3)) {
     is_array_index_ = false;
     return false;
@@ -6582,7 +6591,6 @@ bool StringHasher::UpdateIndex(uint16_t c) {
   array_index_ = array_index_ * 10 + d;
   return true;
 }
-
 
 template<typename Char>
 inline void StringHasher::AddCharacters(const Char* chars, int length) {

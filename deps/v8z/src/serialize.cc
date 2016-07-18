@@ -800,7 +800,8 @@ void Deserializer::ReadObject(int space_number,
   bool is_codespace = (space_number == CODE_SPACE);
   DCHECK(obj->IsCode() == is_codespace);
 #endif
-#if V8_TARGET_ARCH_PPC && \
+// TODO(mcornac):
+#if (V8_TARGET_ARCH_PPC || V8_OS_ZOS) && \
     (ABI_USES_FUNCTION_DESCRIPTORS || V8_OOL_CONSTANT_POOL)
   // If we're on a platform that uses function descriptors
   // these jump tables make use of RelocInfo::INTERNAL_REFERENCE.
@@ -1811,13 +1812,15 @@ ScriptData* CodeSerializer::Serialize(Isolate* isolate,
   // Serialize code object.
   List<byte> payload;
   ListSnapshotSink list_sink(&payload);
-  CodeSerializer cs(isolate, &list_sink, *source);
+  // TODO(mcornac): What is wrong with using the name cs here with xlc?
+  CodeSerializer cs1(isolate, &list_sink, *source);
   DisallowHeapAllocation no_gc;
   Object** location = Handle<Object>::cast(info).location();
-  cs.VisitPointer(location);
-  cs.Pad();
 
-  SerializedCodeData data(&payload, &cs);
+  cs1.VisitPointer(location);
+  cs1.Pad();
+
+  SerializedCodeData data(&payload, &cs1);
   return data.GetScriptData();
 }
 

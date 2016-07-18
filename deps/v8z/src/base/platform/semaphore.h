@@ -13,8 +13,12 @@
 #if V8_OS_MACOSX
 #include <mach/semaphore.h>  // NOLINT
 #elif V8_OS_POSIX
+#if V8_OS_ZOS
+#include "src/s390/semaphore-zos.h"
+#else
 #include <semaphore.h>  // NOLINT
-#endif
+#endif  // V8_OS_ZOS
+#endif  // V8_OS_POSIX
 
 namespace v8 {
 namespace base {
@@ -52,7 +56,11 @@ class Semaphore V8_FINAL {
 #if V8_OS_MACOSX
   typedef semaphore_t NativeHandle;
 #elif V8_OS_POSIX
+  #ifdef V8_OS_ZOS
+  typedef int NativeHandle;
+  #else
   typedef sem_t NativeHandle;
+  #endif
 #elif V8_OS_WIN
   typedef HANDLE NativeHandle;
 #endif

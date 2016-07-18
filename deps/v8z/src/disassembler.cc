@@ -131,6 +131,10 @@ static int DecodeIt(Isolate* isolate,
         pc += 4;
       } else if (it != NULL && !it->done() && it->rinfo()->pc() == pc &&
           it->rinfo()->rmode() == RelocInfo::INTERNAL_REFERENCE) {
+#if ABI_USES_FUNCTION_DESCRIPTORS
+        // z/OS.
+        pc += Assembler::DecodeInternalReference(decode_buffer, pc);
+#else
         // raw pointer embedded in code stream, e.g., jump table
         byte* ptr = *reinterpret_cast<byte**>(pc);
         SNPrintF(decode_buffer,
@@ -138,6 +142,7 @@ static int DecodeIt(Isolate* isolate,
                  reinterpret_cast<intptr_t>(ptr),
                  ptr - begin);
         pc += 4;
+#endif
       } else {
 #elif ABI_USES_FUNCTION_DESCRIPTORS || V8_OOL_CONSTANT_POOL
     // V8_TARGET_ARCH_PPC

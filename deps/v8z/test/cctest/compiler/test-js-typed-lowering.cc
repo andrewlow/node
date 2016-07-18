@@ -121,7 +121,7 @@ class JSTypedLoweringTester : public HandleAndZoneScope {
   void CheckNaN(Node* result) {
     CHECK_EQ(IrOpcode::kNumberConstant, result->opcode());
     double value = ValueOf<double>(result->op());
-    CHECK(std::isnan(value));
+    CHECK(isnan(value));
   }
 
   void CheckTrue(Node* result) {

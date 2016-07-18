@@ -69,6 +69,7 @@
 //  V8_OS_SOLARIS       - Sun Solaris and OpenSolaris
 //  V8_OS_AIX           - AIX
 //  V8_OS_WIN           - Microsoft Windows
+//  V8_OS_ZOS           - z/OS
 
 #if defined(__ANDROID__)
 # define V8_OS_ANDROID 1
@@ -114,6 +115,9 @@
 # define V8_OS_QNX 1
 #elif defined(_WIN32)
 # define V8_OS_WIN 1
+#elif defined(__MVS__)
+# define V8_OS_POSIX 1
+# define V8_OS_ZOS 1
 #endif
 
 
@@ -279,6 +283,11 @@
 # define V8_HAS_DECLSPEC_NOINLINE 1
 
 # define V8_HAS___FORCEINLINE 1
+
+// TODO(mcornac): Should we check if xlc compiler instead of z/OS?
+#elif defined(V8_OS_ZOS)
+# define V8_HAS___ALIGNOF__ 1
+# define V8_HAS_ATTRIBUTE_ALIGNED 1
 
 #endif
 

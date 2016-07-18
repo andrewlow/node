@@ -72,8 +72,8 @@
 #include "unicode/uversion.h"
 #endif
 
-#ifndef _STLP_VENDOR_CSTD
-// STLPort doesn't import fpclassify and isless into the std namespace.
+#if !defined(_STLP_VENDOR_CSTD) && !defined(V8_OS_ZOS)
+// STLPort and xlC do not import fpclassify and isless into the std namespace.
 using std::fpclassify;
 using std::isless;
 #endif
@@ -4631,10 +4631,10 @@ RUNTIME_FUNCTION(Runtime_NumberToRadixString) {
 
   // Slow case.
   CONVERT_DOUBLE_ARG_CHECKED(value, 0);
-  if (std::isnan(value)) {
+  if (isnan(value)) {
     return isolate->heap()->nan_string();
   }
-  if (std::isinf(value)) {
+  if (isinf(value)) {
     if (value < 0) {
       return isolate->heap()->minus_infinity_string();
     }
@@ -6471,8 +6471,72 @@ static bool CheckFastAsciiConvert(char* dst,
   }
   return (expected_changed == changed);
 }
+static bool CheckFastEBCDICConvert(char * dst,
+                                   const char* src,
+                                   int length,
+                                   bool changed,
+                                   bool is_to_lower) {
+  bool expected_changed = false;
+  bool is_char = false;
+  for (int i = 0; i < length ; i++) {
+    if (dst[i] == src[i] ) continue;
+    expected_changed = true;
+    if (is_to_lower) {
+      DCHECK(('A' <= src[i] && src[i] <= 'I')||
+      ('J' <= src[i] && src[i] <= 'R') ||
+      ('S' <= src[i] && src[i] <= 'Z'));
+    } else {
+      DCHECK(('a' <= src[i] && src[i] <= 'i')||
+      ('j' <= src[i] && src[i] <= 'r')||
+      ('s' <= src[i] && src[i] <= 'z'));
+    }
+    DCHECK(dst[i] == (src[i] ^ 0x40));
+  }
+  return (expected_changed == changed);
+}
 #endif
 
+template<class Converter>
+static bool FastEBCDICConvert(char * dst,
+                              const char * src,
+                              int length,
+                              bool * changed_out) {
+#ifdef DEBUG
+  char* saved_dst = dst;
+  const char* saved_src = src;
+#endif
+  DisallowHeapAllocation no_gc;
+  static const char lo_1   = Converter::kIsToLower ? 'A' - 1 : 'a' - 1;
+  static const char hi_1   = Converter::kIsToLower ? 'I' + 1 : 'i' + 1;
+
+  static const char lo_2   = Converter::kIsToLower ? 'J' - 1 : 'j' - 1;
+  static const char hi_2   = Converter::kIsToLower ? 'R' + 1 : 'r' + 1;
+
+  static const char lo_3   = Converter::kIsToLower ? 'S' - 1 : 's' - 1;
+  static const char hi_3   = Converter::kIsToLower ? 'Z' + 1 : 'z' + 1;
+
+  const char* const limit = src + length;
+  bool changed = false;
+
+  while (src < limit) {
+    char c = *src;
+    if (((lo_1 < c) && (c < hi_1)) ||
+        ((lo_2 < c) && (c < hi_2)) ||
+        ((lo_3 < c) && (c < hi_3))) {
+      c ^= 0x40 ;  // Convert the zone nibble.
+      changed = true;
+    }
+    *dst = c;
+    ++src;
+    ++dst;
+  }
+
+  DCHECK(CheckFastEBCDICConvert(
+             saved_dst, saved_src, length, changed, Converter::kIsToLower));
+
+  *changed_out = changed;
+  return true;
+}
 
 template<class Converter>
 static bool FastAsciiConvert(char* dst,
@@ -6493,38 +6557,34 @@ static bool FastAsciiConvert(char* dst,
   bool changed = false;
   uintptr_t or_acc = 0;
   const char* const limit = src + length;
-
-  // dst is newly allocated and always aligned.
-  DCHECK(IsAligned(reinterpret_cast<intptr_t>(dst), sizeof(uintptr_t)));
-  // Only attempt processing one word at a time if src is also aligned.
-  if (IsAligned(reinterpret_cast<intptr_t>(src), sizeof(uintptr_t))) {
-    // Process the prefix of the input that requires no conversion one aligned
-    // (machine) word at a time.
-    while (src <= limit - sizeof(uintptr_t)) {
-      const uintptr_t w = *reinterpret_cast<const uintptr_t*>(src);
-      or_acc |= w;
-      if (AsciiRangeMask(w, lo, hi) != 0) {
-        changed = true;
-        break;
-      }
-      *reinterpret_cast<uintptr_t*>(dst) = w;
-      src += sizeof(uintptr_t);
-      dst += sizeof(uintptr_t);
+#ifdef V8_HOST_CAN_READ_UNALIGNED
+  // Process the prefix of the input that requires no conversion one
+  // (machine) word at a time.
+  while (src <= limit - sizeof(uintptr_t)) {
+    const uintptr_t w = *reinterpret_cast<const uintptr_t*>(src);
+    or_acc |= w;
+    if (AsciiRangeMask(w, lo, hi) != 0) {
+      changed = true;
+      break;
     }
-    // Process the remainder of the input performing conversion when
-    // required one word at a time.
-    while (src <= limit - sizeof(uintptr_t)) {
-      const uintptr_t w = *reinterpret_cast<const uintptr_t*>(src);
-      or_acc |= w;
-      uintptr_t m = AsciiRangeMask(w, lo, hi);
-      // The mask has high (7th) bit set in every byte that needs
-      // conversion and we know that the distance between cases is
-      // 1 << 5.
-      *reinterpret_cast<uintptr_t*>(dst) = w ^ (m >> 2);
-      src += sizeof(uintptr_t);
-      dst += sizeof(uintptr_t);
-    }
+    *reinterpret_cast<uintptr_t*>(dst) = w;
+    src += sizeof(uintptr_t);
+    dst += sizeof(uintptr_t);
   }
+  // Process the remainder of the input performing conversion when
+  // required one word at a time.
+  while (src <= limit - sizeof(uintptr_t)) {
+    const uintptr_t w = *reinterpret_cast<const uintptr_t*>(src);
+    or_acc |= w;
+    uintptr_t m = AsciiRangeMask(w, lo, hi);
+    // The mask has high (7th) bit set in every byte that needs
+    // conversion and we know that the distance between cases is
+    // 1 << 5.
+    *reinterpret_cast<uintptr_t*>(dst) = w ^ (m >> 2);
+    src += sizeof(uintptr_t);
+    dst += sizeof(uintptr_t);
+  }
+#endif
   // Process the last few bytes of the input (or the whole input if
   // unaligned access is not supported).
   while (src < limit) {
@@ -6538,8 +6598,9 @@ static bool FastAsciiConvert(char* dst,
     ++src;
     ++dst;
   }
-
-  if ((or_acc & kAsciiMask) != 0) return false;
+  if ((or_acc & kAsciiMask) != 0) {
+    return false;
+  }
 
   DCHECK(CheckFastAsciiConvert(
              saved_dst, saved_src, length, changed, Converter::kIsToLower));
@@ -6575,13 +6636,22 @@ MUST_USE_RESULT static Object* ConvertCase(
     String::FlatContent flat_content = s->GetFlatContent();
     DCHECK(flat_content.IsFlat());
     bool has_changed_character = false;
-    bool is_ascii = FastAsciiConvert<Converter>(
-        reinterpret_cast<char*>(result->GetChars()),
-        reinterpret_cast<const char*>(flat_content.ToOneByteVector().start()),
-        length,
-        &has_changed_character);
+    bool is_utf = true;
+    if ('a' == 0x81) {
+       is_utf = !FastEBCDICConvert<Converter>(
+       reinterpret_cast<char*>(result->GetChars()),
+       reinterpret_cast<const char*>(flat_content.ToOneByteVector().start()),
+       length,
+       &has_changed_character);
+    } else {
+       is_utf = !FastAsciiConvert<Converter>(
+       reinterpret_cast<char*>(result->GetChars()),
+       reinterpret_cast<const char*>(flat_content.ToOneByteVector().start()),
+       length,
+       &has_changed_character);
+    }
     // If not ASCII, we discard the result and take the 2 byte path.
-    if (is_ascii) return has_changed_character ? *result : *s;
+    if (!is_utf) return has_changed_character ? *result : *s;
   }
 
   Handle<SeqString> result;  // Same length as input.
@@ -7469,8 +7539,8 @@ RUNTIME_FUNCTION(Runtime_NumberEquals) {
 
   CONVERT_DOUBLE_ARG_CHECKED(x, 0);
   CONVERT_DOUBLE_ARG_CHECKED(y, 1);
-  if (std::isnan(x)) return Smi::FromInt(NOT_EQUAL);
-  if (std::isnan(y)) return Smi::FromInt(NOT_EQUAL);
+  if (isnan(x)) return Smi::FromInt(NOT_EQUAL);
+  if (isnan(y)) return Smi::FromInt(NOT_EQUAL);
   if (x == y) return Smi::FromInt(EQUAL);
   Object* result;
   if ((fpclassify(x) == FP_ZERO) && (fpclassify(y) == FP_ZERO)) {
@@ -7507,7 +7577,7 @@ RUNTIME_FUNCTION(Runtime_NumberCompare) {
   CONVERT_DOUBLE_ARG_CHECKED(x, 0);
   CONVERT_DOUBLE_ARG_CHECKED(y, 1);
   CONVERT_ARG_HANDLE_CHECKED(Object, uncomparable_result, 2)
-  if (std::isnan(x) || std::isnan(y)) return *uncomparable_result;
+  if (isnan(x) || isnan(y)) return *uncomparable_result;
   if (x == y) return Smi::FromInt(EQUAL);
   if (isless(x, y)) return Smi::FromInt(LESS);
   return Smi::FromInt(GREATER);
@@ -7731,7 +7801,7 @@ RUNTIME_FUNCTION(Runtime_MathAtan2) {
   CONVERT_DOUBLE_ARG_CHECKED(x, 0);
   CONVERT_DOUBLE_ARG_CHECKED(y, 1);
   double result;
-  if (std::isinf(x) && std::isinf(y)) {
+  if (isinf(x) && isinf(y)) {
     // Make sure that the result in case of two infinite arguments
     // is a multiple of Pi / 4. The sign of the result is determined
     // by the first argument (x) and the sign of the second argument
@@ -7785,7 +7855,7 @@ RUNTIME_FUNCTION(Runtime_MathPowSlow) {
 
   CONVERT_DOUBLE_ARG_CHECKED(y, 1);
   double result = power_helper(x, y);
-  if (std::isnan(result)) return isolate->heap()->nan_value();
+  if (isnan(result)) return isolate->heap()->nan_value();
   return *isolate->factory()->NewNumber(result);
 }
 
@@ -7803,7 +7873,7 @@ RUNTIME_FUNCTION(Runtime_MathPowRT) {
     return Smi::FromInt(1);
   } else {
     double result = power_double_double(x, y);
-    if (std::isnan(result)) return isolate->heap()->nan_value();
+    if (isnan(result)) return isolate->heap()->nan_value();
     return *isolate->factory()->NewNumber(result);
   }
 }
@@ -7897,7 +7967,7 @@ RUNTIME_FUNCTION(Runtime_DateSetValue) {
 
   Handle<Object> value;;
   bool is_value_nan = false;
-  if (std::isnan(time)) {
+  if (isnan(time)) {
     value = isolate->factory()->nan_value();
     is_value_nan = true;
   } else if (!is_utc &&
@@ -8646,7 +8716,7 @@ RUNTIME_FUNCTION(Runtime_GetOptimizationStatus) {
       sync_with_compiler_thread) {
     while (function->IsInOptimizationQueue()) {
       isolate->optimizing_compiler_thread()->InstallOptimizedFunctions();
-      base::OS::Sleep(base::TimeDelta::FromMilliseconds(50));
+      base::OS::Sleep(50);
     }
   }
   if (FLAG_always_opt) {
@@ -15314,7 +15384,7 @@ RUNTIME_FUNCTION(RuntimeReference_StringCharAt) {
   DCHECK(args.length() == 2);
   if (!args[0]->IsString()) return Smi::FromInt(0);
   if (!args[1]->IsNumber()) return Smi::FromInt(0);
-  if (std::isinf(args.number_at(1))) return isolate->heap()->empty_string();
+  if (isinf(args.number_at(1))) return isolate->heap()->empty_string();
   Object* code = __RT_impl_Runtime_StringCharCodeAtRT(args, isolate);
   if (code->IsNaN()) return isolate->heap()->empty_string();
   return __RT_impl_Runtime_CharFromCode(Arguments(1, &code), isolate);
@@ -15442,7 +15512,7 @@ RUNTIME_FUNCTION(RuntimeReference_StringCharCodeAt) {
   DCHECK(args.length() == 2);
   if (!args[0]->IsString()) return isolate->heap()->undefined_value();
   if (!args[1]->IsNumber()) return isolate->heap()->undefined_value();
-  if (std::isinf(args.number_at(1))) return isolate->heap()->nan_value();
+  if (isinf(args.number_at(1))) return isolate->heap()->nan_value();
   return __RT_impl_Runtime_StringCharCodeAtRT(args, isolate);
 }
 

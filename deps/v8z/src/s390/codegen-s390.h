@@ -27,7 +27,8 @@ class StringCharLoadGenerator : public AllStatic {
                        Register string,
                        Register index,
                        Register result,
-                       Label* call_runtime);
+                       Label* call_runtime,
+                       bool translate_to_ascii);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(StringCharLoadGenerator);

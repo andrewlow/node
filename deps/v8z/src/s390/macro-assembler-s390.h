@@ -184,6 +184,7 @@ class MacroAssembler: public Assembler {
             CRegister cr = cr7);
   void Jump(Handle<Code> code, RelocInfo::Mode rmode, Condition cond = al);
   void Call(Register target);
+  void CallC(Register target);
   void CallJSEntry(Register target);
   void Call(Address target, RelocInfo::Mode rmode, Condition cond = al);
   int CallSize(Handle<Code> code,
@@ -196,6 +197,7 @@ class MacroAssembler: public Assembler {
             Condition cond = al);
   void Ret();
 
+  void RetC();
   // Emit code to discard a non-negative number of pointer-sized elements
   // from the stack, clobbering only the sp register.
   void Drop(int count);
@@ -801,6 +803,7 @@ class MacroAssembler: public Assembler {
   void LoadMultipleW(Register dst1, Register dst2, const MemOperand& mem);
   void StoreMultipleW(Register dst1, Register dst2, const MemOperand& mem);
 
+  void Translate(Register target, const MemOperand& table, Length len);
   // Cleanse pointer address on 31bit by zero out top  bit.
   // This is a NOP on 64-bit.
   void CleanseP(Register src) {
@@ -1688,6 +1691,12 @@ class MacroAssembler: public Assembler {
     if (isSmi) {
       SmiToArrayOffset(dst, src, elementSizeLog2);
     } else {
+#if V8_TARGET_ARCH_S390X
+      // src (key) is a 32-bit integer.  Sign extension ensures
+     // upper 32-bit does not contain garbage before being used to
+     // reference memory.
+     lgfr(src, src);
+#endif
       ShiftLeftP(dst, src, Operand(elementSizeLog2));
     }
   }

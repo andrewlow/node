@@ -44,8 +44,8 @@ double modulo(double x, double y) {
   // Workaround MS fmod bugs. ECMA-262 says:
   // dividend is finite and divisor is an infinity => result equals dividend
   // dividend is a zero and divisor is nonzero finite => result equals dividend
-  if (!(std::isfinite(x) && (!std::isfinite(y) && !std::isnan(y))) &&
-      !(x == 0 && (y != 0 && std::isfinite(y)))) {
+  if (!(isfinite(x) && (!isfinite(y) && !isnan(y))) &&
+      !(x == 0 && (y != 0 && isfinite(y)))) {
     x = fmod(x, y);
   }
   return x;
@@ -204,7 +204,7 @@ void CodeGenerator::PrintCode(Handle<Code> code, CompilationInfo* info) {
             function->end_position() - function->start_position() + 1;
         for (int i = 0; i < source_len; i++) {
           if (stream.HasMore()) {
-            os << AsReversiblyEscapedUC16(stream.GetNext());
+            os << AsUC16(stream.GetNext());
           }
         }
         os << "\n\n";

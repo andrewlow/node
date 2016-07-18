@@ -33,7 +33,7 @@ except ImportError:
   import json
 import os
 import struct
-import zlib
+# import zlib
 
 from . import constants
 

@@ -19,10 +19,13 @@
     'conditions': [
       ['OS == "win"', {
         'os_posix': 0,
-        'v8_postmortem_support': 'false'
       }, {
         'os_posix': 1,
+      }],
+      ['OS != "win" and OS != "os390"', {
         'v8_postmortem_support': 'true'
+      }, {
+        'v8_postmortem_support': 'false'
       }],
       ['GENERATOR == "ninja" or OS== "mac"', {
         'OBJ_DIR': '<(PRODUCT_DIR)/obj',
@@ -81,7 +84,7 @@
         'variables': {
           'v8_enable_handle_zapping%': 0,
         },
-        'cflags': [ '-O3', '-ffunction-sections', '-fdata-sections' ],
+        'cflags': [ '-O3' ],
         'conditions': [
           ['target_arch=="x64"', {
             'msvs_configuration_platform': 'x64',
@@ -90,14 +93,17 @@
             # pull in V8's postmortem metadata
             'ldflags': [ '-Wl,-z,allextract' ]
           }],
-          ['clang == 0 and gcc_version >= 40', {
+          ['clang == 0 and gcc_version >= 40 and OS!="os390"', {
             'cflags': [ '-fno-tree-vrp' ],  # Work around compiler bug.
           }],
-          ['clang == 0 and gcc_version <= 44', {
+          ['clang == 0 and gcc_version <= 44 and OS!="os390"', {
             'cflags': [ '-fno-tree-sink' ],  # Work around compiler bug.
           }],
-          ['OS!="mac" and OS!="win"', {
+          ['OS!="mac" and OS!="win" and OS!="os390"', {
             'cflags': [ '-fno-omit-frame-pointer' ],
+          }],
+          ['OS!="os390"', {
+            'cflags': [ '-ffunction-sections', '-fdata-sections' ],
           }],
         ],
         'msvs_settings': {

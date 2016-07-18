@@ -6,6 +6,9 @@
 #include <stdlib.h>
 
 #include "src/v8.h"
+#ifdef IBM_TAG
+#include "src/version.h"
+#endif
 
 #include "src/assembler.h"
 #include "src/base/platform/platform.h"
@@ -538,6 +541,10 @@ void FlagList::PrintHelp() {
        << "        type: " << Type2String(f->type()) << "  default: " << *f
        << "\n";
   }
+#ifdef IBM_TAG
+  printf("\nv%s" IBM_TAG "\n", Version::GetVersion());
+  printf("(c) Copyright IBM Corp. 2013, 2015 All Rights Reserved\n");
+#endif
 }
 
 

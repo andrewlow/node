@@ -21,6 +21,7 @@
 // V8_HOST_ARCH_IA32 on both 32- and 64-bit x86.
 #define V8_HOST_ARCH_IA32 1
 #define V8_HOST_ARCH_32_BIT 1
+#define V8_HOST_CAN_READ_UNALIGNED 1
 #else
 #define V8_HOST_ARCH_X64 1
 #if defined(__x86_64__) && !defined(__LP64__)
@@ -28,13 +29,16 @@
 #else
 #define V8_HOST_ARCH_64_BIT 1
 #endif
+#define V8_HOST_CAN_READ_UNALIGNED 1
 #endif  // __native_client__
 #elif defined(_M_IX86) || defined(__i386__)
 #define V8_HOST_ARCH_IA32 1
 #define V8_HOST_ARCH_32_BIT 1
+#define V8_HOST_CAN_READ_UNALIGNED 1
 #elif defined(__AARCH64EL__)
 #define V8_HOST_ARCH_ARM64 1
 #define V8_HOST_ARCH_64_BIT 1
+#define V8_HOST_CAN_READ_UNALIGNED 1
 #elif defined(__ARMEL__)
 #define V8_HOST_ARCH_ARM 1
 #define V8_HOST_ARCH_32_BIT 1
@@ -51,9 +55,9 @@
 #else
 #define V8_HOST_ARCH_32_BIT 1
 #endif
-#elif defined(__s390__) || defined(__s390x__)
+#elif defined(__s390__) || defined(__s390x__) || defined(__MVS__)
 #define V8_HOST_ARCH_S390 1
-#if defined(__s390x__)
+#if defined(__s390x__) || defined(__MVS__)
 #define V8_HOST_ARCH_64_BIT 1
 #else
 #define V8_HOST_ARCH_32_BIT 1

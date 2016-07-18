@@ -140,10 +140,16 @@
     'default_configuration': 'Debug',
     'configurations': {
       'DebugBaseCommon': {
-        'cflags': [ '-g', '-O0' ],
+        'cflags': [ '-g' ],
         'conditions': [
           [ 'OS=="aix"', {
             'cflags': [ '-gxcoff' ],
+          }],
+          [ 'OS=="os390"', {
+            'cflags': [ '-o noopt' ],
+          }],
+          [ 'OS!="os390"', {
+            'cflags': [ '-O0' ],
           }],
         ],
       },
@@ -222,6 +228,30 @@
         ],
       },
     }],
+    ['OS=="os390"', {
+      'target_defaults': {
+        'cflags': [ '-qdebug=nohook','-g','-Wc,expo','-q64','-qnortti',
+                    '-qlanglvl=extended',
+                    '-qenum=4', '-qbitfield=signed',
+                    '-qasm',
+                    '-qasmlib=sys1.maclib:sys1.modgen',
+                    '-D_ISOC99_SOURCE','-D_UNIX03_SOURCE',
+                    '-D_XOPEN_SOURCE_EXTENDED=1',
+                    '-D_XOPEN_SOURCE=500',
+                    '-D__IBMCPP_TR1__',   # To support PRIx64
+                    '-D_OPEN_SYS_SOCK_IPV6',
+                    '-D_UNIX03_THREADS',
+                    '-D__BIG_ENDIAN=4321','-D__BYTE_ORDER=__BIG_ENDIAN',
+                    '-D_OPEN_SYS_TIMED_EXT=1' ],
+        'ldflags': [ '-q64','-Wc,expo' ],
+        'conditions': [
+          [ 'component=="shared_library"', {
+            'cflags': [ '-fPIC', ],
+          }],
+        ],
+      },
+    }],
+    # 'OS=="os390"
     ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris" \
        or OS=="netbsd" or OS=="aix"', {
       'target_defaults': {

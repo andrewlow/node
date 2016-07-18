@@ -226,8 +226,8 @@ class OS {
   // Get the Alignment guaranteed by Allocate().
   static size_t AllocateAlignment();
 
-  // Sleep for a specified time interval.
-  static void Sleep(TimeDelta interval);
+  // Sleep for a number of milliseconds.
+  static void Sleep(const int milliseconds);
 
   // Abort the current process.
   static void Abort();
@@ -307,12 +307,20 @@ class OS {
 
   static int GetCurrentProcessId();
 
-  static int GetCurrentThreadId();
+#if defined(V8_OS_ZOS)
+  static pthread_t GetCurrentThreadId();
+
+  // On zOS the default character encoding is in EBCDIC, this utility function
+  // will convert strings to ASCII.
+  static void ConvertToASCII(char * str);
+#else
+  static int  GetCurrentThreadId();
+#endif
 
  private:
   static const int msPerSecond = 1000;
 
-#if V8_OS_POSIX
+#if V8_OS_POSIX || V8_OS_ZOS
   static const char* GetGCFakeMMapFile();
 #endif
 
@@ -423,8 +431,11 @@ class VirtualMemory {
 class Thread {
  public:
   // Opaque data type for thread-local storage keys.
+#if defined(V8_OS_ZOS)
+  typedef pthread_key_t LocalStorageKey;
+#else
   typedef int32_t LocalStorageKey;
-
+#endif
   class Options {
    public:
     Options() : name_("v8:<unknown>"), stack_size_(0) {}

@@ -35,7 +35,9 @@
 #ifdef __POSIX__
 # include <netdb.h>         // MAXHOSTNAMELEN on Solaris.
 # include <unistd.h>        // gethostname, sysconf
+#ifndef __MVS__
 # include <sys/param.h>     // MAXHOSTNAMELEN on Linux and the BSDs.
+#endif
 # include <sys/utsname.h>
 #endif  // __MINGW32__
 

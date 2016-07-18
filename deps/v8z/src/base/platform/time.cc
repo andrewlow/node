@@ -546,10 +546,12 @@ TimeTicks TimeTicks::HighResolutionNow() {
            info.numer / info.denom);
 #elif V8_OS_SOLARIS
   ticks = (gethrtime() / Time::kNanosecondsPerMicrosecond);
-#elif V8_LIBRT_NOT_AVAILABLE
+#elif V8_LIBRT_NOT_AVAILABLE || V8_OS_ZOS
   // TODO(bmeurer): This is a temporary hack to support cross-compiling
   // Chrome for Android in AOSP. Remove this once AOSP is fixed, also
   // cleanup the tools/gyp/v8.gyp file.
+  // TODO(mcornac): xlc 2.2 on z/OS does not support clock_gettime.
+  // Remove this when it does.
   struct timeval tv;
   int result = gettimeofday(&tv, NULL);
   DCHECK_EQ(0, result);
