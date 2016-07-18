@@ -104,7 +104,6 @@
           }],
           ['OS!="os390"', {
             'cflags': [ '-ffunction-sections', '-fdata-sections' ],
-            'ldflags': ['-qXPLINK', '-q64']
           }],
         ],
         'msvs_settings': {

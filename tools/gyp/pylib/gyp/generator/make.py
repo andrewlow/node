@@ -142,7 +142,7 @@ cmd_alink_thin = rm -f $@ && $(AR.$(TOOLSET)) crsT $@ $(filter %.o,$^)
 # special "figure out circular dependencies" flags around the entire
 # input list during linking.
 quiet_cmd_link = LINK($(TOOLSET)) $@
-cmd_link = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -qXPLINK -o $@ $(LD_INPUTS) $(LIBS)
+cmd_link = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -o $@ $(LD_INPUTS) $(LIBS)
 
 # We support two kinds of shared objects (.so):
 # 1) shared_library, which is just bundling together many dependent libraries
@@ -243,6 +243,13 @@ quiet_cmd_solink_module = SOLINK_MODULE($(TOOLSET)) $@
 cmd_solink_module = $(LINK.$(TOOLSET)) -shared $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -Wl,-soname=$(@F) -o $@ $(filter-out FORCE_DO_CMD, $^) $(LIBS)
 """
 
+DEP_FLAGS_ZOS = """\
+DEPFLAGS = -DHAVE_ARPA_INET_H -D_XOPEN_SOURCE_EXTENDED -DOPENSSL_NO_GOST -DOPENSSL_NO_HW_PADLOCK -D_ISOC99_SOURCE -qmakedep -qLONGLONG -qLANGLVL=EXTENDED -D_UNIX03_THREADS -D_UNIX03_SOURCE -D_OPEN_SYS_IF_EXT=1 -qXPLINK -qFLOAT=IEEE -D_OPEN_MSGQ_EXT -D_ALL_SOURCE -D_LARGE_TIME_API -DUTMP_FILE=\"/etc/utmpx\" -DPATH_MAX=255 -D_OPEN_SYS_SOCK_IPV6 -D_OPEN_SYS_FILE_EXT -DIP_TTL=-1 -DNI_MAXHOST=1024 -DNI_MAXSERV=32 -q64 -MF $(depfile).raw
+"""
+
+DEP_FLAGS_NON_ZOS = """\
+DEPFLAGS = -MMD -DOPENSSL_NO_GOST -DOPENSSL_NO_HW_PADLOCK -MF $(depfile).raw
+"""
 
 # Header of toplevel Makefile.
 # This should go into the build tree, but it's easier to keep it here for now.
@@ -327,8 +334,7 @@ dirx = $(call unreplace_spaces,$(dir $(call replace_spaces,$1)))
 # We write to a dep file on the side first and then rename at the end
 # so we can't end up with a broken dep file.
 depfile = $(depsdir)/$(call replace_spaces,$@).d
-DEPFLAGS = -DHAVE_ARPA_INET_H -D_XOPEN_SOURCE_EXTENDED -DOPENSSL_NO_GOST -DOPENSSL_NO_HW_PADLOCK -D_ISOC99_SOURCE -qmakedep -qLONGLONG -qLANGLVL=EXTENDED -D_UNIX03_THREADS -D_UNIX03_SOURCE -D_OPEN_SYS_IF_EXT=1 -qXPLINK -qFLOAT=IEEE -D_OPEN_MSGQ_EXT -D_ALL_SOURCE -D_LARGE_TIME_API -DUTMP_FILE=\"/etc/utmpx\" -DPATH_MAX=255 -D_OPEN_SYS_SOCK_IPV6 -D_OPEN_SYS_FILE_EXT -DIP_TTL=-1 -DNI_MAXHOST=1024 -DNI_MAXSERV=32 -q64 -MF $(depfile).raw
-# -DV8_INTERPRETED_REGEXP -DV8_DEPRECATION_WARNINGS -Wc,expo -qdebug=nohook -qnortti -qenum=4 -qbitfield=signed -qasm -qasmlib=sys1.maclib:sys1.modgen -D_ISOC99_SOURCE -D_XOPEN_SOURCE_EXTENDED -D_XOPEN_SOURCE=500 -D__IBMCPP_TR1__ -D__BIG_ENDIAN=4321 -D__BYTE_ORDER=__BIG_ENDIAN -D_OPEN_SYS_TIME -D_EXT=1 
+%(dependency_flags)s
 
 # We have to fixup the deps output in a few ways.
 # (1) the file output should mention the proper .o file.
@@ -2039,6 +2045,7 @@ def GenerateOutput(target_list, target_dicts, data, params):
       'flock': flock_command,
       'flock_index': 1,
       'link_commands': LINK_COMMANDS_LINUX,
+      'dependency_flags': DEP_FLAGS_NON_ZOS,
       'extra_commands': '',
       'srcdir': srcdir,
     }
@@ -2057,6 +2064,7 @@ def GenerateOutput(target_list, target_dicts, data, params):
   elif sys.platform.startswith('os390'):
     header_params.update({
         'link_commands': LINK_COMMANDS_ZOS,
+        'dependency_flags': DEP_FLAGS_ZOS,
     })
   elif flavor == 'solaris':
     header_params.update({
