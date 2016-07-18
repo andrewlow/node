@@ -12,9 +12,9 @@ SHLIB_VERSION_HISTORY=
 SHLIB_MAJOR=1
 SHLIB_MINOR=0.0
 SHLIB_EXT=
-PLATFORM=OS390-Unix64
+PLATFORM=dist
 OPTIONS= no-ec_nistp_64_gcc_128 no-gmp no-jpake no-krb5 no-md2 no-rc5 no-rfc3779 no-sctp no-shared no-ssl2 no-store no-unit-test no-weak-ssl-ciphers no-zlib no-zlib-dynamic static-engine
-CONFIGURE_ARGS=OS390-Unix64
+CONFIGURE_ARGS=dist
 SHLIB_TARGET=
 ifeq ($(shell uname -s),OS/390)
 export SHELL=          /bin/bash
@@ -63,20 +63,20 @@ OPENSSLDIR=/usr/local/ssl
 # equal 4.
 # PKCS1_CHECK - pkcs1 tests.
 
-CC= /c390/archive/zosv2r2/latest/xlc
-CFLAG= -q64 -DB_ENDIAN -DCHARSET_EBCDIC -DNO_SYS_PARAM_H  -D_ALL_SOURCE -DNI_MAXHOST=1024 -DNI_MAXSERV=32 -qLONGLONG -qbitfields=signed -qchars=signed
+CC= cc
+CFLAG= -O
 DEPFLAG= -DOPENSSL_NO_EC_NISTP_64_GCC_128 -DOPENSSL_NO_GMP -DOPENSSL_NO_JPAKE -DOPENSSL_NO_MD2 -DOPENSSL_NO_RC5 -DOPENSSL_NO_RFC3779 -DOPENSSL_NO_SCTP -DOPENSSL_NO_SSL2 -DOPENSSL_NO_STORE -DOPENSSL_NO_UNIT_TEST -DOPENSSL_NO_WEAK_SSL_CIPHERS
 PEX_LIBS= 
-EX_LIBS= -q64
+EX_LIBS= 
 EXE_EXT= 
 ARFLAGS= 
 AR= ar $(ARFLAGS) r
-RANLIB= true
+RANLIB= /usr/bin/ranlib
 NM= nm
-PERL= /bin/perl
+PERL= /usr/bin/perl
 TAR= tar
 TARFLAGS= --no-recursion --record-size=10240
-MAKEDEPPROG= /c390/archive/zosv2r2/latest/xlc
+MAKEDEPPROG=makedepend
 LIBDIR=lib
 
 # We let the C compiler driver to take care of .s files. This is done in
@@ -208,7 +208,7 @@ CLEARENV=	TOP= && unset TOP $${LIB+LIB} $${LIBS+LIBS}	\
 		$${SHARED_LIB+SHARED_LIB} $${LIBEXTRAS+LIBEXTRAS}
 
 BUILDENV=	PLATFORM='$(PLATFORM)' PROCESSOR='$(PROCESSOR)' \
-		SHELL='$(SHELL)'		 		\
+		SHELL='$(SHELL)'		 			\
 		CC='$(CC)' CFLAG='$(CFLAG)' 			\
 		AS='$(CC)' ASFLAG='$(CFLAG) -c'			\
 		AR='$(AR)' NM='$(NM)' RANLIB='$(RANLIB)'	\
@@ -566,7 +566,7 @@ install_sw:
 		tmp="$(SHARED_LIBS)"; \
 		for i in $${tmp:-x}; \
 		do \
-			if [[ -f "$$i" ]] || [[ -f "$$i.a" ]]; then \
+			if [ -f "$$i" ]] || [[ -f "$$i.a" ]; then \
 			(       echo installing $$i; \
 				if [ "$(PLATFORM)" != "Cygwin" ]; then \
 					cp $$i $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/$$i.new; \
@@ -640,7 +640,7 @@ install_docs:
 	@pod2man="`cd ./util; ./pod2mantest $(PERL)`"; \
 	here="`pwd`"; \
 	filecase=; \
-	if [ "$(PLATFORM)" = "DJGPP" ] || [ "$(PLATFORM)" = "Cygwin" ] || [ "$(PLATFORM)" = "mingw" ]; then \
+	if [ "$(PLATFORM)" = "DJGPP" -o "$(PLATFORM)" = "Cygwin" -o "$(PLATFORM)" = "mingw" ]; then \
 		filecase=-i; \
 	fi; \
 	set -e; for i in doc/apps/*.pod; do \
