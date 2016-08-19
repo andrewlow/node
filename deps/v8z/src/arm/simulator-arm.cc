@@ -1309,7 +1309,7 @@ bool Simulator::OverflowFrom(int32_t alu_out,
 
 // Support for VFP comparisons.
 void Simulator::Compute_FPSCR_Flags(double val1, double val2) {
-  if (std::isnan(val1) || std::isnan(val2)) {
+  if (isnan(val1) || isnan(val2)) {
     n_flag_FPSCR_ = false;
     z_flag_FPSCR_ = false;
     c_flag_FPSCR_ = true;
@@ -1917,7 +1917,7 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
 
 
 double Simulator::canonicalizeNaN(double value) {
-  return (FPSCR_default_NaN_mode_ && std::isnan(value)) ?
+  return (FPSCR_default_NaN_mode_ && isnan(value)) ?
     FixedDoubleArray::canonical_not_the_hole_nan_as_double() : value;
 }
 
@@ -3134,7 +3134,7 @@ void Simulator::DecodeVCMP(Instruction* instr) {
 
     // Raise exceptions for quiet NaNs if necessary.
     if (instr->Bit(7) == 1) {
-      if (std::isnan(dd_value)) {
+      if (isnan(dd_value)) {
         inv_op_vfp_flag_ = true;
       }
     }

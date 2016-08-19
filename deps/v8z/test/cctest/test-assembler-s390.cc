@@ -54,11 +54,20 @@ TEST(0) {
 
   Assembler assm(isolate, NULL, 0);
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
   __ lhi(r1, Operand(3));    // test 4-byte instr
   __ llilf(r2, Operand(4));  // test 6-byte instr
   __ lgr(r2, r2);            // test 2-byte opcode
   __ ar(r2, r1);             // test 2-byte instr
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -84,10 +93,13 @@ TEST(1) {
   Assembler assm(isolate, NULL, 0);
   Label L, C;
 
-#if defined(_AIX)
+#if ABI_USES_FUNCTION_DESCRIPTORS
   __ function_descriptor();
 #endif
 
+#if V8_OS_ZOS
+  __ LoadRR(r2, r1);
+#endif
   __ lr(r3, r2);
   __ lhi(r2, Operand(0, kRelocInfo_NONEPTR));
   __ b(&C);
@@ -99,7 +111,12 @@ TEST(1) {
   __ bind(&C);
   __ cfi(r3, Operand(0, kRelocInfo_NONEPTR));
   __ bne(&L);
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -124,10 +141,14 @@ TEST(2) {
   Assembler assm(isolate, NULL, 0);
   Label L, C;
 
-#if defined(_AIX)
+#if ABI_USES_FUNCTION_DESCRIPTORS
   __ function_descriptor();
 #endif
 
+#if V8_OS_ZOS
+  __ LoadRR(r2, r1);
+  __ LoadRR(r1, r4);  // Need to preserve the stack pointer in r4 on z/OS.
+#endif
   __ lgr(r3, r2);
   __ lhi(r2, Operand(1));
   __ b(&C);
@@ -141,7 +162,13 @@ TEST(2) {
   __ bind(&C);
   __ cfi(r3, Operand(0, kRelocInfo_NONEPTR));
   __ bne(&L);
+#if V8_OS_ZOS
+  __ LoadRR(r4, r1);
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   // some relocated stuff here, not executed
   __ RecordComment("dead code, just testing relocations");
@@ -230,6 +257,16 @@ TEST(4) {
   Assembler assm(isolate, NULL, 0);
   Label L2, L3, L4;
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
+#if V8_OS_ZOS
+  __ LoadRR(r0, r4);  // Need to preserve the stack pointer in r4 on z/OS.
+  __ LoadRR(r4, r3);
+  __ LoadRR(r3, r2);
+  __ LoadRR(r2, r1);
+#endif
   __ chi(r2, Operand(10));
   __ ble(&L2);
   __ lr(r2, r4);
@@ -249,7 +286,13 @@ TEST(4) {
 
   __ bind(&L3);
   __ lgfr(r2, r3);
+#if V8_OS_ZOS
+  __ LoadRR(r4, r0);
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -274,10 +317,23 @@ TEST(5) {
 
   MacroAssembler assm(isolate, NULL, 0);
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ LoadRR(r2, r1);
+#endif
   __ mov(r2, Operand(0x12345678));
   __ ExtractBitRange(r3, r2, 3, 2);
   __ lgfr(r2, r3);
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -304,6 +360,13 @@ TEST(6) {
 
   Label yes;
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
+#if V8_OS_ZOS
+  __ LoadRR(r2, r1);
+#endif
   __ mov(r2, Operand(0x12345678));
   __ JumpIfSmi(r2, &yes);
   __ beq(&yes);
@@ -311,7 +374,12 @@ TEST(6) {
   __ b(r14);
   __ bind(&yes);
   __ Load(r2, Operand(1));
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -338,12 +406,25 @@ TEST(7) {
 
   Label yes;
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ LoadRR(r2, r1);
+#endif
   __ mov(r3, Operand(0x1234));
   __ cdfbr(d1, r3);
   __ ldr(d2, d1);
   __ adbr(d1, d2);
   __ cfdbr(Condition(0), r2, d1);
+#if V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -368,13 +449,27 @@ TEST(8) {
 
   MacroAssembler assm(isolate, NULL, 0);
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
+#if V8_OS_ZOS
+  __ LoadRR(r2, r1);
+  __ LoadRR(r1, r4);  // Need to preserve the stack pointer in r4 on z/OS.
+#endif
   // Zero upper bits of r3/r4
   __ llihf(r3, Operand::Zero());
   __ llihf(r4, Operand::Zero());
   __ mov(r3, Operand(0x0002));
   __ mov(r4, Operand(0x0002));
   __ dsgr(r2, r4);
+#if V8_OS_ZOS
+  __ LoadRR(r4, r1);
+  __ LoadRR(r3, r2);
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);
@@ -399,8 +494,16 @@ TEST(9) {
 
   MacroAssembler assm(isolate, NULL, 0);
 
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  __ function_descriptor();
+#endif
+
   __ lzdr(d4);
+#if V8_OS_ZOS
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 
   CodeDesc desc;
   assm.GetCode(&desc);

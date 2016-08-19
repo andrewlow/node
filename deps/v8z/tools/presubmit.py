@@ -42,7 +42,10 @@ import pickle
 import re
 import sys
 import subprocess
-import multiprocessing
+if sys.platform.startswith('os390'):
+  import threading
+else:
+  import multiprocessing
 from subprocess import PIPE
 
 # Disabled LINT rules and reason.
@@ -102,6 +105,15 @@ whitespace/todo
 
 LINT_OUTPUT_PATTERN = re.compile(r'^.+[:(]\d+[:)]|^Done processing')
 
+if sys.platform.startswith('os390'):
+  class CppLintThread(threading.Thread):
+    def __init__(self, target, *args):
+      self._target = target
+      self._args = args
+      threading.Thread.__init__(self)
+
+    def run(self):
+      self._result = self._target(*self._args)
 
 def CppLintWorker(command):
   try:
@@ -267,10 +279,23 @@ class CppLintProcessor(SourceFileProcessor):
     command = [sys.executable, cpplint, '--filter', filt]
 
     commands = join([command + [file] for file in files])
-    count = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(count)
+
+    results = []
     try:
-      results = pool.map_async(CppLintWorker, commands).get(999999)
+      if sys.platform.startswith('os390'):
+        threads = []
+        for cmd in commands:
+          t = CppLintThread(CppLintWorker, cmd)
+          t.start()
+          threads.append(t)
+        print "\nStarted " + str(threading.activeCount()) + " threads."
+        for t in threads:
+          t.join()
+          results.append(t._result);
+      else:
+        count = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(count)
+        results = pool.map_async(CppLintWorker, commands).get(999999)
     except KeyboardInterrupt:
       print "\nCaught KeyboardInterrupt, terminating workers."
       sys.exit(1)

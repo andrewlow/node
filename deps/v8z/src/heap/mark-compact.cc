@@ -4170,18 +4170,6 @@ static inline Address StartOfLiveObject(Address block_address, uint32_t cell) {
 }
 
 
-// Force instantiation of templatized SweepConservatively method for
-// SWEEP_ON_MAIN_THREAD mode.
-template int MarkCompactCollector::SweepConservatively<
-    MarkCompactCollector::SWEEP_ON_MAIN_THREAD>(PagedSpace*, FreeList*, Page*);
-
-
-// Force instantiation of templatized SweepConservatively method for
-// SWEEP_IN_PARALLEL mode.
-template int MarkCompactCollector::SweepConservatively<
-    MarkCompactCollector::SWEEP_IN_PARALLEL>(PagedSpace*, FreeList*, Page*);
-
-
 // Sweeps a space conservatively.  After this has been done the larger free
 // spaces have been put on the free list and the smaller ones have been
 // ignored and left untouched.  A free space is always either ignored or put
@@ -4291,6 +4279,18 @@ int MarkCompactCollector::SweepConservatively(PagedSpace* space,
   }
   return FreeList::GuaranteedAllocatable(static_cast<int>(max_freed_bytes));
 }
+
+
+// Force instantiation of templatized SweepConservatively method for
+// SWEEP_ON_MAIN_THREAD mode.
+template int MarkCompactCollector::SweepConservatively<
+    MarkCompactCollector::SWEEP_ON_MAIN_THREAD>(PagedSpace*, FreeList*, Page*);
+
+
+// Force instantiation of templatized SweepConservatively method for
+// SWEEP_IN_PARALLEL mode.
+template int MarkCompactCollector::SweepConservatively<
+    MarkCompactCollector::SWEEP_IN_PARALLEL>(PagedSpace*, FreeList*, Page*);
 
 
 int MarkCompactCollector::SweepInParallel(PagedSpace* space,

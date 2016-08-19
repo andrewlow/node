@@ -59,7 +59,7 @@ class ConditionVariable V8_FINAL {
   bool WaitFor(Mutex* mutex, const TimeDelta& rel_time) V8_WARN_UNUSED_RESULT;
 
   // The implementation-defined native handle type.
-#if V8_OS_POSIX
+#if V8_OS_POSIX || V8_OS_ZOS
   typedef pthread_cond_t NativeHandle;
 #elif V8_OS_WIN
   struct Event;

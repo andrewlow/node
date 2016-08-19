@@ -306,19 +306,40 @@ void S390Debugger::Debug() {
                   reinterpret_cast<Instruction*>(sim_->get_pc()));
         }
 
-        if (argc == 2 && last_pc != sim_->get_pc() &&
-                            GetValue(arg1, &value)) {
-          for (int i = 1; (!sim_->has_bad_pc()) &&  i < value; i++) {
-            disasm::NameConverter converter;
-            disasm::Disassembler dasm(converter);
-            // use a reasonably large buffer
-            v8::internal::EmbeddedVector<char, 256> buffer;
-            dasm.InstructionDecode(buffer,
-                                   reinterpret_cast<byte*>(sim_->get_pc()));
-            PrintF("  0x%08" V8PRIxPTR "  %s\n", sim_->get_pc(),
-                   buffer.start());
-            sim_->ExecuteInstruction(
-                    reinterpret_cast<Instruction*>(sim_->get_pc()));
+        if (argc == 2 && last_pc != sim_->get_pc()) {
+          disasm::NameConverter converter;
+          disasm::Disassembler dasm(converter);
+          // use a reasonably large buffer
+          v8::internal::EmbeddedVector<char, 256> buffer;
+
+          if (GetValue(arg1, &value)) {
+            // Interpret a numeric argument as the number of instructions to
+            // step past.
+            for (int i = 1; (!sim_->has_bad_pc()) &&  i < value; i++) {
+              dasm.InstructionDecode(buffer,
+                                    reinterpret_cast<byte*>(sim_->get_pc()));
+              PrintF("  0x%08" V8PRIxPTR "  %s\n", sim_->get_pc(),
+                    buffer.start());
+              sim_->ExecuteInstruction(
+                      reinterpret_cast<Instruction*>(sim_->get_pc()));
+            }
+          } else {
+            // Otherwise treat it as the mnemonic of the opcode to stop at.
+            char mnemonic[256];
+            while (!sim_->has_bad_pc()) {
+              dasm.InstructionDecode(buffer,
+                                    reinterpret_cast<byte*>(sim_->get_pc()));
+              char* mnemonicStart = buffer.start();
+              while (*mnemonicStart != 0 && *mnemonicStart != ' ')
+                mnemonicStart++;
+              SScanF(mnemonicStart, "%s", mnemonic);
+              if (!strcmp(arg1, mnemonic)) break;
+
+              PrintF("  0x%08" V8PRIxPTR "  %s\n", sim_->get_pc(),
+                    buffer.start());
+              sim_->ExecuteInstruction(
+                      reinterpret_cast<Instruction*>(sim_->get_pc()));
+            }
           }
         }
       } else if ((strcmp(cmd, "c") == 0) || (strcmp(cmd, "cont") == 0)) {
@@ -613,6 +634,8 @@ void S390Debugger::Debug() {
         } else {
           PrintF("Wrong usage. Use help command for more information.\n");
         }
+      } else if (strcmp(cmd, "icount") == 0) {
+        PrintF("%05d\n", sim_->icount_);
       } else if ((strcmp(cmd, "t") == 0) || strcmp(cmd, "trace") == 0) {
         ::v8::internal::FLAG_trace_sim = !::v8::internal::FLAG_trace_sim;
         PrintF("Trace of executed instructions is %s\n",
@@ -812,7 +835,7 @@ Simulator::Simulator(Isolate* isolate) : isolate_(isolate) {
 #if V8_TARGET_ARCH_S390X
   size_t stack_size = 2 * 1024*1024;  // allocate 2MB for stack
 #else
-  size_t stack_size = 1 * 1024*1024;  // allocate 1MB for stack
+  size_t stack_size = 1 * 1024*1024 + 2048;  // allocate 1MB for stack
 #endif
   stack_ = reinterpret_cast<char*>(malloc(stack_size));
   pc_modified_ = false;
@@ -842,10 +865,15 @@ Simulator::Simulator(Isolate* isolate) : isolate_(isolate) {
     fp_registers_[i] = 0.0;
   }
 
-  // The sp is initialized to point to the bottom (high address) of the
-  // allocated stack area. To be safe in potential stack underflows we leave
-  // some buffer below.
+// The sp is initialized to point to the bottom (high address) of the
+// allocated stack area. To be safe in potential stack underflows we leave
+// some buffer below.
+#ifdef V8_OS_ZOS
+  registers_[r4] = reinterpret_cast<intptr_t>(stack_) + stack_size - 64;
+#else
   registers_[sp] = reinterpret_cast<intptr_t>(stack_) + stack_size - 64;
+#endif
+
   InitializeCoverage();
 
   last_debugger_input_ = NULL;
@@ -1280,20 +1308,41 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
            & (::v8::internal::FLAG_sim_stack_alignment - 1)) == 0;
       Redirection* redirection = Redirection::FromSwiInstruction(instr);
       const int kArgCount = 6;
+#ifdef V8_OS_ZOS
+      const int regArgCount = 3;
+      int arg0_regnum = 1;
+      int result_reg = r3;
+#else
+      const int regArgCount = 5;
       int arg0_regnum = 2;
+      int result_reg = r2;
+#endif
+
 #if V8_TARGET_ARCH_S390X && !ABI_RETURNS_OBJECT_PAIRS_IN_REGS
       intptr_t result_buffer = 0;
       if (redirection->type() == ExternalReference::BUILTIN_OBJECTPAIR_CALL) {
+#ifdef V8_OS_ZOS
+        result_buffer = get_register(r1);
+#else
         result_buffer = get_register(r2);
+#endif
         arg0_regnum++;
       }
 #endif
       intptr_t arg[kArgCount];
-      for (int i = 0; i < kArgCount-1; i++) {
+      for (int i = 0; i < regArgCount; i++) {
         arg[i] = get_register(arg0_regnum + i);
       }
       intptr_t* stack_pointer = reinterpret_cast<intptr_t*>(get_register(sp));
+#ifdef V8_OS_ZOS
+      intptr_t* argument_area = reinterpret_cast<intptr_t*>(get_register(r4)
+         + 2048 + 16 * kPointerSize);
+      arg[3] = argument_area[3];
+      arg[4] = argument_area[4];
+      arg[5] = argument_area[5];
+#else
       arg[5] = stack_pointer[kCalleeRegisterSaveAreaSize / kPointerSize];
+#endif
       bool fp_call =
          (redirection->type() == ExternalReference::BUILTIN_FP_FP_CALL) ||
          (redirection->type() == ExternalReference::BUILTIN_COMPARE_CALL) ||
@@ -1301,8 +1350,16 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
          (redirection->type() == ExternalReference::BUILTIN_FP_INT_CALL);
 
       // Place the return address on the stack, making the call GC safe.
+      // TODO(mcornac): If this is necessary we must find the right slot.
+      // Pushing to slot 0 overwrites important data on stack.
+#ifdef V8_OS_ZOS
+      intptr_t* ra_slot = reinterpret_cast<intptr_t*>(get_register(r4)
+         + 2048 + 3 * kPointerSize);
+      *ra_slot = get_register(r7);
+#else
       *reinterpret_cast<intptr_t*>(get_register(sp)
-          + kStackFrameRASlot * kPointerSize) = get_register(r14);
+         + kStackFrameRASlot * kPointerSize) = get_register(r14);
+#endif
 
       intptr_t external =
           reinterpret_cast<intptr_t>(redirection->external_function());
@@ -1497,8 +1554,13 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
         if (::v8::internal::FLAG_trace_sim) {
           PrintF("Returned %08x\n", hi_res);
         }
+#ifdef V8_OS_ZOS
+        set_register(r1, hi_res);
+        set_register(r2, lo_res);
+#else
         set_register(r2, hi_res);
         set_register(r3, lo_res);
+#endif
 #else
         if (::v8::internal::FLAG_trace_sim) {
           PrintF("Returned %08x\n", lo_res);
@@ -1515,7 +1577,7 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
           if (::v8::internal::FLAG_trace_sim) {
             PrintF("Returned %08" V8PRIxPTR "\n", result);
           }
-          set_register(r2, result);
+          set_register(result_reg, result);
         } else {
           DCHECK(redirection->type() ==
                  ExternalReference::BUILTIN_OBJECTPAIR_CALL);
@@ -1528,8 +1590,13 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
                    result.x, result.y);
           }
 #if ABI_RETURNS_OBJECT_PAIRS_IN_REGS
+#ifdef V8_OS_ZOS
+          set_register(r1, result.x);
+          set_register(r2, result.y);
+#else
           set_register(r2, result.x);
           set_register(r3, result.y);
+#endif
 #else
           memcpy(reinterpret_cast<void *>(result_buffer), &result,
                       sizeof(struct ObjectPair));
@@ -1537,8 +1604,16 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
         }
 #endif
       }
+#ifdef V8_OS_ZOS
+      // Todo(muntasir):In CEntryStub we subtract 2 bytes from the return addr
+      // prior to saving it, fixing this up here, need to investigate why we
+      // are doing this in CEntryStub prior to removing this
+      int64_t saved_lr = *ra_slot + 2;
+#else
       int64_t saved_lr = *reinterpret_cast<intptr_t*>(get_register(sp)
                              + kStackFrameRASlot * kPointerSize);
+#endif
+
 #if (!V8_TARGET_ARCH_S390X && V8_HOST_ARCH_S390)
       // On zLinux-31, the saved_lr might be tagged with a high bit of 1.
       // Cleanse it before proceeding with simulation.
@@ -2341,12 +2416,14 @@ bool Simulator::DecodeFourByte(Instruction* instr) {
       break;
     }
     case TRAP4: {
+#ifndef V8_OS_ZOS
       // whack the space of the caller allocated stack
       int64_t sp_addr = get_register(sp);
       for (int i = 0; i < kCalleeRegisterSaveAreaSize / kPointerSize; ++i) {
         // we dont want to whack the RA (r14)
         if (i != 14) (reinterpret_cast<intptr_t*>(sp_addr))[i] = 0xdeadbabe;
       }
+#endif
       SoftwareInterrupt(instr);
       break;
     }
@@ -3277,6 +3354,26 @@ bool Simulator::DecodeSixByte(Instruction* instr) {
       uint8_t imm_val = siyInstr->I2Value();
       SetS390ConditionCode<uint8_t>(mem_val, imm_val);
       break;
+    }
+    case TR: {
+     //Translate (Mem - Mem)
+      SSInstruction *ssinst = reinterpret_cast<SSInstruction *>(instr);
+      int b1 = ssinst->B1Value();
+      int b2 = ssinst->B2Value();
+      int length = ssinst->Length() + 1;
+      int64_t  b1_val = (b1 == 0) ? 0 : get_register(b1);
+      int64_t  b2_val = (b2 == 0) ? 0 : get_register(b2);
+      intptr_t d1_val = ssinst->D1Value();
+      intptr_t d2_val = ssinst->D2Value();
+      intptr_t target = b1_val + d1_val;
+      intptr_t translation_table = b2_val + d2_val;
+      while(length > 0) {
+        intptr_t table_index   = ReadBU(target);
+        uint8_t  translate_val = ReadBU(translation_table + table_index);
+        WriteB(target, translate_val); 
+        length--;
+      }
+      break;           
     }
     case TMY: {
       // Test Under Mask (Mem - Imm) (8)
@@ -4292,6 +4389,8 @@ int32_t Simulator:: ByteReverse(int32_t word) {
 
 // Executes the current instruction.
 void Simulator::ExecuteInstruction(Instruction* instr, bool auto_incr_pc) {
+  icount_++;
+
   if (v8::internal::FLAG_check_icache) {
     CheckICache(isolate_->simulator_i_cache(), instr);
   }
@@ -4345,7 +4444,6 @@ void Simulator::Execute() {
     // should be stopping at a particular executed instruction.
     while (program_counter != end_sim_pc) {
       Instruction* instr = reinterpret_cast<Instruction*>(program_counter);
-      icount_++;
       ExecuteInstruction(instr);
       program_counter = get_pc();
     }
@@ -4354,7 +4452,6 @@ void Simulator::Execute() {
     // we reach the particular instuction count.
     while (program_counter != end_sim_pc) {
       Instruction* instr = reinterpret_cast<Instruction*>(program_counter);
-      icount_++;
       if (icount_ == ::v8::internal::FLAG_stop_sim_at) {
         S390Debugger dbg(this);
         dbg.Debug();
@@ -4371,14 +4468,18 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
   // Prepare to execute the code at entry
 #if ABI_USES_FUNCTION_DESCRIPTORS
   // entry is the function descriptor
-  set_pc(*(reinterpret_cast<intptr_t *>(entry)));
+  set_pc(*(reinterpret_cast<intptr_t *>(entry+kPointerSize)));
 #else
   // entry is the instruction address
   set_pc(reinterpret_cast<intptr_t>(entry));
 #endif
 // Remember the values of non-volatile registers.
   int64_t r6_val = get_register(r6);
+#ifdef V8_OS_ZOS
+  int64_t r14_val = get_register(r14);
+#else
   int64_t r7_val = get_register(r7);
+#endif
   int64_t r8_val = get_register(r8);
   int64_t r9_val = get_register(r9);
   int64_t r10_val = get_register(r10);
@@ -4390,8 +4491,11 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
   // Put down marker for end of simulation. The simulator will stop simulation
   // when the PC reaches this value. By saving the "end simulation" value into
   // the LR the simulation stops when returning to this call point.
+#ifdef V8_OS_ZOS
+  registers_[7] = end_sim_pc;
+#else
   registers_[14] = end_sim_pc;
-
+#endif
 
 
   // Set up the non-volatile registers with a known value. To be able to check
@@ -4400,7 +4504,11 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
   if (reg_arg_count < 5) {
     set_register(r6, callee_saved_value);
   }
+#ifdef V8_OS_ZOS
+  set_register(r14, callee_saved_value);
+#else
   set_register(r7, callee_saved_value);
+#endif
   set_register(r8, callee_saved_value);
   set_register(r9, callee_saved_value);
   set_register(r10, callee_saved_value);
@@ -4415,7 +4523,11 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
   if (reg_arg_count < 5) {
     CHECK_EQ(callee_saved_value, get_register(r6));
   }
+#ifdef V8_OS_ZOS
+  CHECK_EQ(callee_saved_value, get_register(r14));
+#else
   CHECK_EQ(callee_saved_value, get_register(r7));
+#endif
   CHECK_EQ(callee_saved_value, get_register(r8));
   CHECK_EQ(callee_saved_value, get_register(r9));
   CHECK_EQ(callee_saved_value, get_register(r10));
@@ -4425,7 +4537,11 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
 
   // Restore non-volatile registers with the original value.
   set_register(r6, r6_val);
+#ifdef V8_OS_ZOS
+  set_register(r14, r14_val);
+#else
   set_register(r7, r7_val);
+#endif
   set_register(r8, r8_val);
   set_register(r9, r9_val);
   set_register(r10, r10_val);
@@ -4438,7 +4554,11 @@ void Simulator::CallInternal(byte *entry, int reg_arg_count) {
 intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   // Remember the values of non-volatile registers.
   int64_t r6_val = get_register(r6);
+#ifndef V8_OS_ZOS
   int64_t r7_val = get_register(r7);
+#else
+  int64_t r14_val = get_register(r14);
+#endif
   int64_t r8_val = get_register(r8);
   int64_t r9_val = get_register(r9);
   int64_t r10_val = get_register(r10);
@@ -4451,38 +4571,68 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   va_start(parameters, argument_count);
   // Set up arguments
 
+#ifdef V8_OS_ZOS
+  // First 3 arguments passed in registers r1-r3.
+  int reg_arg_max   = 3;
+  int reg_arg_start = 1;
+#else
   // First 5 arguments passed in registers r2-r6.
-  int reg_arg_count   = (argument_count > 5) ? 5 : argument_count;
+  int reg_arg_max   = 5;
+  int reg_arg_start = 2;
+#endif
+  int reg_arg_count   = (argument_count > reg_arg_max) ?
+                        reg_arg_max : argument_count;
   int stack_arg_count = argument_count - reg_arg_count;
   for (int i = 0; i < reg_arg_count; i++) {
-      intptr_t value = va_arg(parameters, intptr_t);
-      set_register(i + 2, value);
+    intptr_t value = va_arg(parameters, intptr_t);
+    set_register(i + reg_arg_start, value);
   }
 
+#ifdef V8_OS_ZOS
+  // Remaining arguments passed on stack.
+  int64_t original_stack = get_register(r4);
+  // Compute position of stack on entry to generated code.
+  // callee save area + debug_area + arg_area_prefix = 16 * kPointerSize
+  intptr_t entry_stack = original_stack -
+                         (19 * kPointerSize +
+                          stack_arg_count * sizeof(intptr_t));
+#else
   // Remaining arguments passed on stack.
   int64_t original_stack = get_register(sp);
   // Compute position of stack on entry to generated code.
   intptr_t entry_stack = (original_stack -
                           (kCalleeRegisterSaveAreaSize +
                            stack_arg_count * sizeof(intptr_t)));
+#endif
+
   if (base::OS::ActivationFrameAlignment() != 0) {
     entry_stack &= -base::OS::ActivationFrameAlignment();
   }
   // Store remaining arguments on stack, from low to high memory.
-  // +2 is a hack for the LR slot + old SP on PPC
+#ifdef V8_OS_ZOS
+  intptr_t* stack_argument = reinterpret_cast<intptr_t*>(entry_stack +
+    kStackPointerBias + 19 * kPointerSize);
+#else
   intptr_t* stack_argument = reinterpret_cast<intptr_t*>(entry_stack +
     kCalleeRegisterSaveAreaSize);
+#endif
+
   for (int i = 0; i < stack_arg_count; i++) {
     intptr_t value = va_arg(parameters, intptr_t);
     stack_argument[i] = value;
   }
+
   va_end(parameters);
+#ifdef V8_OS_ZOS
+  set_register(r4, entry_stack);
+#else
   set_register(sp, entry_stack);
+#endif
 
   // Prepare to execute the code at entry
 #if ABI_USES_FUNCTION_DESCRIPTORS
   // entry is the function descriptor
-  set_pc(*(reinterpret_cast<intptr_t *>(entry)));
+  set_pc(*(reinterpret_cast<intptr_t *>(entry+kPointerSize)));
 #else
   // entry is the instruction address
   set_pc(reinterpret_cast<intptr_t>(entry));
@@ -4491,8 +4641,11 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   // Put down marker for end of simulation. The simulator will stop simulation
   // when the PC reaches this value. By saving the "end simulation" value into
   // the LR the simulation stops when returning to this call point.
+#ifdef V8_OS_ZOS
+  registers_[7] = end_sim_pc;
+#else
   registers_[14] = end_sim_pc;
-
+#endif
 
 
   // Set up the non-volatile registers with a known value. To be able to check
@@ -4501,7 +4654,12 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   if (reg_arg_count < 5) {
     set_register(r6, callee_saved_value);
   }
+
+#ifndef V8_OS_ZOS
   set_register(r7, callee_saved_value);
+#else
+  set_register(r14, callee_saved_value);
+#endif
   set_register(r8, callee_saved_value);
   set_register(r9, callee_saved_value);
   set_register(r10, callee_saved_value);
@@ -4516,7 +4674,11 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   if (reg_arg_count < 5) {
     CHECK_EQ(callee_saved_value, get_register(r6));
   }
+#ifndef V8_OS_ZOS
   CHECK_EQ(callee_saved_value, get_register(r7));
+#else
+  CHECK_EQ(callee_saved_value, get_register(r14));
+#endif
   CHECK_EQ(callee_saved_value, get_register(r8));
   CHECK_EQ(callee_saved_value, get_register(r9));
   CHECK_EQ(callee_saved_value, get_register(r10));
@@ -4526,7 +4688,11 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
 
   // Restore non-volatile registers with the original value.
   set_register(r6, r6_val);
+#ifndef V8_OS_ZOS
   set_register(r7, r7_val);
+#else
+  set_register(r14, r14_val);
+#endif
   set_register(r8, r8_val);
   set_register(r9, r9_val);
   set_register(r10, r10_val);
@@ -4534,11 +4700,20 @@ intptr_t Simulator::Call(byte* entry, int argument_count, ...) {
   set_register(r12, r12_val);
   set_register(r13, r13_val);
   // Pop stack passed arguments.
+#ifdef V8_OS_ZOS
+  CHECK_EQ(entry_stack, get_register(r4));
+  set_register(r4, original_stack);
+#else
   CHECK_EQ(entry_stack, get_register(sp));
   set_register(sp, original_stack);
+#endif
 
   // Return value register
+#if V8_OS_ZOS
+  intptr_t result = get_register(r3);
+#else
   intptr_t result = get_register(r2);
+#endif
   return result;
 }
 

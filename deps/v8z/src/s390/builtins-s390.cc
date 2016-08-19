@@ -871,7 +871,6 @@ static void GenerateMakeCodeYoungAgainCommon(MacroAssembler* masm) {
 
   // Point r2 at the start of the PlatformCodeAge sequence.
   __ LoadRR(r2, ip);
-
   // The following registers must be saved and restored when calling through to
   // the runtime:
   //   r2 - contains return address (beginning of patch sequence)
@@ -880,12 +879,24 @@ static void GenerateMakeCodeYoungAgainCommon(MacroAssembler* masm) {
   FrameScope scope(masm, StackFrame::MANUAL);
   __ CleanseP(r14);
   __ LoadRR(r0, r14);
+#ifdef V8_OS_ZOS
+  __ MultiPush(r0.bit() | r1.bit() | r2.bit() | r3.bit() | fp.bit());
+#else
   __ MultiPush(r0.bit() | r2.bit() | r3.bit() | fp.bit());
+#endif
   __ PrepareCallCFunction(2, 0, r4);
   __ mov(r3, Operand(ExternalReference::isolate_address(masm->isolate())));
+#ifdef V8_OS_ZOS
+  __ LoadRR(r1, r2);
+  __ LoadRR(r2, r3);
+#endif  
   __ CallCFunction(
       ExternalReference::get_make_code_young_function(masm->isolate()), 2);
+#ifdef V8_OS_ZOS
+  __ MultiPop(r0.bit() | r1.bit() | r2.bit() | r3.bit() | fp.bit());
+#else
   __ MultiPop(r0.bit() | r2.bit() | r3.bit() | fp.bit());
+#endif
   __ LoadRR(r14, r0);
   __ LoadRR(ip, r2);
   __ Jump(ip);
@@ -922,12 +933,25 @@ void Builtins::Generate_MarkCodeAsExecutedOnce(MacroAssembler* masm) {
   FrameScope scope(masm, StackFrame::MANUAL);
   __ CleanseP(r14);
   __ LoadRR(r0, r14);
+#ifdef V8_OS_ZOS
+  __ MultiPush(r0.bit() | r1.bit() | r2.bit() | r3.bit() | fp.bit());
+#else
   __ MultiPush(r0.bit() | r2.bit() | r3.bit() | fp.bit());
+#endif
+  
   __ PrepareCallCFunction(2, 0, r4);
   __ mov(r3, Operand(ExternalReference::isolate_address(masm->isolate())));
+#ifdef V8_OS_ZOS
+  __ LoadRR(r1, r2);
+  __ LoadRR(r2, r3);
+#endif
   __ CallCFunction(ExternalReference::get_mark_code_as_executed_function(
         masm->isolate()), 2);
+#ifdef V8_OS_ZOS
+  __ MultiPop(r0.bit() | r1.bit() | r2.bit() | r3.bit() | fp.bit());
+#else
   __ MultiPop(r0.bit() | r2.bit() | r3.bit() | fp.bit());
+#endif
   __ LoadRR(r14, r0);
   __ LoadRR(ip, r2);
 

@@ -254,7 +254,7 @@ void PPCDebugger::Debug() {
   // make them invisible to all commands.
   UndoBreakpoints();
   // Disable tracing while simulating
-  bool trace=::v8::internal::FLAG_trace_sim;
+  bool trace = ::v8::internal::FLAG_trace_sim;
   ::v8::internal::FLAG_trace_sim = false;
 
   while (!done && !sim_->has_bad_pc()) {
@@ -1871,7 +1871,7 @@ bool Simulator::ExecuteExt2_10bit(Instruction *instr) {
       intptr_t ra_val = ra == 0 ? 0 : get_register(ra);
       intptr_t rb_val = get_register(rb);
       float frs_val = static_cast<float>(get_double_from_d_register(frs));
-      int32_t *p=  reinterpret_cast<int32_t*>(&frs_val);
+      int32_t *p = reinterpret_cast<int32_t*>(&frs_val);
       WriteW(ra_val + rb_val, *p, instr);
       if (opcode == STFSUX) {
         DCHECK(ra != 0);
@@ -3499,7 +3499,7 @@ void Simulator::ExecuteGeneric(Instruction* instr) {
       int32_t offset = SIGN_EXT_IMM16(instr->Bits(15, 0));
       intptr_t ra_val = ra == 0 ? 0 : get_register(ra);
       float frs_val = static_cast<float>(get_double_from_d_register(frs));
-      int32_t *p=  reinterpret_cast<int32_t*>(&frs_val);
+      int32_t *p = reinterpret_cast<int32_t*>(&frs_val);
       WriteW(ra_val + offset, *p, instr);
       if (opcode == STFSU) {
         DCHECK(ra != 0);

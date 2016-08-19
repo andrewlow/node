@@ -7,6 +7,8 @@
 
 #include "v8.h"
 
+#undef index
+
 /**
  * Profiler support for the V8 JavaScript engine.
  */

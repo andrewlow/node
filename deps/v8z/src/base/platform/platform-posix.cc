@@ -20,9 +20,6 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#if !defined(_AIX)
-#include <sys/syscall.h>
-#endif
 #include <sys/time.h>
 #include <sys/types.h>
 #if defined(__linux__)
@@ -53,6 +50,10 @@
 #include "src/base/platform/time.h"
 #include "src/base/utils/random-number-generator.h"
 
+#if !defined(_AIX) && !defined(V8_OS_ZOS)
+#include <sys/syscall.h>
+#endif
+
 #ifdef V8_FAST_TLS_SUPPORTED
 #include "src/base/atomicops.h"
 #endif
@@ -63,7 +64,12 @@ namespace base {
 namespace {
 
 // 0 is never a valid thread id.
-const pthread_t kNoThread = (pthread_t) 0;
+#if V8_OS_ZOS
+  // TODO(mcornac):
+  const pthread_t kNoThread = {0, 0, 0, 0, 0, 0, 0, 0};
+#else
+  const pthread_t kNoThread = (pthread_t) 0;
+#endif
 
 bool g_hard_abort = false;
 
@@ -73,7 +79,12 @@ const char* g_gc_fake_mmap = NULL;
 
 
 int OS::NumberOfProcessorsOnline() {
+#if V8_OS_ZOS
+  // TODO(mcornac):
+  return 1;
+#else
   return static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
+#endif
 }
 
 
@@ -139,6 +150,9 @@ uint64_t OS::TotalPhysicalMemory() {
   }
   // convert Kb to bytes.
   return static_cast<uint64_t>(realMem) * 1024;
+#elif V8_OS_ZOS
+  // TODO(mcornac):
+  return 0;
 #else
   intptr_t pages = sysconf(_SC_PHYS_PAGES);
   intptr_t page_size = sysconf(_SC_PAGESIZE);
@@ -180,10 +194,14 @@ intptr_t OS::CommitPageSize() {
 
 
 void OS::Free(void* address, const size_t size) {
+#if V8_OS_ZOS
+  free(address);
+#else
   // TODO(1240712): munmap has a return value which is ignored here.
   int result = munmap(address, size);
   USE(result);
   DCHECK(result == 0);
+#endif
 }
 
 
@@ -233,7 +251,7 @@ const char* OS::GetGCFakeMMapFile() {
 
 
 void* OS::GetRandomMmapAddr() {
-#if V8_OS_NACL
+#if V8_OS_NACL || V8_OS_ZOS
   // TODO(bradchen): restore randomization once Native Client gets
   // smarter about using mmap address hints.
   // See http://code.google.com/p/nativeclient/issues/3341
@@ -307,8 +325,9 @@ size_t OS::AllocateAlignment() {
 }
 
 
-void OS::Sleep(TimeDelta interval) {
-  usleep(static_cast<useconds_t>(interval.InMicroseconds()));
+void OS::Sleep(int milliseconds) {
+  useconds_t ms = static_cast<useconds_t>(milliseconds);
+  usleep(1000 * ms);
 }
 
 
@@ -331,8 +350,12 @@ void OS::DebugBreak() {
 #elif V8_HOST_ARCH_MIPS64
   asm("break");
 #elif V8_HOST_ARCH_S390
+#if V8_OS_ZOS
+  // TODO(mcornac):
+#else
   // Software breakpoint instruction is 0x0001
   asm volatile(".word 0x0001");
+#endif
 #elif V8_HOST_ARCH_PPC
   asm("twge 2,2");
 #elif V8_HOST_ARCH_IA32
@@ -367,12 +390,19 @@ int OS::GetCurrentProcessId() {
   return static_cast<int>(getpid());
 }
 
-
+#if defined(V8_OS_ZOS)
+pthread_t OS::GetCurrentThreadId() {
+#else
 int OS::GetCurrentThreadId() {
+#endif
+
 #if defined(ANDROID)
   return static_cast<int>(syscall(__NR_gettid));
 #elif V8_OS_AIX
   return static_cast<int>(thread_self());
+#elif V8_OS_ZOS
+  // TODO(mcornac):
+  return pthread_self();
 #else
   return static_cast<int>(syscall(SYS_gettid));
 #endif  // defined(ANDROID)
@@ -417,7 +447,7 @@ void OS::ClearTimezoneCache(TimezoneCache* cache) {
 
 
 double OS::DaylightSavingsOffset(double time, TimezoneCache*) {
-  if (std::isnan(time)) return nan_value();
+  if (isnan(time)) return nan_value();
   time_t tv = static_cast<time_t>(std::floor(time/msPerSecond));
   struct tm* t = localtime(&tv);
   if (NULL == t) return nan_value();
@@ -611,7 +641,10 @@ static void* ThreadEntry(void* arg) {
   // one).
   { LockGuard<Mutex> lock_guard(&thread->data()->thread_creation_mutex_); }
   SetThreadName(thread->name());
+#ifndef V8_OS_ZOS
+  // TODO(muntasir): FIXME
   DCHECK(thread->data()->thread_ != kNoThread);
+#endif
   thread->NotifyStartedAndRun();
   return NULL;
 }
@@ -650,7 +683,10 @@ void Thread::Start() {
   DCHECK_EQ(0, result);
   result = pthread_attr_destroy(&attr);
   DCHECK_EQ(0, result);
+#ifndef V8_OS_ZOS
+  // TODO(muntasir): FIXME
   DCHECK(data_->thread_ != kNoThread);
+#endif
   USE(result);
 }
 

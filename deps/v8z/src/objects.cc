@@ -923,7 +923,7 @@ bool Object::SameValue(Object* other) {
     double other_value = other->Number();
     bool equal = this_value == other_value;
     // SameValue(NaN, NaN) is true.
-    if (!equal) return std::isnan(this_value) && std::isnan(other_value);
+    if (!equal) return isnan(this_value) && isnan(other_value);
     // SameValue(0.0, -0.0) is false.
     return (this_value != 0) || ((1 / this_value) == (1 / other_value));
   }
@@ -944,7 +944,7 @@ bool Object::SameValueZero(Object* other) {
     double other_value = other->Number();
     // +0 == -0 is true
     return this_value == other_value
-        || (std::isnan(this_value) && std::isnan(other_value));
+        || (isnan(this_value) && isnan(other_value));
   }
   if (IsString() && other->IsString()) {
     return String::cast(this)->Equals(String::cast(other));
@@ -1196,7 +1196,7 @@ void String::StringShortPrint(StringStream* accumulator) {
   for (int i = 0; i < len; i++) {
     uint16_t c = stream.GetNext();
 
-    if (c < 32 || c >= 127) {
+    if (GET_ASCII_CODE(c) < 32 || GET_ASCII_CODE(c) >= 127) {
       ascii = false;
     }
   }
@@ -1219,7 +1219,7 @@ void String::StringShortPrint(StringStream* accumulator) {
         accumulator->Add("\\r");
       } else if (c == '\\') {
         accumulator->Add("\\\\");
-      } else if (c < 32 || c > 126) {
+      } else if (GET_ASCII_CODE(c) < 32 || GET_ASCII_CODE(c) > 126) {
         accumulator->Add("\\x%02x", c);
       } else {
         accumulator->Put(static_cast<char>(c));
@@ -9026,7 +9026,36 @@ template <typename Char>
 static inline bool CompareRawStringContents(const Char* const a,
                                             const Char* const b,
                                             int length) {
-  return CompareChars(a, b, length) == 0;
+  int i = 0;
+#ifndef V8_HOST_CAN_READ_UNALIGNED
+  // If this architecture isn't comfortable reading unaligned ints
+  // then we have to check that the strings are aligned before
+  // comparing them blockwise.
+  const int kAlignmentMask = sizeof(uint32_t) - 1;  // NOLINT
+  uintptr_t pa_addr = reinterpret_cast<uintptr_t>(a);
+  uintptr_t pb_addr = reinterpret_cast<uintptr_t>(b);
+  if (((pa_addr & kAlignmentMask) | (pb_addr & kAlignmentMask)) == 0) {
+#endif
+    const int kStepSize = sizeof(int) / sizeof(Char);  // NOLINT
+    int endpoint = length - kStepSize;
+    // Compare blocks until we reach near the end of the string.
+    for (; i <= endpoint; i += kStepSize) {
+      uint32_t wa = *reinterpret_cast<const uint32_t*>(a + i);
+      uint32_t wb = *reinterpret_cast<const uint32_t*>(b + i);
+      if (wa != wb) {
+        return false;
+      }
+    }
+#ifndef V8_HOST_CAN_READ_UNALIGNED
+  }
+#endif
+  // Compare the remaining characters that didn't fit into a block.
+  for (; i < length; i++) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 
@@ -9308,7 +9337,7 @@ bool String::IsUtf8EqualTo(Vector<const char> str, bool allow_prefix_match) {
       if (Get(i++) != unibrow::Utf16::LeadSurrogate(r)) return false;
       if (Get(i) != unibrow::Utf16::TrailSurrogate(r)) return false;
     } else {
-      if (Get(i) != r) return false;
+      if (GET_ASCII_CODE(Get(i)) != r) return false;
     }
     utf8_data += cursor;
     remaining_in_str -= cursor;
@@ -9467,7 +9496,7 @@ uint32_t StringHasher::ComputeUtf8Hash(Vector<const char> chars,
   // Handle some edge cases
   if (vector_length <= 1) {
     DCHECK(vector_length == 0 ||
-           static_cast<uint8_t>(chars.start()[0]) <=
+           static_cast<uint8_t>(GET_ASCII_CODE(chars[0])) <=
                unibrow::Utf8::kMaxOneByteChar);
     *utf16_length_out = vector_length;
     return HashSequentialString(chars.start(), vector_length, seed);
@@ -11402,10 +11431,7 @@ void Code::Disassemble(const char* name, OStream& os) {  // NOLINT
 
   os << "Instructions (size = " << instruction_size() << ")\n";
   // TODO(svenpanne) The Disassembler should use streams, too!
-  {
-    CodeTracer::Scope trace_scope(GetIsolate()->GetCodeTracer());
-    Disassembler::Decode(trace_scope.file(), this);
-  }
+  Disassembler::Decode(stdout, this);
   os << "\n";
 
   if (kind() == FUNCTION) {
@@ -14561,6 +14587,7 @@ template class Dictionary<UnseededNumberDictionary,
                           UnseededNumberDictionaryShape,
                           uint32_t>;
 
+#ifndef V8_OS_ZOS
 template Handle<SeededNumberDictionary>
 Dictionary<SeededNumberDictionary, SeededNumberDictionaryShape, uint32_t>::
     New(Isolate*, int at_least_space_for, PretenureFlag pretenure);
@@ -14679,7 +14706,7 @@ int Dictionary<NameDictionary, NameDictionaryShape, Handle<Name> >::
 template
 int HashTable<SeededNumberDictionary, SeededNumberDictionaryShape, uint32_t>::
     FindEntry(uint32_t);
-
+#endif
 
 Handle<Object> JSObject::PrepareSlowElementsForSort(
     Handle<JSObject> object, uint32_t limit) {
@@ -16692,7 +16719,7 @@ Object* JSDate::DoGetField(FieldIndex index) {
   }
 
   double time = value()->Number();
-  if (std::isnan(time)) return GetIsolate()->heap()->nan_value();
+  if (isnan(time)) return GetIsolate()->heap()->nan_value();
 
   int64_t local_time_ms = date_cache->ToLocal(static_cast<int64_t>(time));
   int days = DateCache::DaysFromTime(local_time_ms);
@@ -16711,7 +16738,7 @@ Object* JSDate::GetUTCField(FieldIndex index,
                             DateCache* date_cache) {
   DCHECK(index >= kFirstUTCField);
 
-  if (std::isnan(value)) return GetIsolate()->heap()->nan_value();
+  if (isnan(value)) return GetIsolate()->heap()->nan_value();
 
   int64_t time_ms = static_cast<int64_t>(value);
 

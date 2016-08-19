@@ -129,12 +129,12 @@ void StringStream::Add(Vector<const char> format, Vector<FmtElm> elms) {
     }
     case 'f': case 'g': case 'G': case 'e': case 'E': {
       double value = current.data_.u_double_;
-      int inf = std::isinf(value);
+      int inf = isinf(value);
       if (inf == -1) {
         Add("-inf");
       } else if (inf == 1) {
         Add("inf");
-      } else if (std::isnan(value)) {
+      } else if (isnan(value)) {
         Add("nan");
       } else {
         EmbeddedVector<char, 28> formatted;
@@ -299,9 +299,11 @@ bool StringStream::Put(String* str, int start, int end) {
   StringCharacterStream stream(str, &op, start);
   for (int i = start; i < end && stream.HasMore(); i++) {
     uint16_t c = stream.GetNext();
+#ifndef V8_OS_ZOS
     if (c >= 127 || c < 32) {
       c = '?';
     }
+#endif
     if (!Put(static_cast<char>(c))) {
       return false;  // Output was truncated.
     }

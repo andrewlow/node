@@ -17,8 +17,8 @@
 #include "src/strtod.h"
 #include "src/utils.h"
 
-#ifndef _STLP_VENDOR_CSTD
-// STLPort doesn't import fpclassify into the std namespace.
+#if !defined(_STLP_VENDOR_CSTD) && !defined(V8_OS_ZOS)
+// STLPort and xlC do not import fpclassify into the std namespace.
 using std::fpclassify;
 #endif
 

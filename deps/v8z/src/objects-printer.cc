@@ -602,7 +602,11 @@ void String::StringPrint(OStream& os) {  // NOLINT
     }
   }
   for (int i = 0; i < len; i++) {
-    os << AsUC16(Get(i));
+#ifndef V8_OS_ZOS
+      os << AsUC16(Get(i));
+#else
+      os << static_cast<char>(Get(i));
+#endif
   }
   if (len != length()) {
     os << truncated_epilogue;

@@ -4822,7 +4822,7 @@ THREADED_TEST(ConversionException) {
   CheckUncle(&try_catch);
 
   double number_value = obj->NumberValue();
-  CHECK_NE(0, std::isnan(number_value));
+  CHECK_NE(0, isnan(number_value));
   CheckUncle(&try_catch);
 
   int64_t integer_value = obj->IntegerValue();
@@ -15237,12 +15237,10 @@ class RegExpInterruptionThread : public v8::base::Thread {
     for (regexp_interruption_data.loop_count = 0;
          regexp_interruption_data.loop_count < 7;
          regexp_interruption_data.loop_count++) {
-      // Wait a bit before requesting GC.
-      v8::base::OS::Sleep(v8::base::TimeDelta::FromMilliseconds(50));
+      v8::base::OS::Sleep(50);  // Wait a bit before requesting GC.
       reinterpret_cast<i::Isolate*>(isolate_)->stack_guard()->RequestGC();
     }
-    // Wait a bit before terminating.
-    v8::base::OS::Sleep(v8::base::TimeDelta::FromMilliseconds(50));
+    v8::base::OS::Sleep(50);  // Wait a bit before terminating.
     v8::V8::TerminateExecution(isolate_);
   }
 
@@ -18106,7 +18104,7 @@ static uint64_t DoubleToBits(double value) {
 
 static double DoubleToDateTime(double input) {
   double date_limit = 864e13;
-  if (std::isnan(input) || input < -date_limit || input > date_limit) {
+  if (isnan(input) || input < -date_limit || input > date_limit) {
     return v8::base::OS::nan_value();
   }
   return (input < 0) ? -(std::floor(-input)) : std::floor(input);
@@ -18169,7 +18167,7 @@ THREADED_TEST(QuietSignalingNaNs) {
     // Check that Number::New preserves non-NaNs and quiets SNaNs.
     v8::Handle<v8::Value> number = v8::Number::New(isolate, test_value);
     double stored_number = number->NumberValue();
-    if (!std::isnan(test_value)) {
+    if (!isnan(test_value)) {
       CHECK_EQ(test_value, stored_number);
     } else {
       uint64_t stored_bits = DoubleToBits(stored_number);
@@ -18190,7 +18188,7 @@ THREADED_TEST(QuietSignalingNaNs) {
         v8::Date::New(isolate, test_value);
     double expected_stored_date = DoubleToDateTime(test_value);
     double stored_date = date->NumberValue();
-    if (!std::isnan(expected_stored_date)) {
+    if (!isnan(expected_stored_date)) {
       CHECK_EQ(expected_stored_date, stored_date);
     } else {
       uint64_t stored_bits = DoubleToBits(stored_date);
@@ -20696,38 +20694,6 @@ void CallCompletedCallbackException() {
 }
 
 
-TEST(SealHandleScope) {
-  v8::Isolate* isolate = CcTest::isolate();
-  v8::HandleScope handle_scope(isolate);
-  LocalContext env;
-
-  v8::SealHandleScope seal(isolate);
-
-  // Should fail
-  v8::Local<v8::Object> obj = v8::Object::New(isolate);
-
-  USE(obj);
-}
-
-
-TEST(SealHandleScopeNested) {
-  v8::Isolate* isolate = CcTest::isolate();
-  v8::HandleScope handle_scope(isolate);
-  LocalContext env;
-
-  v8::SealHandleScope seal(isolate);
-
-  {
-    v8::HandleScope handle_scope(isolate);
-
-    // Should work
-    v8::Local<v8::Object> obj = v8::Object::New(isolate);
-
-    USE(obj);
-  }
-}
-
-
 TEST(CallCompletedCallbackOneException) {
   LocalContext env;
   v8::HandleScope scope(env->GetIsolate());
@@ -21621,7 +21587,7 @@ class ThreadInterruptTest {
       struct sigaction action;
 
       // Ensure that we'll enter waiting condition
-      v8::base::OS::Sleep(v8::base::TimeDelta::FromMilliseconds(100));
+      v8::base::OS::Sleep(100);
 
       // Setup signal handler
       memset(&action, 0, sizeof(action));
@@ -21632,7 +21598,7 @@ class ThreadInterruptTest {
       kill(getpid(), SIGCHLD);
 
       // Ensure that if wait has returned because of error
-      v8::base::OS::Sleep(v8::base::TimeDelta::FromMilliseconds(100));
+      v8::base::OS::Sleep(100);
 
       // Set value and signal semaphore
       test_->sem_value_ = 1;

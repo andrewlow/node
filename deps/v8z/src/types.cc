@@ -124,7 +124,7 @@ template<class Config>
 int TypeImpl<Config>::BitsetType::Lub(double value) {
   DisallowHeapAllocation no_allocation;
   if (i::IsMinusZero(value)) return kMinusZero;
-  if (std::isnan(value)) return kNaN;
+  if (isnan(value)) return kNaN;
   if (IsUint32Double(value)) return Lub(FastD2UI(value));
   if (IsInt32Double(value)) return Lub(FastD2I(value));
   return kOtherNumber;

@@ -23,7 +23,7 @@ bool Locker::active_ = false;
 // the lock for a given isolate.
 void Locker::Initialize(v8::Isolate* isolate) {
   DCHECK(isolate != NULL);
-  has_lock_= false;
+  has_lock_ = false;
   top_level_ = true;
   isolate_ = reinterpret_cast<i::Isolate*>(isolate);
   // Record that the Locker has been used at least once.

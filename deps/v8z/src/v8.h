@@ -46,6 +46,13 @@
 #include "src/types-inl.h"  // NOLINT
 #include "src/zone-inl.h"  // NOLINT
 
+#ifndef V8_OS_ZOS
+// xlC does not import isnan, isinf or isfinite into the std namespace.
+#define isnan(x) std::isnan(x)
+#define isfinite(x) std::isfinite(x)
+#define signbit(x) std::signbit(x)
+#endif
+
 namespace v8 {
 namespace internal {
 

@@ -117,11 +117,6 @@ consts_misc = [
 
     { 'name': 'bit_field3_dictionary_map_shift',
         'value': 'Map::DictionaryMap::kShift' },
-    { 'name': 'fieldindex_mask',
-       'value': 'PropertyDetails::FieldIndexField::kMask' },
-    { 'name': 'fieldindex_shift',
-       'value': 'PropertyDetails::FieldIndexField::kShift' },
-
 
     { 'name': 'off_fp_context',
         'value': 'StandardFrameConstants::kContextOffset' },
@@ -147,7 +142,7 @@ extras_accessors = [
     'Map, instance_size, int, kInstanceSizeOffset',
     'Map, bit_field, char, kBitFieldOffset',
     'Map, bit_field2, char, kBitField2Offset',
-    'Map, bit_field3, int, kBitField3Offset',
+    'Map, bit_field3, SMI, kBitField3Offset',
     'Map, prototype, Object, kPrototypeOffset',
     'NameDictionaryShape, prefix_size, int, kPrefixSize',
     'NameDictionaryShape, entry_size, int, kEntrySize',

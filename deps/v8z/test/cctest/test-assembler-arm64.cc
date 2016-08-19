@@ -5719,26 +5719,26 @@ static float MinMaxHelper(float n,
   uint32_t raw_n = float_to_rawbits(n);
   uint32_t raw_m = float_to_rawbits(m);
 
-  if (std::isnan(n) && ((raw_n & kSQuietNanMask) == 0)) {
+  if (isnan(n) && ((raw_n & kSQuietNanMask) == 0)) {
     // n is signalling NaN.
     return rawbits_to_float(raw_n | kSQuietNanMask);
-  } else if (std::isnan(m) && ((raw_m & kSQuietNanMask) == 0)) {
+  } else if (isnan(m) && ((raw_m & kSQuietNanMask) == 0)) {
     // m is signalling NaN.
     return rawbits_to_float(raw_m | kSQuietNanMask);
   } else if (quiet_nan_substitute == 0.0) {
-    if (std::isnan(n)) {
+    if (isnan(n)) {
       // n is quiet NaN.
       return n;
-    } else if (std::isnan(m)) {
+    } else if (isnan(m)) {
       // m is quiet NaN.
       return m;
     }
   } else {
     // Substitute n or m if one is quiet, but not both.
-    if (std::isnan(n) && !std::isnan(m)) {
+    if (isnan(n) && !isnan(m)) {
       // n is quiet NaN: replace with substitute.
       n = quiet_nan_substitute;
-    } else if (!std::isnan(n) && std::isnan(m)) {
+    } else if (!isnan(n) && isnan(m)) {
       // m is quiet NaN: replace with substitute.
       m = quiet_nan_substitute;
     }
@@ -5760,26 +5760,26 @@ static double MinMaxHelper(double n,
   uint64_t raw_n = double_to_rawbits(n);
   uint64_t raw_m = double_to_rawbits(m);
 
-  if (std::isnan(n) && ((raw_n & kDQuietNanMask) == 0)) {
+  if (isnan(n) && ((raw_n & kDQuietNanMask) == 0)) {
     // n is signalling NaN.
     return rawbits_to_double(raw_n | kDQuietNanMask);
-  } else if (std::isnan(m) && ((raw_m & kDQuietNanMask) == 0)) {
+  } else if (isnan(m) && ((raw_m & kDQuietNanMask) == 0)) {
     // m is signalling NaN.
     return rawbits_to_double(raw_m | kDQuietNanMask);
   } else if (quiet_nan_substitute == 0.0) {
-    if (std::isnan(n)) {
+    if (isnan(n)) {
       // n is quiet NaN.
       return n;
-    } else if (std::isnan(m)) {
+    } else if (isnan(m)) {
       // m is quiet NaN.
       return m;
     }
   } else {
     // Substitute n or m if one is quiet, but not both.
-    if (std::isnan(n) && !std::isnan(m)) {
+    if (isnan(n) && !isnan(m)) {
       // n is quiet NaN: replace with substitute.
       n = quiet_nan_substitute;
-    } else if (!std::isnan(n) && std::isnan(m)) {
+    } else if (!isnan(n) && isnan(m)) {
       // m is quiet NaN: replace with substitute.
       m = quiet_nan_substitute;
     }
@@ -10565,8 +10565,8 @@ TEST(process_nan_float) {
 
 
 static void ProcessNaNsHelper(double n, double m, double expected) {
-  DCHECK(std::isnan(n) || std::isnan(m));
-  DCHECK(std::isnan(expected));
+  DCHECK(isnan(n) || isnan(m));
+  DCHECK(isnan(expected));
 
   SETUP();
   START();
@@ -10637,8 +10637,8 @@ TEST(process_nans_double) {
 
 
 static void ProcessNaNsHelper(float n, float m, float expected) {
-  DCHECK(std::isnan(n) || std::isnan(m));
-  DCHECK(std::isnan(expected));
+  DCHECK(isnan(n) || isnan(m));
+  DCHECK(isnan(expected));
 
   SETUP();
   START();
@@ -10709,10 +10709,10 @@ TEST(process_nans_float) {
 
 
 static void DefaultNaNHelper(float n, float m, float a) {
-  DCHECK(std::isnan(n) || std::isnan(m) || std::isnan(a));
+  DCHECK(isnan(n) || isnan(m) || isnan(a));
 
-  bool test_1op = std::isnan(n);
-  bool test_2op = std::isnan(n) || std::isnan(m);
+  bool test_1op = isnan(n);
+  bool test_2op = isnan(n) || isnan(m);
 
   SETUP();
   START();
@@ -10837,10 +10837,10 @@ TEST(default_nan_float) {
 
 
 static void DefaultNaNHelper(double n, double m, double a) {
-  DCHECK(std::isnan(n) || std::isnan(m) || std::isnan(a));
+  DCHECK(isnan(n) || isnan(m) || isnan(a));
 
-  bool test_1op = std::isnan(n);
-  bool test_2op = std::isnan(n) || std::isnan(m);
+  bool test_1op = isnan(n);
+  bool test_2op = isnan(n) || isnan(m);
 
   SETUP();
   START();

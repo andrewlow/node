@@ -59,7 +59,7 @@ UnaryMathFunction CreateExpFunction() {
         temp1, temp2, temp3);
     __ Pop(temp3, temp2, temp1);
     __ ldr(d0, result);
-    __ Ret();
+    __ RetC();
   }
 
   CodeDesc desc;
@@ -99,8 +99,7 @@ UnaryMathFunction CreateSqrtFunction() {
   __ MovFromFloatParameter(d0);
   __ sqdbr(d0, d0);
   __ MovToFloatResult(d0);
-  __ Ret();
-
+  __ RetC();
   CodeDesc desc;
   masm.GetCode(&desc);
 #if !ABI_USES_FUNCTION_DESCRIPTORS
@@ -495,7 +494,8 @@ void StringCharLoadGenerator::Generate(MacroAssembler* masm,
                                        Register string,
                                        Register index,
                                        Register result,
-                                       Label* call_runtime) {
+                                       Label* call_runtime,
+                                       bool translate_to_ascii) {
   // Fetch the instance type of the receiver into result register.
   __ LoadP(result, FieldMemOperand(string, HeapObject::kMapOffset));
   __ LoadlB(result, FieldMemOperand(result, Map::kInstanceTypeOffset));
@@ -569,19 +569,37 @@ void StringCharLoadGenerator::Generate(MacroAssembler* masm,
   __ LoadP(string,
            FieldMemOperand(string, ExternalString::kResourceDataOffset));
 
-  Label ascii, done;
+  Label ascii, convert, done;
   __ bind(&check_encoding);
   STATIC_ASSERT(kTwoByteStringTag == 0);
   __ mov(r0, Operand(kStringEncodingMask));
   __ AndP(r0, result);
   __ bne(&ascii, Label::kNear);
+
   // Two-byte string.
   __ ShiftLeftP(result, index, Operand(1));
   __ LoadLogicalHalfWordP(result, MemOperand(string, result));
+  if (translate_to_ascii) {
+    // If the character is in one byte range then it still needs ebcdic to ascii
+    // conversion.
+    __ CmpP(result, Operand(256));
+    __ blt(&convert, Label::kNear);
+  }
   __ b(&done, Label::kNear);
+
   __ bind(&ascii);
   // Ascii string.
   __ LoadlB(result, MemOperand(string, index));
+  
+  if (translate_to_ascii) {
+    __ bind(&convert);
+    __ lay(sp, MemOperand(sp, -kPointerSize));
+    __ StoreByte(result, MemOperand(sp, 0));
+    __ mov(result, Operand(ExternalReference::ebcdic_to_ascii_table()));
+    __ Translate(sp, MemOperand(result, 0), 0);
+    __ LoadlB(result, MemOperand(sp, 0));
+    __ pop();
+  }
   __ bind(&done);
 }
 

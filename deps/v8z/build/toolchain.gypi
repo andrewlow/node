@@ -520,6 +520,25 @@
           },
         },
       }],
+      ['OS=="os390"', {
+        'cflags': [
+          '-qasmlib=sys1.maclib:sys1.modgen',
+          '-qasm',
+          '-qenum=4',
+          '-qdebug=nohook',
+          '-qCSECT=v8z',
+          '-D_XOPEN_SOURCE_EXTENDED=1',
+          '-D_XOPEN_SOURCE=500',
+          '-qbitfield=signed',
+          '-qnortti',
+          '-Wc,expo',
+          '-g',
+          '-D__IBMCPP_TR1__',
+          '-D__BIG_ENDIAN=4321',
+          '-D__BYTE_ORDER=__BIG_ENDIAN',
+          '-D_OPEN_SYS_TIMED_EXT=1',
+        ],
+      }],
       ['(OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris" \
          or OS=="netbsd" or OS=="mac" or OS=="android" or OS=="qnx") and \
         (v8_target_arch=="arm" or v8_target_arch=="ia32" or \

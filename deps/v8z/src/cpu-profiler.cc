@@ -108,32 +108,16 @@ ProfilerEventsProcessor::SampleProcessingResult
 
 void ProfilerEventsProcessor::Run() {
   while (running_) {
-    base::TimeTicks nextSampleTime =
-        base::TimeTicks::HighResolutionNow() + period_;
-    base::TimeTicks now;
-    SampleProcessingResult result;
-    // Keep processing existing events until we need to do next sample
-    // or the ticks buffer is empty.
+    base::ElapsedTimer timer;
+    timer.Start();
+    // Keep processing existing events until we need to do next sample.
     do {
-      result = ProcessOneSample();
-      if (result == FoundSampleForNextCodeEvent) {
+      if (FoundSampleForNextCodeEvent == ProcessOneSample()) {
         // All ticks of the current last_processed_code_event_id_ are
         // processed, proceed to the next code event.
         ProcessCodeEvent();
       }
-      now = base::TimeTicks::HighResolutionNow();
-    } while (result != NoSamplesInQueue && now < nextSampleTime);
-
-    if (nextSampleTime > now) {
-#if V8_OS_WIN
-      // Do not use Sleep on Windows as it is very imprecise.
-      // Could be up to 16ms jitter, which is unacceptable for the purpose.
-      while (base::TimeTicks::HighResolutionNow() < nextSampleTime) {
-      }
-#else
-      base::OS::Sleep(nextSampleTime - now);
-#endif
-    }
+    } while (!timer.HasExpired(period_));
 
     // Schedule next sample. sampler_ is NULL in tests.
     if (sampler_) sampler_->DoSample();

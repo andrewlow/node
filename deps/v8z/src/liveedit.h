@@ -56,7 +56,7 @@ class LiveEditFunctionTracker {
 };
 
 
-class LiveEdit : AllStatic {
+class LiveEdit : private AllStatic {
  public:
   // Describes how exactly a frame has been dropped from stack.
   enum FrameDropMode {

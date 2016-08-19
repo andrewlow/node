@@ -108,7 +108,11 @@ void Semaphore::Wait() {
 bool Semaphore::WaitFor(const TimeDelta& rel_time) {
   // Compute the time for end of timeout.
   const Time time = Time::NowFromSystemTime() + rel_time;
+#if V8_OS_ZOS
+  struct timespec ts = time.ToTimespec();
+#else
   const struct timespec ts = time.ToTimespec();
+#endif
 
   // Wait for semaphore signalled or timeout.
   while (true) {

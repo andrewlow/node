@@ -3497,8 +3497,16 @@ void FullCodeGenerator::EmitDateField(CallRuntime* expr) {
     }
     __ bind(&runtime);
     __ PrepareCallCFunction(2, scratch1);
+#ifdef V8_OS_ZOS
+    __ LoadRR(r1, object);
+    __ LoadSmiLiteral(r2, index);
+#else
     __ LoadSmiLiteral(r3, index);
+#endif    
     __ CallCFunction(ExternalReference::get_date_field_function(isolate()), 2);
+#ifdef V8_OS_ZOS
+    __ LoadRR(result, r3);
+#endif
     __ b(&done);
   }
 

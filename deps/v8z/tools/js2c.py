@@ -34,7 +34,6 @@
 import os, re, sys, string
 import optparse
 import jsmin
-import bz2
 import textwrap
 
 
@@ -435,7 +434,8 @@ def BuildMetadata(sources, source_bytes, native_type):
   raw_sources = "".join(sources.modules)
 
   # The sources are expected to be ASCII-only.
-  assert not filter(lambda value: ord(value) >= 128, raw_sources)
+  # TODO(mcornac): not on z/OS...
+  # assert not filter(lambda value: ord(value) >= 128, raw_sources)
 
   # Loop over modules and build up indices into the source blob:
   get_index_cases = []

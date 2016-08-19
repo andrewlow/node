@@ -91,7 +91,7 @@ static inline void *mmapHelper(size_t len, int prot, int flags,
 
 
 const char* OS::LocalTimezone(double time, TimezoneCache* cache) {
-  if (std::isnan(time)) return "";
+  if (isnan(time)) return "";
   time_t tv = static_cast<time_t>(floor(time/msPerSecond));
   struct tm* t = localtime(&tv);
   if (NULL == t) return "";
