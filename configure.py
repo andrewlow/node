@@ -871,6 +871,8 @@ def host_arch_cc():
     # we only support gcc at this point and the default on AIX
     # would be xlc so hard code gcc
     k = cc_macros('gcc')
+  elif sys.platform.startswith('zos'):
+    return 's390x';
   else:
     k = cc_macros(os.environ.get('CC_host'))
 
@@ -1129,6 +1131,8 @@ def configure_node(o):
     shlib_suffix = '%s.dylib'
   elif sys.platform.startswith('aix'):
     shlib_suffix = '%s.a'
+  elif sys.platform.startswith('zos'):
+    shlib_suffix = '%s.x'
   else:
     shlib_suffix = 'so.%s'
   if '%s' in shlib_suffix:
