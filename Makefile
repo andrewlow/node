@@ -9,7 +9,7 @@ FLAKY_TESTS ?= run
 TEST_CI_ARGS ?=
 STAGINGSERVER ?= node-www
 LOGLEVEL ?= silent
-OSTYPE := $(shell uname -s | tr '[A-Z]' '[a-z]')
+OSTYPE := $(shell uname -s | tr '[A-Z]' '[a-z]' | tr -d '/')
 COVTESTS ?= test-cov
 COV_SKIP_TESTS ?= core_line_numbers.js,testFinalizer.js,test_function/test.js
 GTEST_FILTER ?= "*"
@@ -802,7 +802,7 @@ endif # ifeq ($(DISTTYPE),release)
 
 DISTTYPEDIR ?= $(DISTTYPE)
 RELEASE=$(shell sed -ne 's/\#define NODE_VERSION_IS_RELEASE \([01]\)/\1/p' src/node_version.h)
-PLATFORM=$(shell uname | tr '[:upper:]' '[:lower:]')
+PLATFORM=$(shell uname | tr '[:upper:]' '[:lower:]' | tr -d '/')
 NPMVERSION=v$(shell cat deps/npm/package.json | grep '"version"' | sed 's/^[^:]*: "\([^"]*\)",.*/\1/')
 
 UNAME_M=$(shell uname -m)
@@ -824,6 +824,9 @@ else
 ifeq ($(findstring s390,$(UNAME_M)),s390)
 DESTCPU ?= s390
 else
+ifeq ($(findstring OS/390,$(shell uname -s)),OS/390)
+DESTCPU ?= s390x
+else
 ifeq ($(findstring arm,$(UNAME_M)),arm)
 DESTCPU ?= arm
 else
@@ -834,6 +837,7 @@ ifeq ($(findstring powerpc,$(shell uname -p)),powerpc)
 DESTCPU ?= ppc64
 else
 DESTCPU ?= x86
+endif
 endif
 endif
 endif

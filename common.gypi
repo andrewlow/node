@@ -507,7 +507,19 @@
           #      see https://github.com/nodejs/node/pull/21848
           #      or https://github.com/nodejs/node/issues/27925
           'OPENSSL_NO_PINSHARED'
-        ],
+        ]
+      }],
+      ['OS == "zos"', {
+         'cflags': [
+           '-q64',
+           '-Wc,DLL',
+           '-qARCH=9',
+           '-qTUNE=10',
+           '-qENUM=INT',
+           ],
+           'ldflags': [
+            '-q64',
+           ],
       }],
       ['node_shared_openssl!="true"', {
         # `OPENSSL_THREADS` is defined via GYP for openSSL for all architectures.
