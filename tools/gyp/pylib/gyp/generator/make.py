@@ -96,6 +96,8 @@ def CalculateVariables(default_variables, params):
     default_variables.setdefault('OS', operating_system)
     if flavor == 'aix':
       default_variables.setdefault('SHARED_LIB_SUFFIX', '.a')
+    elif flavor == 'zos':
+      default_variables.setdefault('SHARED_LIB_SUFFIX', '.x')
     else:
       default_variables.setdefault('SHARED_LIB_SUFFIX', '.so')
     default_variables.setdefault('SHARED_LIB_DIR','$(builddir)/lib.$(TOOLSET)')
@@ -172,6 +174,23 @@ cmd_solink = $(LINK.$(TOOLSET)) -o $@ -shared $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET
 
 quiet_cmd_solink_module = SOLINK_MODULE($(TOOLSET)) $@
 cmd_solink_module = $(LINK.$(TOOLSET)) -o $@ -shared $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -Wl,-soname=$(@F) -Wl,--start-group $(filter-out FORCE_DO_CMD, $^) -Wl,--end-group $(LIBS)
+"""
+
+LINK_COMMANDS_ZOS = """\
+quiet_cmd_alink = AR($(TOOLSET)) $@
+cmd_alink = rm -f $@ && $(AR.$(TOOLSET)) crs $@ $(filter %.o,$^)
+
+quiet_cmd_alink_thin = AR($(TOOLSET)) $@
+cmd_alink_thin = rm -f $@ && $(AR.$(TOOLSET)) crsT $@ $(filter %.o,$^)
+
+quiet_cmd_link = LINK($(TOOLSET)) $@
+cmd_link = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -o $@ $(LD_INPUTS) $(LIBS)
+
+quiet_cmd_solink = SOLINK($(TOOLSET)) $@
+cmd_solink = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -Wl,DLL -o $(patsubst %.x,%.so,$@) $(LD_INPUTS) $(LIBS) && if [ -f $(notdir $@) ]; then /bin/cp $(notdir $@) $@; else true; fi
+
+quiet_cmd_solink_module = SOLINK_MODULE($(TOOLSET)) $@
+cmd_solink_module = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -o $@ $(filter-out FORCE_DO_CMD, $^) $(LIBS)
 """
 
 LINK_COMMANDS_MAC = """\
@@ -317,7 +336,11 @@ dirx = $(call unreplace_spaces,$(dir $(call replace_spaces,$1)))
 # We write to a dep file on the side first and then rename at the end
 # so we can't end up with a broken dep file.
 depfile = $(depsdir)/$(call replace_spaces,$@).d
+ifeq ($(shell uname),OS/390)
+DEPFLAGS = -qmakedep=gcc -MF $(depfile).raw
+else
 DEPFLAGS = -MMD -MF $(depfile).raw
+endif
 
 # We have to fixup the deps output in a few ways.
 # (1) the file output should mention the proper .o file.
@@ -1356,6 +1379,8 @@ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(obj)/%%%s FORCE_DO_CMD
       target_prefix = 'lib'
       if self.flavor == 'aix':
         target_ext = '.a'
+      elif self.flavor == 'zos':
+        target_ext = '.x'
       else:
         target_ext = '.so'
     elif self.type == 'none':
@@ -2052,6 +2077,12 @@ def GenerateOutput(target_list, target_dicts, data, params):
         'flock': './gyp-flock-tool flock',
         'flock_index': 2,
     })
+  elif flavor == 'zos':
+    copy_archive_arguments = '-pPRf'
+    header_params.update({
+        'link_commands': LINK_COMMANDS_ZOS,
+        'copy_archive_args': copy_archive_arguments,
+    })
   elif flavor == 'freebsd':
     # Note: OpenBSD has sysutils/flock. lockf seems to be FreeBSD specific.
     header_params.update({
@@ -2081,6 +2112,15 @@ def GenerateOutput(target_list, target_dicts, data, params):
     'CXX.host':    GetEnvironFallback(('CXX_host', 'CXX'), 'g++'),
     'LINK.host':   GetEnvironFallback(('LINK_host', 'LINK'), '$(CXX.host)'),
   })
+
+  if flavor == 'zos':
+    header_params.update({
+    'CC.target':   GetEnvironFallback(('CC_target', 'CC'), 'njsc'),
+    'CXX.target':  GetEnvironFallback(('CXX_target', 'CXX'), 'njsc++'),
+    'CC.host':     GetEnvironFallback(('CC_host', 'CC'), 'njsc'),
+    'CXX.host':    GetEnvironFallback(('CXX_host', 'CXX'), 'njsc++'),
+    })
+
 
   build_file, _, _ = gyp.common.ParseQualifiedTarget(target_list[0])
   make_global_settings_array = data[build_file].get('make_global_settings', [])
