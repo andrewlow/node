@@ -120,6 +120,9 @@
 # define V8_OS_QNX 1
 #elif defined(_WIN32)
 # define V8_OS_WIN 1
+#elif defined(__MVS__)
+#define V8_OS_POSIX 1
+#define V8_OS_ZOS 1
 #endif
 
 
