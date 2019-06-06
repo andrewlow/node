@@ -11,6 +11,15 @@
   ],
   # build options specific to OS
   'conditions': [
+     ['OS=="zos"', {
+       'defines': [
+         '_ZOS',
+         'OPENSSL_NO_HW',
+         'NI_MAXHOST=1024',
+         'NI_MAXSERV=32',
+       ],
+     },
+     ],
     [ 'OS=="aix"', {
       # AIX is missing /usr/include/endian.h
       'defines': [

@@ -12,6 +12,8 @@
       'includes': ['config/archs/linux-ppc64/asm/openssl.gypi'],
     }, 'target_arch=="s390x" and OS=="linux"', {
       'includes': ['config/archs/linux64-s390x/asm/openssl.gypi'],
+    }, 'target_arch=="s390x" and OS=="zos"', {
+      'includes': ['config/archs/zos-s390x/asm/openssl.gypi'],
     }, 'target_arch=="arm" and OS=="linux"', {
       'includes': ['config/archs/linux-armv4/asm/openssl.gypi'],
     }, 'target_arch=="arm64" and OS=="linux"', {
