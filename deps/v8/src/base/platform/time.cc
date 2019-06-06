@@ -57,7 +57,7 @@ int64_t ComputeThreadTicks() {
              thread_info_data.system_time.microseconds);
   return micros;
 }
-#elif V8_OS_POSIX
+#elif V8_OS_POSIX && !V8_OS_ZOS
 // Helper function to get results from clock_gettime() and convert to a
 // microsecond timebase. Minimum requirement is MONOTONIC_CLOCK to be supported
 // on the system. FreeBSD 6 has CLOCK_MONOTONIC but defines
@@ -724,6 +724,12 @@ TimeTicks TimeTicks::Now() {
            info.numer / info.denom);
 #elif V8_OS_SOLARIS
   ticks = (gethrtime() / Time::kNanosecondsPerMicrosecond);
+#elif V8_OS_ZOS
+  struct timeval tv;
+  int result = gettimeofday(&tv,NULL);
+  DCHECK_EQ(0, result);
+  USE(result);
+  ticks = (tv.tv_sec * Time::kMicrosecondsPerSecond + tv.tv_usec);
 #elif V8_OS_POSIX
   ticks = ClockNow(CLOCK_MONOTONIC);
 #else
@@ -737,6 +743,8 @@ TimeTicks TimeTicks::Now() {
 bool TimeTicks::IsHighResolution() {
 #if V8_OS_MACOSX
   return true;
+#elif V8_OS_ZOS
+  return true;
 #elif V8_OS_POSIX
   static bool is_high_resolution = IsHighResolutionTimer(CLOCK_MONOTONIC);
   return is_high_resolution;
@@ -749,7 +757,7 @@ bool TimeTicks::IsHighResolution() {
 
 
 bool ThreadTicks::IsSupported() {
-#if (defined(_POSIX_THREAD_CPUTIME) && (_POSIX_THREAD_CPUTIME >= 0)) || \
+#if !defined(V8_OS_ZOS) && (defined(_POSIX_THREAD_CPUTIME) && (_POSIX_THREAD_CPUTIME >= 0)) || \
     defined(V8_OS_MACOSX) || defined(V8_OS_ANDROID) || defined(V8_OS_SOLARIS)
   return true;
 #elif defined(V8_OS_WIN)

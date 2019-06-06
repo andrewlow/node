@@ -154,11 +154,14 @@
           ],
         },
         'defines': [ 'DEBUG', '_DEBUG', 'V8_ENABLE_CHECKS' ],
-        'cflags': [ '-g', '-O0' ],
+        'cflags': [ '-g' ],
         'conditions': [
           ['OS=="aix"', {
             'cflags': [ '-gxcoff' ],
             'ldflags': [ '-Wl,-bbigtoc' ],
+          }],
+          ['OS != "zos"', {
+            'cflags': [ '-O0' ],
           }],
           ['OS == "android"', {
             'cflags': [ '-fPIE' ],
@@ -201,7 +204,7 @@
             # pull in V8's postmortem metadata
             'ldflags': [ '-Wl,-z,allextract' ]
           }],
-          ['OS!="mac" and OS!="win"', {
+          ['OS!="mac" and OS!="win" and OS!="zos"', {
             'cflags': [ '-fno-omit-frame-pointer' ],
           }],
           ['OS=="linux"', {
@@ -312,7 +315,7 @@
       [ 'target_arch=="arm64"', {
         'msvs_configuration_platform': 'arm64',
       }],
-      ['asan == 1 and OS != "mac"', {
+      ['asan == 1 and OS != "mac" and OS!="zos"', {
         'cflags+': [
           '-fno-omit-frame-pointer',
           '-fsanitize=address',
@@ -510,12 +513,32 @@
         ]
       }],
       ['OS == "zos"', {
+         'defines': [
+           '_XOPEN_SOURCE_EXTENDED',
+           '_UNIX03_THREADS',
+           '_UNIX03_WITHDRAWN',
+           '_UNIX03_SOURCE',
+           '_OPEN_SYS_SOCK_IPV6',
+           '_POSIX_SOURCE',
+           '_OPEN_SYS',
+           '_OPEN_SYS_IF_EXT',
+           '_OPEN_SYS_SOCK_IPV6',
+           '_OPEN_MSGQ_EXT',
+           'PATH_MAX=255'
+           '_LARGE_TIME_API'
+           '_ALL_SOURCE',
+           '__IBMCPP_TR1__',
+           'NODE_PLATFORM="os390"',
+           'PATH_MAX=_POSIX_PATH_MAX',
+         ], 
          'cflags': [
            '-q64',
            '-Wc,DLL',
            '-qARCH=9',
+           '-qASCII',
            '-qTUNE=10',
            '-qENUM=INT',
+           '-qEXPORTALL',
            ],
            'ldflags': [
             '-q64',

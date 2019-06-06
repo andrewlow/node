@@ -25,6 +25,9 @@
 #if V8_OS_WIN
 #include "src/base/win32-headers.h"
 #endif
+#if V8_OS_ZOS
+#include "src/base/sys-info-zos.h"
+#endif
 
 namespace v8 {
 namespace base {
@@ -39,6 +42,11 @@ int SysInfo::NumberOfProcessors() {
     return 1;
   }
   return ncpu;
+#elif V8_OS_ZOS
+  ZOSCVT* __ptr32 cvt = ((ZOSPSA*)0)->cvt;
+  ZOSRMCT* __ptr32 rmct = cvt->rmct;
+  ZOSCCT* __ptr32 cct = rmct->cct;
+  return static_cast<int>(cct->cpuCount);
 #elif V8_OS_POSIX
   long result = sysconf(_SC_NPROCESSORS_ONLN);  // NOLINT(runtime/int)
   if (result == -1) {
@@ -90,6 +98,12 @@ int64_t SysInfo::AmountOfPhysicalMemory() {
 #elif V8_OS_AIX
   int64_t result = sysconf(_SC_AIX_REALMEM);
   return static_cast<int64_t>(result) * 1024L;
+#elif V8_OS_ZOS
+  ZOSCVT * __ptr32 cvt = ((ZOSPSA*)0)->cvt;
+  ZOSRCE * __ptr32 rce = cvt->rce;
+  intptr_t pages = rce->pool;
+  intptr_t page_size = sysconf(_SC_PAGESIZE);
+  return static_cast<uint64_t>(pages) * page_size;
 #elif V8_OS_POSIX
   long pages = sysconf(_SC_PHYS_PAGES);    // NOLINT(runtime/int)
   long page_size = sysconf(_SC_PAGESIZE);  // NOLINT(runtime/int)
