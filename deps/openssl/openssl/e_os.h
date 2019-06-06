@@ -305,6 +305,12 @@ extern FILE *_imp___iob;
 
 /***********************************************/
 
+# if defined(OPENSSL_SYS_OS390)
+#  define NO_SYS_PARAM_H
+# endif
+
+/***********************************************/
+
 # if defined(OPENSSL_SYS_WINDOWS)
 #  define strcasecmp _stricmp
 #  define strncasecmp _strnicmp

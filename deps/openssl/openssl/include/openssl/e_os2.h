@@ -119,6 +119,9 @@ extern "C" {
 #  if defined(_AIX) && !defined(OPENSSL_SYS_AIX)
 #   define OPENSSL_SYS_AIX
 #  endif
+#  if defined(__MVS__) && !defined(OPENSSL_SYS_OS390)
+#   define OPENSSL_SYS_OS390
+#  endif
 # endif
 
 /* -------------------------------- VOS ----------------------------------- */
