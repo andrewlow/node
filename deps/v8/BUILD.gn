@@ -574,7 +574,9 @@ config("toolchain") {
     if (host_byteorder == "little") {
       defines += [ "V8_TARGET_ARCH_S390_LE_SIM" ]
     } else {
-      cflags += [ "-march=z196" ]
+      if (current_os == "zos") {
+        cflags += [ "-march=z196" ]
+      }
     }
   }
   if (v8_current_cpu == "ppc" || v8_current_cpu == "ppc64") {

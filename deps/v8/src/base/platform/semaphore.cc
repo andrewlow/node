@@ -7,6 +7,9 @@
 #if V8_OS_MACOSX
 #include <mach/mach_init.h>
 #include <mach/task.h>
+#elif V8_OS_ZOS
+#include <algorithm>
+#include <sched.h>
 #endif
 
 #include <errno.h>

@@ -14,7 +14,12 @@
 #if V8_OS_MACOSX
 #include <mach/semaphore.h>  // NOLINT
 #elif V8_OS_POSIX
+#if V8_OS_ZOS
+#include "src/s390/semaphore-zos.h"
+#include <vector>
+#else
 #include <semaphore.h>  // NOLINT
+#endif
 #endif
 
 namespace v8 {
