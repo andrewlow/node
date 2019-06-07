@@ -1,6 +1,6 @@
 {
   'variables': {
-    'openssl_defines_linux64-s390x': [
+    'openssl_defines_zos-s390x': [
       'NDEBUG',
       'OPENSSL_USE_NODELETE',
       'B_ENDIAN',
@@ -19,16 +19,16 @@
       'GHASH_ASM',
       'POLY1305_ASM',
     ],
-    'openssl_cflags_linux64-s390x': [
+    'openssl_cflags_zos-s390x': [
       '-Wa,--noexecstack',
       '-Wall -O3',
-      '-pthread -m64',
+      '-m64',
       '-Wall -O3',
     ],
-    'openssl_ex_libs_linux64-s390x': [
-      '-ldl -pthread',
+    'openssl_ex_libs_zos-s390x': [
+      '',
     ],
-    'openssl_cli_srcs_linux64-s390x': [
+    'openssl_cli_srcs_zos-s390x': [
       'openssl/apps/asn1pars.c',
       'openssl/apps/ca.c',
       'openssl/apps/ciphers.c',
@@ -84,11 +84,11 @@
       'openssl/apps/s_socket.c',
     ],
   },
-  'defines': ['<@(openssl_defines_linux64-s390x)'],
+  'defines': ['<@(openssl_defines_zos-s390x)'],
   'include_dirs': [
     './include',
   ],
-  'cflags' : ['<@(openssl_cflags_linux64-s390x)'],
-  'libraries': ['<@(openssl_ex_libs_linux64-s390x)'],
-  'sources': ['<@(openssl_cli_srcs_linux64-s390x)'],
+  'cflags' : ['<@(openssl_cflags_zos-s390x)'],
+  'libraries': ['<@(openssl_ex_libs_zos-s390x)'],
+  'sources': ['<@(openssl_cli_srcs_zos-s390x)'],
 }

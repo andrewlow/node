@@ -682,21 +682,21 @@
       'openssl/engines/e_capi.c',
       'openssl/engines/e_padlock.c',
     ],
-    'openssl_sources_linux64-s390x': [
+    'openssl_sources_zos-s390x': [
     ],
-    'openssl_defines_linux64-s390x': [
+    'openssl_defines_zos-s390x': [
       'NDEBUG',
       'OPENSSL_USE_NODELETE',
       'B_ENDIAN',
       'OPENSSL_PIC',
     ],
-    'openssl_cflags_linux64-s390x': [
+    'openssl_cflags_zos-s390x': [
       '-Wall -O3',
-      '-pthread -m64',
+      '-m64',
       '-Wall -O3',
     ],
-    'openssl_ex_libs_linux64-s390x': [
-      '-ldl -pthread',
+    'openssl_ex_libs_zos-s390x': [
+      '',
     ],
   },
   'include_dirs': [
@@ -705,8 +705,8 @@
     './crypto',
     './crypto/include/internal',
   ],
-  'defines': ['<@(openssl_defines_linux64-s390x)'],
-  'cflags' : ['<@(openssl_cflags_linux64-s390x)'],
-  'libraries': ['<@(openssl_ex_libs_linux64-s390x)'],
-  'sources': ['<@(openssl_sources)', '<@(openssl_sources_linux64-s390x)'],
+  'defines': ['<@(openssl_defines_zos-s390x)'],
+  'cflags' : ['<@(openssl_cflags_zos-s390x)'],
+  'libraries': ['<@(openssl_ex_libs_zos-s390x)'],
+  'sources': ['<@(openssl_sources)', '<@(openssl_sources_zos-s390x)'],
 }
