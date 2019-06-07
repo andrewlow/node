@@ -10,7 +10,7 @@
  * https://www.openssl.org/source/license.html
  */
 
-#define PLATFORM "platform: linux64-s390x"
+#define PLATFORM "platform: zos-s390x"
 #define DATE "built on: Thu May  2 20:28:15 2019 UTC"
 
 /*

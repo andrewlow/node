@@ -676,21 +676,21 @@
       'openssl/engines/e_capi.c',
       'openssl/engines/e_padlock.c',
     ],
-    'openssl_sources_linux64-s390x': [
-      './config/archs/linux64-s390x/asm/crypto/aes/aes-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/bn/s390x-gf2m.s',
-      './config/archs/linux64-s390x/asm/crypto/bn/s390x-mont.S',
-      './config/archs/linux64-s390x/asm/crypto/chacha/chacha-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/modes/ghash-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/poly1305/poly1305-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/rc4/rc4-s390x.s',
-      './config/archs/linux64-s390x/asm/crypto/s390xcpuid.S',
-      './config/archs/linux64-s390x/asm/crypto/sha/keccak1600-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/sha/sha1-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/sha/sha256-s390x.S',
-      './config/archs/linux64-s390x/asm/crypto/sha/sha512-s390x.S',
+    'openssl_sources_zos-s390x': [
+      './config/archs/zos-s390x/asm/crypto/aes/aes-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/bn/s390x-gf2m.s',
+      './config/archs/zos-s390x/asm/crypto/bn/s390x-mont.S',
+      './config/archs/zos-s390x/asm/crypto/chacha/chacha-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/modes/ghash-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/poly1305/poly1305-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/rc4/rc4-s390x.s',
+      './config/archs/zos-s390x/asm/crypto/s390xcpuid.S',
+      './config/archs/zos-s390x/asm/crypto/sha/keccak1600-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/sha/sha1-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/sha/sha256-s390x.S',
+      './config/archs/zos-s390x/asm/crypto/sha/sha512-s390x.S',
     ],
-    'openssl_defines_linux64-s390x': [
+    'openssl_defines_zos-s390x': [
       'NDEBUG',
       'OPENSSL_USE_NODELETE',
       'B_ENDIAN',
@@ -709,14 +709,14 @@
       'GHASH_ASM',
       'POLY1305_ASM',
     ],
-    'openssl_cflags_linux64-s390x': [
+    'openssl_cflags_zos-s390x': [
       '-Wa,--noexecstack',
       '-Wall -O3',
-      '-pthread -m64',
+      '-m64',
       '-Wall -O3',
     ],
-    'openssl_ex_libs_linux64-s390x': [
-      '-ldl -pthread',
+    'openssl_ex_libs_zos-s390x': [
+      '',
     ],
   },
   'include_dirs': [
@@ -725,8 +725,8 @@
     './crypto',
     './crypto/include/internal',
   ],
-  'defines': ['<@(openssl_defines_linux64-s390x)'],
-  'cflags' : ['<@(openssl_cflags_linux64-s390x)'],
-  'libraries': ['<@(openssl_ex_libs_linux64-s390x)'],
-  'sources': ['<@(openssl_sources)', '<@(openssl_sources_linux64-s390x)'],
+  'defines': ['<@(openssl_defines_zos-s390x)'],
+  'cflags' : ['<@(openssl_cflags_zos-s390x)'],
+  'libraries': ['<@(openssl_ex_libs_zos-s390x)'],
+  'sources': ['<@(openssl_sources)', '<@(openssl_sources_zos-s390x)'],
 }

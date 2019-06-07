@@ -62,7 +62,7 @@ our %config = (
   perl_archname => "x86_64-linux-gnu-thread-multi",
   perl_cmd => "/usr/bin/perl",
   perl_version => "5.26.1",
-  perlargv => [ "no-comp", "no-shared", "no-afalgeng", "enable-ssl-trace", "linux64-s390x" ],
+  perlargv => [ "no-comp", "no-shared", "no-afalgeng", "enable-ssl-trace", "zos-s390x" ],
   perlenv => {
       "AR" => undef,
       "ARFLAGS" => undef,
@@ -108,7 +108,7 @@ our %config = (
   shlib_version_history => "",
   shlib_version_number => "1.1",
   sourcedir => ".",
-  target => "linux64-s390x",
+  target => "zos-s390x",
   tdirs => [ "ossl_shim" ],
   version => "1.1.1b",
   version_num => "0x1010102fL",
@@ -139,7 +139,7 @@ our %target = (
   build_scheme => [ "unified", "unix" ],
   cast_asm_src => "c_enc.c",
   cast_obj => "c_enc.o",
-  cflags => "-pthread -m64",
+  cflags => "-m64",
   chacha_asm_src => "chacha-s390x.S",
   chacha_obj => "chacha-s390x.o",
   cmll_asm_src => "camellia.c cmll_misc.c cmll_cbc.c",
@@ -147,7 +147,7 @@ our %target = (
   cppflags => "",
   cpuid_asm_src => "s390xcap.c s390xcpuid.S",
   cpuid_obj => "s390xcap.o s390xcpuid.o",
-  cxxflags => "-std=c++11 -pthread -m64",
+  cxxflags => "-std=c++11 -m64",
   defines => [  ],
   des_asm_src => "des_enc.c fcrypt_b.c",
   des_obj => "des_enc.o fcrypt_b.o",
@@ -157,7 +157,7 @@ our %target = (
   ec_asm_src => "",
   ec_obj => "",
   enable => [ "afalgeng" ],
-  ex_libs => "-ldl -pthread",
+  ex_libs => "",
   exe_extension => "",
   includes => [  ],
   keccak1600_asm_src => "keccak1600-s390x.S",
@@ -4202,13 +4202,13 @@ our %unified_info = (
                 [
                     "util/mkdef.pl",
                     "crypto",
-                    "linux",
+                    "zos",
                 ],
             "libssl.map" =>
                 [
                     "util/mkdef.pl",
                     "ssl",
-                    "linux",
+                    "zos",
                 ],
             "test/buildtest_aes.c" =>
                 [
