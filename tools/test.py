@@ -37,6 +37,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import platform
 import time
 import threading
 import utils
@@ -198,7 +199,6 @@ class ProgressIndicator(object):
       self.remaining -= 1
       self.HasRun(output)
       self.lock.release()
-
 
 def EscapeCommand(command):
   parts = []
@@ -615,6 +615,10 @@ class TestOutput(object):
 def KillProcessWithID(pid, signal_to_send=signal.SIGTERM):
   if utils.IsWindows():
     os.popen('taskkill /T /F /PID %d' % pid)
+  elif utils.IsZos():
+    os.kill(pid, signal_to_send)
+    time.sleep(5)
+    os.system("killharder " + str(pid));
   else:
     os.kill(pid, signal_to_send)
 
@@ -1713,7 +1717,6 @@ def Main():
       sys.stderr.write("%4i (%s) %s\n" % (i, t, entry.GetLabel()))
 
   return result
-
 
 if __name__ == '__main__':
   sys.exit(Main())

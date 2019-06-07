@@ -71,6 +71,8 @@ def GuessOS():
     return 'aix'
   elif id == 'OS400':
     return 'ibmi'
+  elif id == 'OS/390':
+    return 'zos'
   else:
     return None
 
@@ -106,3 +108,6 @@ def GuessArchitecture():
 
 def IsWindows():
   return GuessOS() == 'win32'
+
+def IsZos():
+  return GuessOS() == 'zos'
