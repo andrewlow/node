@@ -356,11 +356,15 @@
           'defines': [ 'BUILDING_UV_SHARED=1' ]
         }],
         ['OS=="zos"', {
+          'dependencies': [ '../../deps/zoslib/zoslib.gyp:zoslib' ],
           'sources': [
             'src/unix/pthread-fixes.c',
             'src/unix/os390.c',
-            'src/unix/os390-syscalls.c'
-          ]
+            'src/unix/os390-syscalls.c',
+          ],
+          'cflags': [
+            '-qenum=int',
+          ],
         }],
       ]
     },

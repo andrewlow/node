@@ -26,6 +26,10 @@
  * getting the errno to the right place (req->result or as the return value.)
  */
 
+#if defined(__MVS__)
+#define _OPEN_SYS_FILE_EXT 1
+#endif
+
 #include "uv.h"
 #include "internal.h"
 
@@ -95,6 +99,7 @@ extern char *mkdtemp(char *template); /* See issue #740 on AIX < 7 */
     UV_REQ_INIT(req, UV_FS);                                                  \
     req->fs_type = UV_FS_ ## subtype;                                         \
     req->result = 0;                                                          \
+    req->new_file = 0;                                                        \
     req->ptr = NULL;                                                          \
     req->loop = loop;                                                         \
     req->path = NULL;                                                         \
@@ -154,6 +159,11 @@ extern char *mkdtemp(char *template); /* See issue #740 on AIX < 7 */
     }                                                                         \
   }                                                                           \
   while (0)
+
+#if defined(__MVS__)
+#define readlink(...) os390_readlink(__VA_ARGS__)
+#include "zos.h"
+#endif
 
 
 static int uv__fs_close(int fd) {
@@ -267,7 +277,24 @@ static ssize_t uv__fs_open(uv_fs_t* req) {
   if (req->cb != NULL)
     uv_rwlock_rdlock(&req->loop->cloexec_lock);
 
+#if defined(__MVS__)
+  struct stat buffer;
+  int file_exists = (stat(req->path, &buffer) == 0);
+  req->new_file = !file_exists;
+#endif
+
   r = open(req->path, req->flags, req->mode);
+
+#if defined(__MVS__)
+  struct stat st;
+  if (r >= 0 && 0 == fstat(r, &st)) {
+    if (0 == st.st_tag.ft_txtflag && 0 == st.st_tag.ft_ccsid &&
+        0 != (req->flags & O_RDONLY)) {
+      // read untag file
+      __file_needs_conversion_init(req->path, r);
+    }
+  }
+#endif
 
   /* In case of failure `uv__cloexec` will leave error in `errno`,
    * so it is enough to just set `r` to `-1`.
@@ -281,6 +308,16 @@ static ssize_t uv__fs_open(uv_fs_t* req) {
 
   if (req->cb != NULL)
     uv_rwlock_rdunlock(&req->loop->cloexec_lock);
+
+#if defined(__MVS__)
+  int old_errno = errno;
+  // Tag newly written files as 819 which does not exit prior to the open
+  if (req->new_file && r >= 0)
+    __chgfdccsid(r, 819);
+
+  // restore errno from open
+  errno = old_errno;
+#endif
 
   return r;
 #endif  /* O_CLOEXEC */
@@ -343,6 +380,18 @@ static ssize_t uv__fs_read(uv_fs_t* req) {
 #endif
   unsigned int iovmax;
   ssize_t result;
+
+#if defined(_AIX) || defined(__MVS__)
+  struct stat buf;
+
+  if(fstat(req->file, &buf))
+    return -1;
+
+  if(S_ISDIR(buf.st_mode)) {
+    errno = EISDIR;
+    return -1;
+  }
+#endif
 
   iovmax = uv__getiovmax();
   if (req->nbufs > iovmax)
@@ -928,6 +977,36 @@ static ssize_t uv__fs_utime(uv_fs_t* req) {
 }
 
 
+#if defined(__MVS__)
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+ssize_t __writev(int fd, const struct iovec *iov, int iovcnt) {
+  size_t bytes = 0;
+
+  for (int i = 0; i < iovcnt; ++i) {
+    if ((SSIZE_MAX - bytes) < iov[i].iov_len) {
+      errno = EINVAL;
+      return -1;
+    }
+    bytes += iov[i].iov_len;
+  }
+
+  char *buffer = (char *)__alloca(bytes);
+
+  size_t copy_bytes = bytes;
+  char *bp = buffer;
+  for (int i = 0; i < iovcnt; ++i) {
+    size_t copy = MIN(iov[i].iov_len, copy_bytes);
+    bp = memcpy((void *)bp, (void *)iov[i].iov_base, copy) + copy;
+    copy_bytes -= copy;
+    if (copy_bytes == 0)
+      break;
+  }
+  ssize_t num_bytes = write(fd, buffer, bytes);
+  return num_bytes;
+}
+#endif
+
+
 static ssize_t uv__fs_write(uv_fs_t* req) {
 #if defined(__linux__)
   static int no_pwritev;
@@ -949,7 +1028,11 @@ static ssize_t uv__fs_write(uv_fs_t* req) {
     if (req->nbufs == 1)
       r = write(req->file, req->bufs[0].base, req->bufs[0].len);
     else
+#if defined(__MVS__)
+      r = __writev(req->file, (struct iovec*) req->bufs, req->nbufs);
+#else
       r = writev(req->file, (struct iovec*) req->bufs, req->nbufs);
+#endif
   } else {
     if (req->nbufs == 1) {
       r = pwrite(req->file, req->bufs[0].base, req->bufs[0].len, req->off);
@@ -1073,6 +1156,11 @@ static ssize_t uv__fs_copyfile(uv_fs_t* req) {
   }
 #endif
 
+#if defined(__MVS__)
+  // copy the source tag to dest
+  __chgfdccsid(dstfd, src_statsbuf.st_tag.ft_ccsid);
+#endif
+
   bytes_to_send = src_statsbuf.st_size;
   in_offset = 0;
   while (bytes_to_send != 0) {
@@ -1160,7 +1248,8 @@ static void uv__to_stat(struct stat* src, uv_stat_t* dst) {
   dst->st_birthtim.tv_nsec = src->st_ctimensec;
   dst->st_flags = 0;
   dst->st_gen = 0;
-#elif !defined(_AIX) && (       \
+#elif !defined(_AIX) &&         \
+    !defined(__MVS__) && (      \
     defined(__DragonFly__)   || \
     defined(__FreeBSD__)     || \
     defined(__OpenBSD__)     || \
@@ -1380,6 +1469,22 @@ static ssize_t uv__fs_write_all(uv_fs_t* req) {
 }
 
 
+static ssize_t uv__fs_access(uv_fs_t* req) {
+#ifdef __MVS__
+  int r = 0;
+  if (req->flags & F_OK)
+    r = access(req->path, F_OK);
+
+  if (r > -1)
+    r = access(req->path, req->flags & (R_OK | W_OK | X_OK));
+
+  return r;
+#else
+  return access(req->path, req->flags);
+#endif
+}
+
+
 static void uv__fs_work(struct uv__work* w) {
   int retry_on_eintr;
   uv_fs_t* req;
@@ -1398,7 +1503,7 @@ static void uv__fs_work(struct uv__work* w) {
     break;
 
     switch (req->fs_type) {
-    X(ACCESS, access(req->path, req->flags));
+    X(ACCESS, uv__fs_access(req));
     X(CHMOD, chmod(req->path, req->mode));
     X(CHOWN, chown(req->path, req->uid, req->gid));
     X(CLOSE, uv__fs_close(req->file));
@@ -1506,6 +1611,9 @@ int uv_fs_chown(uv_loop_t* loop,
 int uv_fs_close(uv_loop_t* loop, uv_fs_t* req, uv_file file, uv_fs_cb cb) {
   INIT(CLOSE);
   req->file = file;
+#if defined(__MVS__)
+  __fd_close(file);
+#endif
   POST;
 }
 

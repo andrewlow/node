@@ -599,6 +599,8 @@ static int uv__custom_sem_trywait(uv_sem_t* sem_) {
   return 0;
 }
 
+
+#if !platform_needs_custom_semaphore
 static int uv__sem_init(uv_sem_t* sem, unsigned int value) {
   if (sem_init(sem, 0, value))
     return UV__ERR(errno);
@@ -645,6 +647,8 @@ static int uv__sem_trywait(uv_sem_t* sem) {
 
   return 0;
 }
+#endif
+
 
 int uv_sem_init(uv_sem_t* sem, unsigned int value) {
 #if defined(__GLIBC__) && !defined(__UCLIBC__)

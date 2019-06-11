@@ -205,9 +205,10 @@
             '_XOPEN_SOURCE=500',
           ],
         }],
-        [ 'OS == "zos"', {
-          'cflags': [ '-qxplink' ],
-          'ldflags': [ '-qxplink' ],
+        [ 'OS=="zos"', {
+          'cflags': [
+            '-qenum=int',
+          ],
         }],
         ['uv_library=="shared_library"', {
           'defines': [ 'USING_UV_SHARED=1' ],
@@ -270,9 +271,10 @@
             'runner-unix.h',
           ]
         }],
-        [ 'OS == "zos"', {
-          'cflags': [ '-qxplink' ],
-          'ldflags': [ '-qxplink' ],
+        [ 'OS=="zos"', {
+          'cflags': [
+            '-qenum=int',
+          ],
         }],
         ['uv_library=="shared_library"', {
           'defines': [ 'USING_UV_SHARED=1' ],

@@ -44,6 +44,10 @@ extern char **environ;
 # include <grp.h>
 #endif
 
+#if defined(__MVS__)
+#include "zos.h"
+#endif
+
 
 static void uv__chld(uv_signal_t* handle, int signum) {
   uv_process_t* process;
@@ -185,7 +189,7 @@ skip:
  * Used for initializing stdio streams like options.stdin_stream. Returns
  * zero on success. See also the cleanup section in uv_spawn().
  */
-static int uv__process_init_stdio(uv_stdio_container_t* container, int fds[2]) {
+static int uv__process_init_stdio(uv_stdio_container_t* container, int fds[2], int use_pipe) {
   int mask;
   int fd;
 
@@ -197,10 +201,15 @@ static int uv__process_init_stdio(uv_stdio_container_t* container, int fds[2]) {
 
   case UV_CREATE_PIPE:
     assert(container->data.stream != NULL);
-    if (container->data.stream->type != UV_NAMED_PIPE)
+    if (container->data.stream->type != UV_NAMED_PIPE) {
       return UV_EINVAL;
-    else
-      return uv__make_socketpair(fds, 0);
+    } else {
+      /* z/OS socketpair issue on stderr. */
+      if (use_pipe)
+        return uv__make_pipe(fds, 0);
+      else
+        return uv__make_socketpair(fds, 0);
+    }
 
   case UV_INHERIT_FD:
   case UV_INHERIT_STREAM:
@@ -285,6 +294,11 @@ static void uv__process_child_init(const uv_process_options_t* options,
 
   if (options->flags & UV_PROCESS_DETACHED)
     setsid();
+
+#if defined(__MVS__)
+  sigfillset(&set);
+  sigprocmask(SIG_UNBLOCK, &set, NULL);
+#endif
 
   /* First duplicate low numbered fds, since it's not safe to duplicate them,
    * they could get replaced. Example: swapping stdout and stderr; without
@@ -461,7 +475,14 @@ int uv_spawn(uv_loop_t* loop,
   }
 
   for (i = 0; i < options->stdio_count; i++) {
-    err = uv__process_init_stdio(options->stdio + i, pipes[i]);
+#if defined(__MVS__)
+    if (i == 2) /* stderr */
+      err = uv__process_init_stdio(options->stdio + i, pipes[i], 1);
+    else
+      err = uv__process_init_stdio(options->stdio + i, pipes[i], 0);
+#else
+    err = uv__process_init_stdio(options->stdio + i, pipes[i], 0);
+#endif
     if (err)
       goto error;
   }
@@ -588,10 +609,15 @@ int uv_process_kill(uv_process_t* process, int signum) {
 
 
 int uv_kill(int pid, int signum) {
-  if (kill(pid, signum))
+  if (kill(pid, signum)) {
+#if defined(__MVS__)
+    if (getpgid(pid) == getpgid(0) && errno == EPERM)
+      return 0;  /* EPERM is returned because the process is a zombie */
+#endif
     return UV__ERR(errno);
-  else
+  } else {
     return 0;
+  }
 }
 
 

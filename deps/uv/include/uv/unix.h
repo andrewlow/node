@@ -360,6 +360,7 @@ typedef struct {
   const char *new_path;                                                       \
   uv_file file;                                                               \
   int flags;                                                                  \
+  int new_file;                                                               \
   mode_t mode;                                                                \
   unsigned int nbufs;                                                         \
   uv_buf_t* bufs;                                                             \
