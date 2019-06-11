@@ -167,7 +167,9 @@ UV_DESTRUCTOR(static void cleanup(void)) {
   if (nthreads == 0)
     return;
 
+#ifndef __MVS__
   post(&exit_message, UV__WORK_CPU);
+#endif
 
   for (i = 0; i < nthreads; i++)
     if (uv_thread_join(threads + i))

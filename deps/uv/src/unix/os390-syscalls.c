@@ -27,6 +27,7 @@
 #include <search.h>
 #include <termios.h>
 #include <sys/msg.h>
+#include <unistd.h>
 
 #define CW_CONDVAR 32
 
@@ -134,6 +135,11 @@ static void maybe_resize(uv__os390_epoll* lst, unsigned int len) {
 }
 
 
+UV_DESTRUCTOR(static void cleanup(void)) {
+  msgctl(uv_backend_fd(uv_default_loop()), IPC_RMID, NULL);
+}
+
+
 static void init_message_queue(uv__os390_epoll* lst) {
   struct {
     long int header;
@@ -142,8 +148,10 @@ static void init_message_queue(uv__os390_epoll* lst) {
 
   /* initialize message queue */
   lst->msg_queue = msgget(IPC_PRIVATE, 0600 | IPC_CREAT);
-  if (lst->msg_queue == -1)
+  if (lst->msg_queue == -1) {
+    perror("msgget");
     abort();
+  }
 
   /*
      On z/OS, the message queue will be affiliated with the process only
@@ -151,12 +159,16 @@ static void init_message_queue(uv__os390_epoll* lst) {
      can be queried for all message queues belonging to our process id.
   */
   msg.header = 1;
-  if (msgsnd(lst->msg_queue, &msg, sizeof(msg.body), 0) != 0)
+  if (msgsnd(lst->msg_queue, &msg, sizeof(msg.body), 0) != 0) {
+    perror("msgsnd");
     abort();
+  }
 
   /* Clean up the dummy message sent above */
-  if (msgrcv(lst->msg_queue, &msg, sizeof(msg.body), 0, 0) != sizeof(msg.body))
+  if (msgrcv(lst->msg_queue, &msg, sizeof(msg.body), 0, 0) != sizeof(msg.body)) {
+    perror("msgrcv");
     abort();
+  }
 }
 
 
@@ -198,8 +210,10 @@ static void epoll_init(void) {
   if (uv_mutex_init(&global_epoll_lock))
     abort();
 
-  if (pthread_atfork(&before_fork, &after_fork, &child_fork))
-    abort();
+/* TODO: This code was removed with the message: fix.
+ * if (pthread_atfork(&before_fork, &after_fork, &child_fork))
+ *   abort();
+ */
 }
 
 
@@ -233,12 +247,20 @@ int epoll_ctl(uv__os390_epoll* lst,
   uv_mutex_lock(&global_epoll_lock);
 
   if (op == EPOLL_CTL_DEL) {
-    if (fd >= lst->size || lst->items[fd].fd == -1) {
-      uv_mutex_unlock(&global_epoll_lock);
-      errno = ENOENT;
-      return -1;
+    if (event->is_msg) {
+      /* The user has deleted the System V message queue. Highly likely
+       * because the process is being shut down. So stop listening to it.
+       */
+      lst->msg_queue = -1;
+      lst->items[lst->size - 1].fd = -1;
+    } else {
+      if (fd >= lst->size || lst->items[fd].fd == -1) {
+        uv_mutex_unlock(&global_epoll_lock);
+        errno = ENOENT;
+        return -1;
+      }
+      lst->items[fd].fd = -1;
     }
-    lst->items[fd].fd = -1;
   } else if (op == EPOLL_CTL_ADD) {
 
     /* Resizing to 'fd + 1' would expand the list to contain at least
@@ -299,6 +321,12 @@ int epoll_wait(uv__os390_epoll* lst, struct epoll_event* events,
 
     ev.fd = pfd->fd;
     ev.events = pfd->revents;
+
+    if (i == lst->size - 1)
+      ev.is_msg = 1;
+    else
+      ev.is_msg = 0;
+
     if (pfd->revents & POLLIN && pfd->revents & POLLOUT)
       reventcount += 2;
     else if (pfd->revents & (POLLIN | POLLOUT))
@@ -434,6 +462,28 @@ char* mkdtemp(char* path) {
 }
 
 
+char* os390_realpath(const char* path, char* buf) {
+  char *tmpbuf;
+  char *ret;
+  int len;
+  if (*path != '$')
+    return realpath(path, buf);
+
+  len = strlen(path);
+  tmpbuf = uv__malloc(len + 2);
+  if (tmpbuf == NULL) {
+    errno = ENOMEM;
+    return NULL;
+  }
+
+  tmpbuf[0] = '/';
+  strcpy(tmpbuf + 1, path);
+  ret = realpath(tmpbuf, buf);
+  uv__free(tmpbuf);
+  return ret;
+}
+
+
 ssize_t os390_readlink(const char* path, char* buf, size_t len) {
   ssize_t rlen;
   ssize_t vlen;
@@ -455,7 +505,7 @@ ssize_t os390_readlink(const char* path, char* buf, size_t len) {
     return rlen;
   }
 
-  if (rlen < 3 || strncmp("/$", tmpbuf, 2) != 0) {
+  if (rlen < 3 || (strncmp("/$", tmpbuf, 2) != 0 && strncmp("$", tmpbuf, 1) != 0)) {
     /* Straightforward readlink. */
     memcpy(buf, tmpbuf, rlen);
     uv__free(tmpbuf);
@@ -475,7 +525,7 @@ ssize_t os390_readlink(const char* path, char* buf, size_t len) {
   /* Read real path of the variable. */
   old_delim = *delimiter;
   *delimiter = '\0';
-  if (realpath(tmpbuf, realpathstr) == NULL) {
+  if (os390_realpath(tmpbuf, realpathstr) == NULL) {
     uv__free(tmpbuf);
     return -1;
   }
