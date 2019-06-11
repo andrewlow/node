@@ -121,6 +121,7 @@ int uv__platform_loop_init(uv_loop_t* loop) {
 
   ep = epoll_create1(0);
   loop->ep = ep;
+  loop->backend_fd = ep->msg_queue;
   if (ep == NULL)
     return UV__ERR(errno);
 
@@ -339,7 +340,7 @@ uint64_t uv_get_free_memory(void) {
   data_area_ptr rcep = {0};
   cvt.assign = *(data_area_ptr_assign_type*)(CVT_PTR);
   rcep.assign = *(data_area_ptr_assign_type*)(cvt.deref + CVTRCEP_OFFSET);
-  freeram = *((uint64_t*)(rcep.deref + RCEAFC_OFFSET)) * 4;
+  freeram = *((uint32_t*)(rcep.deref + RCEAFC_OFFSET)) * 4096;
   return freeram;
 }
 
@@ -351,7 +352,7 @@ uint64_t uv_get_total_memory(void) {
   data_area_ptr rcep = {0};
   cvt.assign = *(data_area_ptr_assign_type*)(CVT_PTR);
   rcep.assign = *(data_area_ptr_assign_type*)(cvt.deref + CVTRCEP_OFFSET);
-  totalram = *((uint64_t*)(rcep.deref + RCEPOOL_OFFSET)) * 4;
+  totalram = *((uint32_t*)(rcep.deref + RCEPOOL_OFFSET)) * 4096;
   return totalram;
 }
 
@@ -441,7 +442,10 @@ static int uv__interface_addresses_v6(uv_interface_address_t** addresses,
   __net_ifconf6header_t ifc;
   __net_ifconf6entry_t* ifr;
   __net_ifconf6entry_t* p;
-  __net_ifconf6entry_t flg;
+  /* FIXME: z/OS
+   * __net_ifconf6entry_t flg;
+   */
+  int i;
 
   *count = 0;
   /* Assume maximum buffer size allowable */
@@ -498,17 +502,24 @@ static int uv__interface_addresses_v6(uv_interface_address_t** addresses,
 
     /* All conditions above must match count loop */
 
-    address->name = uv__strdup(p->__nif6e_name);
-
-    if (p->__nif6e_addr.sin6_family == AF_INET6)
-      address->address.address6 = *((struct sockaddr_in6*) &p->__nif6e_addr);
-    else
-      address->address.address4 = *((struct sockaddr_in*) &p->__nif6e_addr);
+    i = 0;
+    while (i < sizeof(p->__nif6e_name) / sizeof(char) && p->__nif6e_name[i] != ' ')
+      ++i;
+    address->name = uv__malloc(i + 1);
+    if (address->name) {
+      memcpy(address->name, p->__nif6e_name, i);
+      address->name[i] = '\0';
+    }
 
     /* TODO: Retrieve netmask using SIOCGIFNETMASK ioctl */
 
-    address->is_internal = flg.__nif6e_flags & _NIF6E_FLAGS_LOOPBACK ? 1 : 0;
-    memset(address->phys_addr, 0, sizeof(address->phys_addr));
+    address->address.address6 = *((struct sockaddr_in6*) &p->__nif6e_addr);
+    address->is_internal = p->__nif6e_flags & _NIF6E_FLAGS_LOOPBACK ? 1 : 0;
+
+    /* FIXME: z/OS
+     * address->is_internal = flg.__nif6e_flags & _NIF6E_FLAGS_LOOPBACK ? 1 : 0;
+     * memset(address->phys_addr, 0, sizeof(address->phys_addr));
+     */
     address++;
   }
 
@@ -526,6 +537,7 @@ int uv_interface_addresses(uv_interface_address_t** addresses, int* count) {
   struct ifreq* ifr;
   struct ifreq* p;
   int count_v6;
+  int i;
 
   *count = 0;
   *addresses = NULL;
@@ -618,14 +630,16 @@ int uv_interface_addresses(uv_interface_address_t** addresses, int* count) {
 
     /* All conditions above must match count loop */
 
-    address->name = uv__strdup(p->ifr_name);
-
-    if (p->ifr_addr.sa_family == AF_INET6) {
-      address->address.address6 = *((struct sockaddr_in6*) &p->ifr_addr);
-    } else {
-      address->address.address4 = *((struct sockaddr_in*) &p->ifr_addr);
+    i = 0;
+    while (i < sizeof(p->ifr_name) / sizeof(char) && p->ifr_name[i] != ' ')
+      ++i;
+    address->name = uv__malloc(i + 1);
+    if (address->name) {
+      memcpy(address->name, p->ifr_name, i);
+      address->name[i] = '\0';
     }
 
+    address->address.address4 = *((struct sockaddr_in*) &p->ifr_addr);
     address->is_internal = flg.ifr_flags & IFF_LOOPBACK ? 1 : 0;
     memset(address->phys_addr, 0, sizeof(address->phys_addr));
     address++;
@@ -666,6 +680,9 @@ void uv__platform_invalidate_fd(uv_loop_t* loop, int fd) {
         events[i].fd = -1;
 
   /* Remove the file descriptor from the epoll. */
+  dummy.events = 0;
+  dummy.fd = fd;
+  dummy.is_msg = 0;
   if (loop->ep != NULL)
     epoll_ctl(loop->ep, EPOLL_CTL_DEL, fd, &dummy);
 }
@@ -766,8 +783,24 @@ int uv_fs_event_stop(uv_fs_event_t* handle) {
     abort();
 
   uv__handle_stop(handle);
+  if (handle->path != NULL) {
+    uv__free(handle->path);
+    handle->path = NULL;
+  }
 
   return 0;
+}
+
+
+static void os390_re_regfileint(uv_fs_event_t* handle) {
+  if (handle == NULL || handle->path == NULL)
+    return;
+  char* savepath = uv__strdup(handle->path);
+  uv__free(handle->path);
+  handle->path = NULL;
+  handle->flags &= ~UV_HANDLE_ACTIVE;
+  uv_fs_event_start(handle, handle->cb, savepath, 0);
+  uv__free(savepath);
 }
 
 
@@ -782,11 +815,14 @@ static int os390_message_queue_handler(uv__os390_epoll* ep) {
 
   msglen = msgrcv(ep->msg_queue, &msg, sizeof(msg), 0, IPC_NOWAIT);
 
-  if (msglen == -1 && errno == ENOMSG)
-    return 0;
-
-  if (msglen == -1)
-    abort();
+  if (msglen == -1) {
+    if (errno == ENOMSG)
+      return 0;
+    else if (errno == EINVAL)
+      return -1;
+    else
+      abort();
+  }
 
   events = 0;
   if (msg.__rfim_event == _RFIM_ATTR || msg.__rfim_event == _RFIM_WRITE)
@@ -798,6 +834,7 @@ static int os390_message_queue_handler(uv__os390_epoll* ep) {
     return 0;
 
   handle = *(uv_fs_event_t**)(msg.__rfim_utok);
+  os390_re_regfileint(handle);
   handle->cb(handle, uv__basename_r(handle->path), events, 0);
   return 1;
 }
@@ -841,6 +878,7 @@ void uv__io_poll(uv_loop_t* loop, int timeout) {
 
     e.events = w->pevents;
     e.fd = w->fd;
+    e.is_msg = 0;
 
     if (w->events == 0)
       op = EPOLL_CTL_ADD;
@@ -923,8 +961,15 @@ void uv__io_poll(uv_loop_t* loop, int timeout) {
         continue;
 
       ep = loop->ep;
-      if (fd == ep->msg_queue) {
-        os390_message_queue_handler(ep);
+      if (pe->is_msg) {
+        uv_fs_event_t* phandle = NULL;
+        if (os390_message_queue_handler(ep) == -1) {
+          /* The user has deleted the System V message queue. Highly likely
+           * because the process is being shut down. So stop listening to it.
+           */
+          epoll_ctl(loop->ep, UV__EPOLL_CTL_DEL, ep->msg_queue, pe);
+          loop->backend_fd = -1;
+        }
         continue;
       }
 
