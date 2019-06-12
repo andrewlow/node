@@ -1281,7 +1281,8 @@ TEST_IMPL(fs_fstat) {
   ASSERT(s->st_mtim.tv_nsec == t.st_mtimensec);
   ASSERT(s->st_ctim.tv_sec == t.st_ctime);
   ASSERT(s->st_ctim.tv_nsec == t.st_ctimensec);
-#elif defined(__sun)           || \
+#elif !defined(__MVS__) && (      \
+      defined(__sun)           || \
       defined(__DragonFly__)   || \
       defined(__FreeBSD__)     || \
       defined(__OpenBSD__)     || \
@@ -1290,7 +1291,7 @@ TEST_IMPL(fs_fstat) {
       defined(_BSD_SOURCE)     || \
       defined(_SVID_SOURCE)    || \
       defined(_XOPEN_SOURCE)   || \
-      defined(_DEFAULT_SOURCE)
+      defined(_DEFAULT_SOURCE))
   ASSERT(s->st_atim.tv_sec == t.st_atim.tv_sec);
   ASSERT(s->st_atim.tv_nsec == t.st_atim.tv_nsec);
   ASSERT(s->st_mtim.tv_sec == t.st_mtim.tv_sec);
