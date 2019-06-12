@@ -208,6 +208,8 @@
         [ 'OS=="zos"', {
           'cflags': [
             '-qenum=int',
+            '-qexportall',
+            '-qascii',
           ],
         }],
         ['uv_library=="shared_library"', {
@@ -274,6 +276,8 @@
         [ 'OS=="zos"', {
           'cflags': [
             '-qenum=int',
+            '-qexportall',
+            '-qascii',
           ],
         }],
         ['uv_library=="shared_library"', {
