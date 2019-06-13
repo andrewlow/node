@@ -66,6 +66,8 @@ namespace internal {
 // stack allocating MacroAssembler takes 120K bytes.
 // See issue crbug.com/405338
 #define V8_DEFAULT_STACK_SIZE_KB 864
+#elif V8_OS_ZOS
+#define V8_DEFAULT_STACK_SIZE_KB 4096
 #else
 // Slightly less than 1MB, since Windows' default stack size for
 // the main execution thread is 1MB for both 32 and 64-bit.

@@ -32,6 +32,16 @@ void* AlignedAllocInternal(size_t size, size_t alignment) {
   // posix_memalign is not exposed in some Android versions, so we fall back to
   // memalign. See http://code.google.com/p/android/issues/detail?id=35391.
   ptr = memalign(alignment, size);
+#elif V8_OS_ZOS
+  void **aligned_ptr;
+  int offset = alignment - 1 + sizeof(void *);
+  ptr = (void *)malloc(size + offset);
+  if (ptr == NULL) {
+     return ptr;
+  }
+  aligned_ptr = (void **)(((size_t)(ptr) + offset) & ~(alignment -1));
+  aligned_ptr[-1] = ptr;
+  return aligned_ptr;
 #else
   if (posix_memalign(&ptr, alignment, size)) ptr = nullptr;
 #endif
@@ -142,6 +152,8 @@ void AlignedFree(void* ptr) {
 #elif V8_LIBC_BIONIC
   // Using free is not correct in general, but for V8_LIBC_BIONIC it is.
   free(ptr);
+#elif V8_OS_ZOS
+  free(((void **)ptr)[-1]);
 #else
   free(ptr);
 #endif

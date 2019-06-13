@@ -1030,6 +1030,17 @@
           },
         },
       }],
+      ['OS=="zos"', {
+         'defines': [
+           '__IBMCPP_TR1__',
+           '_OPEN_SYS_TIMED_EXT',
+           '__BIG_ENDIAN=4321',
+           '__BYTE_ORDER=__BIG_ENDIAN',
+         ],
+         'cflags': [
+           '-qasmlib=sys1.maclib:sys1.modgen',
+         ]
+      }],
       ['(OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris" \
          or OS=="netbsd" or OS=="mac" or OS=="android" or OS=="qnx") and \
         v8_target_arch=="ia32"', {

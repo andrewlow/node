@@ -1538,7 +1538,9 @@ Simulator::Simulator(Isolate* isolate) : isolate_(isolate) {
   base::CallOnce(&once, &Simulator::EvalTableInit);
 // Set up simulator support first. Some of this information is needed to
 // setup the architecture state.
-#if V8_TARGET_ARCH_S390X
+#if V8_OS_ZOS
+  size_t stack_size = MB + 2048;
+#elif V8_TARGET_ARCH_S390X
   size_t stack_size = FLAG_sim_stack_size * KB;
 #else
   size_t stack_size = MB;  // allocate 1MB for stack
@@ -1573,8 +1575,12 @@ Simulator::Simulator(Isolate* isolate) : isolate_(isolate) {
   // The sp is initialized to point to the bottom (high address) of the
   // allocated stack area. To be safe in potential stack underflows we leave
   // some buffer below.
+#ifdef V8_OS_ZOS
+  registers_[r4] = reinterpret_cast<intptr_t>(stack_) + stack_size - stack_protection_size_; 
+#else
   registers_[sp] =
       reinterpret_cast<intptr_t>(stack_) + stack_size - stack_protection_size_;
+#endif
 
   last_debugger_input_ = nullptr;
 }
@@ -1894,16 +1900,24 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
           0;
       Redirection* redirection = Redirection::FromInstruction(instr);
       const int kArgCount = 10;
+#ifdef V8_OS_ZOS
+      const int kRegisterArgCount = 3;
+      int arg0_regnum = 1;
+      int result_reg = 3;
+#else
       const int kRegisterArgCount = 5;
       int arg0_regnum = 2;
+#endif
       intptr_t result_buffer = 0;
       bool uses_result_buffer =
           redirection->type() == ExternalReference::BUILTIN_CALL_PAIR &&
           !ABI_RETURNS_OBJECTPAIR_IN_REGS;
+#ifndef V8_OS_ZOS
       if (uses_result_buffer) {
         result_buffer = get_register(r2);
         arg0_regnum++;
       }
+#endif
       intptr_t arg[kArgCount];
       // First 5 arguments in registers r2-r6.
       for (int i = 0; i < kRegisterArgCount; i++) {
@@ -1911,11 +1925,20 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
       }
       // Remaining arguments on stack
       intptr_t* stack_pointer = reinterpret_cast<intptr_t*>(get_register(sp));
+#ifdef V8_OS_ZOS
+      intptr_t* argument_area = reinterpret_cast<intptr_t*>(get_register(r4)
+          + 2048 + 16 * kPointerSize);
+      for (int i = kRegisterArgCount; i< kArgCount; i++) {
+        arg[i] = argument_area[i];
+      }
+      STATIC_ASSERT(kArgCount == kRegisterArgCount + 7);
+#else
       for (int i = kRegisterArgCount; i < kArgCount; i++) {
         arg[i] = stack_pointer[(kCalleeRegisterSaveAreaSize / kPointerSize) +
                                (i - kRegisterArgCount)];
       }
       STATIC_ASSERT(kArgCount == kRegisterArgCount + 5);
+#endif
       STATIC_ASSERT(kMaxCParameters == kArgCount);
       bool fp_call =
           (redirection->type() == ExternalReference::BUILTIN_FP_FP_CALL) ||
@@ -1924,9 +1947,15 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
           (redirection->type() == ExternalReference::BUILTIN_FP_INT_CALL);
 
       // Place the return address on the stack, making the call GC safe.
+#ifdef V8_OS_ZOS
+      intptr_t * ra_slot = reinterpret_cast<intptr_t*>(get_register(r4)
+        + 2048 + 3 * kPointerSize);
+      *ra_slot = get_register(r7);
+#else
       *reinterpret_cast<intptr_t*>(get_register(sp) +
                                    kStackFrameRASlot * kPointerSize) =
           get_register(r14);
+#endif
 
       intptr_t external =
           reinterpret_cast<intptr_t>(redirection->external_function());
@@ -2192,8 +2221,12 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
         //         }
         // #endif
       }
+#ifdef V8_OS_ZOS
+      int64_t saved_lr = *ra_slot + 2;
+#else
       int64_t saved_lr = *reinterpret_cast<intptr_t*>(
           get_register(sp) + kStackFrameRASlot * kPointerSize);
+#endif
 #if (!V8_TARGET_ARCH_S390X && V8_HOST_ARCH_S390)
       // On zLinux-31, the saved_lr might be tagged with a high bit of 1.
       // Cleanse it before proceeding with simulation.
@@ -2444,7 +2477,11 @@ void Simulator::CallInternal(Address entry, int reg_arg_count) {
   }
   // Remember the values of non-volatile registers.
   int64_t r6_val = get_register(r6);
+#ifdef V8_OS_ZOS
+  int64_t r14_val = get_register(r14);
+#else
   int64_t r7_val = get_register(r7);
+#endif
   int64_t r8_val = get_register(r8);
   int64_t r9_val = get_register(r9);
   int64_t r10_val = get_register(r10);
@@ -2460,7 +2497,11 @@ void Simulator::CallInternal(Address entry, int reg_arg_count) {
   // Put down marker for end of simulation. The simulator will stop simulation
   // when the PC reaches this value. By saving the "end simulation" value into
   // the LR the simulation stops when returning to this call point.
+#ifdef V8_OS_ZOS
+  registers_[7] = end_sim_pc;
+#else
   registers_[14] = end_sim_pc;
+#endif
 
   // Set up the non-volatile registers with a known value. To be able to check
   // that they are preserved properly across JS execution.
@@ -2468,7 +2509,11 @@ void Simulator::CallInternal(Address entry, int reg_arg_count) {
   if (reg_arg_count < 5) {
     set_register(r6, callee_saved_value + 6);
   }
+#ifdef V8_OS_ZOS
+  set_register(r14, callee_saved_value);
+#else
   set_register(r7, callee_saved_value + 7);
+#endif
   set_register(r8, callee_saved_value + 8);
   set_register(r9, callee_saved_value + 9);
   set_register(r10, callee_saved_value + 10);
@@ -2495,7 +2540,11 @@ void Simulator::CallInternal(Address entry, int reg_arg_count) {
   if (reg_arg_count < 5) {
     DCHECK_EQ(callee_saved_value + 6, get_register(r6));
   }
+#ifdef V8_OS_ZOS
+  DCHECK_EQ(callee_saved_value + 14, get_register(r7));
+#else
   DCHECK_EQ(callee_saved_value + 7, get_register(r7));
+#endif
   DCHECK_EQ(callee_saved_value + 8, get_register(r8));
   DCHECK_EQ(callee_saved_value + 9, get_register(r9));
   DCHECK_EQ(callee_saved_value + 10, get_register(r10));
@@ -2506,7 +2555,11 @@ void Simulator::CallInternal(Address entry, int reg_arg_count) {
 
   // Restore non-volatile registers with the original value.
   set_register(r6, r6_val);
+#ifdef V8_OS_ZOS
+  set_register(r14, r14_val);
+#else
   set_register(r7, r7_val);
+#endif
   set_register(r8, r8_val);
   set_register(r9, r9_val);
   set_register(r10, r10_val);
@@ -2522,7 +2575,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
 
   // Remember the values of non-volatile registers.
   int64_t r6_val = get_register(r6);
+#ifndef V8_OS_ZOS
   int64_t r7_val = get_register(r7);
+#else
+  int64_t r14_val = get_register(r14);
+#endif
   int64_t r8_val = get_register(r8);
   int64_t r9_val = get_register(r9);
   int64_t r10_val = get_register(r10);
@@ -2533,33 +2590,59 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
   // Set up arguments
 
   // First 5 arguments passed in registers r2-r6.
-  int reg_arg_count = std::min(5, argument_count);
+#ifdef V8_OS_ZOS
+  int reg_arg_max = 3;
+  int reg_arg_start = 1;
+#else
+  int reg_arg_max = 5;
+  int reg_arg_start = 2;
+#endif
+
+  int reg_arg_count = std::min(reg_arg_max, argument_count);
   int stack_arg_count = argument_count - reg_arg_count;
   for (int i = 0; i < reg_arg_count; i++) {
-    set_register(i + 2, arguments[i]);
+    set_register(i + reg_arg_start, arguments[i]);
   }
 
+#ifdef V8_OS_ZOS
+  //Reamining arguments passed on stack
+  int64_t original_stack = get_register(r4);
+  //Computer position of stack on entry to generated code
+  intptr_t entry_stack  =
+      (original_stack -
+       (kCalleeRegisterSaveAreaSize + stack_arg_count * sizeof(intptr_t)));
+#else
   // Remaining arguments passed on stack.
   int64_t original_stack = get_register(sp);
   // Compute position of stack on entry to generated code.
   uintptr_t entry_stack =
       (original_stack -
        (kCalleeRegisterSaveAreaSize + stack_arg_count * sizeof(intptr_t)));
+#endif
   if (base::OS::ActivationFrameAlignment() != 0) {
     entry_stack &= -base::OS::ActivationFrameAlignment();
   }
 
   // Store remaining arguments on stack, from low to high memory.
+#ifdef V8_OS_ZOS
+  intptr_t* stack_argument =
+      reinterpret_cast<intptr_t*>(entry_stack + kStackPointerBias + 19 * kPointerSize);
+#else
   intptr_t* stack_argument =
       reinterpret_cast<intptr_t*>(entry_stack + kCalleeRegisterSaveAreaSize);
+#endif
   memcpy(stack_argument, arguments + reg_arg_count,
          stack_arg_count * sizeof(*arguments));
+#ifdef V8_OS_ZOS
+  set_register(r4, entry_stack);
+#else
   set_register(sp, entry_stack);
+#endif
 
 // Prepare to execute the code at entry
 #if ABI_USES_FUNCTION_DESCRIPTORS
   // entry is the function descriptor
-  set_pc(*(reinterpret_cast<intptr_t*>(entry)));
+  set_pc(*(reinterpret_cast<intptr_t*>(entry + kPointerSize)));
 #else
   // entry is the instruction address
   set_pc(static_cast<intptr_t>(entry));
@@ -2571,7 +2654,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
   // Put down marker for end of simulation. The simulator will stop simulation
   // when the PC reaches this value. By saving the "end simulation" value into
   // the LR the simulation stops when returning to this call point.
+#ifdef V8_OS_ZOS
+  registers_[7] = end_sim_pc;
+#else
   registers_[14] = end_sim_pc;
+#endif
 
   // Set up the non-volatile registers with a known value. To be able to check
   // that they are preserved properly across JS execution.
@@ -2579,7 +2666,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
   if (reg_arg_count < 5) {
     set_register(r6, callee_saved_value + 6);
   }
-  set_register(r7, callee_saved_value + 7);
+#ifndef V8_OS_ZOS
+   set_register(r7, callee_saved_value + 7);
+#else
+  set_register(r14, callee_saved_value + 14);
+#endif
   set_register(r8, callee_saved_value + 8);
   set_register(r9, callee_saved_value + 9);
   set_register(r10, callee_saved_value + 10);
@@ -2595,7 +2686,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
   if (reg_arg_count < 5) {
     DCHECK_EQ(callee_saved_value + 6, get_low_register<uint32_t>(r6));
   }
-  DCHECK_EQ(callee_saved_value + 7, get_low_register<uint32_t>(r7));
+#ifndef V8_OS_ZOS
+   DCHECK_EQ(callee_saved_value + 7, get_low_register<uint32_t>(r7));
+#else
+  DCHECK_EQ(callee_saved_value + 14, get_low_register<int32_t>(r14));
+#endif
   DCHECK_EQ(callee_saved_value + 8, get_low_register<uint32_t>(r8));
   DCHECK_EQ(callee_saved_value + 9, get_low_register<uint32_t>(r9));
   DCHECK_EQ(callee_saved_value + 10, get_low_register<uint32_t>(r10));
@@ -2606,7 +2701,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
   if (reg_arg_count < 5) {
     DCHECK_EQ(callee_saved_value + 6, get_register(r6));
   }
+#ifndef V8_OS_ZOS
   DCHECK_EQ(callee_saved_value + 7, get_register(r7));
+#else
+  DCHECK_EQ(callee_saved_value + 14, get_register(r14));
+#endif
   DCHECK_EQ(callee_saved_value + 8, get_register(r8));
   DCHECK_EQ(callee_saved_value + 9, get_register(r9));
   DCHECK_EQ(callee_saved_value + 10, get_register(r10));
@@ -2617,7 +2716,11 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
 
   // Restore non-volatile registers with the original value.
   set_register(r6, r6_val);
+#ifndef V8_OS_ZOS
   set_register(r7, r7_val);
+#else
+  set_register(r14, r14_val);
+#endif
   set_register(r8, r8_val);
   set_register(r9, r9_val);
   set_register(r10, r10_val);
@@ -2631,10 +2734,17 @@ intptr_t Simulator::CallImpl(Address entry, int argument_count,
 #else
   DCHECK_EQ(entry_stack, get_register(sp));
 #endif
+#ifdef V8_OS_ZOS
+  set_register(r4, original_stack);
+  // Return value register
+  intptr_t result = get_register(r3);
+#else
   set_register(sp, original_stack);
 
   // Return value register
-  return get_register(r2);
+  intptr_t result = get_register(r2);
+#endif
+  return result;
 }
 
 void Simulator::CallFP(Address entry, double d0, double d1) {
@@ -4425,7 +4535,16 @@ EVALUATE(LCR) {
   int32_t r2_val = get_low_register<int32_t>(r2);
   int32_t result = 0;
   bool isOF = false;
+
+#ifndef V8_OS_ZOS
   isOF = __builtin_ssub_overflow(0, r2_val, &result);
+#else
+  int32_t original_r2_val = r2_val;
+  r2_val = ~r2_val;
+  r2_val = r2_val + 1;
+  set_low_register(r1, result);
+  isOF = (r2_val < 0 && original_r2_val < 0);
+#endif
   set_low_register(r1, result);
   SetS390ConditionCode<int32_t>(r2_val, 0);
   // Checks for overflow where r2_val = -2147483648.
@@ -6428,12 +6547,14 @@ EVALUATE(TABORT) {
 EVALUATE(TRAP4) {
   DCHECK_OPCODE(TRAP4);
   int length = 4;
+#ifndef V8_OS_ZOS
   // whack the space of the caller allocated stack
   int64_t sp_addr = get_register(sp);
   for (int i = 0; i < kCalleeRegisterSaveAreaSize / kPointerSize; ++i) {
     // we dont want to whack the RA (r14)
     if (i != 14) (reinterpret_cast<intptr_t*>(sp_addr))[i] = 0xDEADBABE;
   }
+#endif
   SoftwareInterrupt(instr);
   return length;
 }
@@ -7781,7 +7902,13 @@ EVALUATE(LCGR) {
   int64_t result = 0;
   bool isOF = false;
 #ifdef V8_TARGET_ARCH_S390X
+#ifndef V8_OS_ZOS
   isOF = __builtin_ssubl_overflow(0L, r2_val, &result);
+#else
+  r2_val = ~r2_val;
+  result = r2_val + 1;
+  isOF = (r2_val < 0 && (r2_val +1) > 0);
+#endif
 #else
   isOF = __builtin_ssubll_overflow(0L, r2_val, &result);
 #endif
@@ -8240,7 +8367,7 @@ EVALUATE(MLGR) {
 
 EVALUATE(DLGR) {
   DCHECK_OPCODE(DLGR);
-#ifdef V8_TARGET_ARCH_S390X
+#ifdef V8_TARGET_ARCH_S390X && !defined(V8_OS_ZOS)
   DECODE_RRE_INSTRUCTION(r1, r2);
   uint64_t r1_val = get_register(r1);
   uint64_t r2_val = get_register(r2);
@@ -9457,7 +9584,7 @@ EVALUATE(MLG) {
 
 EVALUATE(DLG) {
   DCHECK_OPCODE(DLG);
-#ifdef V8_TARGET_ARCH_S390X
+#ifdef V8_TARGET_ARCH_S390X && !defined(V8_OS_ZOS)
   DECODE_RXY_A_INSTRUCTION(r1, x2, b2, d2);
   uint64_t r1_val = get_register(r1);
   int64_t x2_val = (x2 == 0) ? 0 : get_register(x2);

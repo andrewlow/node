@@ -132,7 +132,9 @@ void JSONTraceWriter::AppendTraceEvent(TraceObject* trace_event) {
   if (append_comma_) stream_ << ",";
   append_comma_ = true;
   stream_ << "{\"pid\":" << trace_event->pid()
+#ifndef V8_OS_ZOS
           << ",\"tid\":" << trace_event->tid()
+#endif
           << ",\"ts\":" << trace_event->ts()
           << ",\"tts\":" << trace_event->tts() << ",\"ph\":\""
           << trace_event->phase() << "\",\"cat\":\""

@@ -1102,7 +1102,13 @@ DEFINE_INT(cpu_profiler_sampling_interval, 1000,
 DEFINE_BOOL(
     trace_side_effect_free_debug_evaluate, false,
     "print debug messages for side-effect-free debug-evaluate for testing")
-DEFINE_BOOL(hard_abort, true, "abort by crashing")
+#if V8_OS_ZOS
+ // Do not force crash on abort on zOS, as it may cause further LE ABENDS
+ // during their error handling / stack walking.
+ DEFINE_BOOL(hard_abort, false, "abort by crashing")
+#else
+ DEFINE_BOOL(hard_abort, true, "abort by crashing")
+#endif
 
 // inspector
 DEFINE_BOOL(expose_inspector_scripts, false,
@@ -1253,7 +1259,11 @@ DEFINE_UINT(serialization_chunk_size, 4096,
 // Regexp
 DEFINE_BOOL(regexp_optimization, true, "generate optimized regexp code")
 DEFINE_BOOL(regexp_mode_modifiers, false, "enable inline flags in regexp.")
+#ifdef V8_OS_ZOS
+DEFINE_BOOL(regexp_interpret_all, true, "interpret all regexp code")
+#else
 DEFINE_BOOL(regexp_interpret_all, false, "interpret all regexp code")
+#endif
 DEFINE_BOOL(regexp_tier_up, false,
             "enable regexp interpreter and tier up to the compiler")
 DEFINE_NEG_IMPLICATION(regexp_interpret_all, regexp_tier_up)
