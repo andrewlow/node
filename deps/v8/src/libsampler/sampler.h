@@ -12,7 +12,7 @@
 #include "src/base/lazy-instance.h"
 #include "src/base/macros.h"
 
-#if V8_OS_POSIX && !V8_OS_CYGWIN && !V8_OS_FUCHSIA
+#if V8_OS_POSIX && !V8_OS_CYGWIN && !V8_OS_FUCHSIA && !V8_OS_ZOS
 #define USE_SIGNALS
 #endif
 

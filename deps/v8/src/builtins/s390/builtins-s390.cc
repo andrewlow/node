@@ -565,10 +565,28 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
   Label invoke, handler_entry, exit;
 
+#ifdef V8_OS_ZOS
+  __ function_descriptor();
+#endif
+
   int pushed_stack_space = 0;
   {
     NoRootArrayScope no_root_array(masm);
 
+#if V8_OS_ZOS
+  __ LoadRR(sp, r4);
+  __ lay(sp, MemOperand(sp, -12 * kPointerSize));
+  __ StoreMultipleP(r4, sp, MemOperand(sp, 0));
+  // Expecting paramters in r2-r6. XPLINK uses r1-r3 for the first three
+  // parameters and also places them starting at r4+2112 on the biased stack.
+  // Explicitly load argc and argv from stack back into r5/r6 respectively.
+  __ LoadP(r5, MemOperand(r4, 2048 + (19  * kPointerSize)));
+  __ LoadP(r6, MemOperand(r4, 2048 + (20  * kPointerSize)));
+
+  __ LoadRR(r4, r3);
+  __ LoadRR(r3, r2);
+  __ LoadRR(r2, r1);
+#else
     // saving floating point registers
     // 64bit ABI requires f8 to f15 be saved
     // http://refspecs.linuxbase.org/ELF/zSeries/lzsabi0_zSeries.html
@@ -581,8 +599,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ std(d13, MemOperand(sp, 5 * kDoubleSize));
     __ std(d14, MemOperand(sp, 6 * kDoubleSize));
     __ std(d15, MemOperand(sp, 7 * kDoubleSize));
+#endif
     pushed_stack_space += kNumCalleeSavedDoubles * kDoubleSize;
 
+#if !defined(V8_OS_ZOS)
     // zLinux ABI
     //    Incoming parameters:
     //          r2: root register value
@@ -601,6 +621,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     // Initialize the root register.
     // C calling convention. The first argument is passed in r2.
     __ LoadRR(kRootRegister, r2);
+#endif
   }
 
   // save r6 to r1
@@ -722,8 +743,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ lay(sp, MemOperand(sp, -EntryFrameConstants::kCallerFPOffset));
 
   // Reload callee-saved preserved regs, return address reg (r14) and sp
+#if !defined(V8_OS_ZOS)  
   __ LoadMultipleP(r6, sp, MemOperand(sp, 0));
   __ la(sp, MemOperand(sp, 10 * kPointerSize));
+#endif
 
 // saving floating point registers
 #if V8_TARGET_ARCH_S390X
@@ -745,7 +768,14 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ la(sp, MemOperand(sp, 2 * kDoubleSize));
 #endif
 
+#ifdef V8_OS_ZOS
+  __ LoadRR(r3, r2);
+  __ LoadMultipleP(r4, sp, MemOperand(sp, 0));
+  __ lay(sp, MemOperand(sp, 12 * kPointerSize));
+  __ b(r7);
+#else
   __ b(r14);
+#endif
 }
 
 }  // namespace
@@ -1903,8 +1933,13 @@ static void EnterArgumentsAdaptorFrame(MacroAssembler* masm) {
   __ lay(sp, MemOperand(sp, -5 * kPointerSize));
 
   // Cleanse the top nibble of 31-bit pointers.
+#ifdef V8_OS_ZOS
   __ CleanseP(r14);
   __ StoreP(r14, MemOperand(sp, 4 * kPointerSize));
+#else
+  __ CleanseP(r7);
+  __ StoreP(r7, MemOperand(sp, 4 * kPointerSize));
+#endif
   __ StoreP(fp, MemOperand(sp, 3 * kPointerSize));
   __ StoreP(r6, MemOperand(sp, 2 * kPointerSize));
   __ StoreP(r3, MemOperand(sp, 1 * kPointerSize));
@@ -2703,12 +2738,14 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // Need at least one extra slot for return address location.
   int arg_stack_space = 1;
 
+#ifndef V8_OS_ZOS
   // Pass buffer for return value on stack if necessary
   bool needs_return_buffer =
       result_size == 2 && !ABI_RETURNS_OBJECTPAIR_IN_REGS;
   if (needs_return_buffer) {
     arg_stack_space += result_size;
   }
+#endif
 
 #if V8_TARGET_ARCH_S390X
   // 64-bit linux pass Argument object by reference not value
@@ -2720,15 +2757,26 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
       builtin_exit_frame ? StackFrame::BUILTIN_EXIT : StackFrame::EXIT);
 
   // Store a copy of argc, argv in callee-saved registers for later.
+#ifdef V8_OS_ZOS
+  __ LoadRR(r9, r2);
+  __ LoadRR(r10, r3);
+  // r2, r9: number of arguments including receiver  (C callee-saved)
+  // r3, r10: pointer to the first argument
+  // r7: pointer to builtin function descriptor (C callee-saved)
+  // r8: pointer to builtin function (C callee-saved)
+#else
+  // Store a copy of argc, argv in callee-saved registers for later.
   __ LoadRR(r6, r2);
   __ LoadRR(r8, r3);
   // r2, r6: number of arguments including receiver  (C callee-saved)
   // r3, r8: pointer to the first argument
   // r7: pointer to builtin function  (C callee-saved)
+#endif
 
   // Result returned in registers or stack, depending on result size and ABI.
 
   Register isolate_reg = r4;
+#ifndef V8_OS_ZOS  
   if (needs_return_buffer) {
     // The return value is 16-byte non-scalar value.
     // Use frame storage reserved by calling function to pass return
@@ -2742,17 +2790,60 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
     // write to r8 (preserved) before entry
     __ LoadRR(r8, r2);
   }
+#endif
+
   // Call C built-in.
   __ Move(isolate_reg, ExternalReference::isolate_address(masm->isolate()));
 
-  __ StoreReturnAddressAndCall(r7);
+#if V8_OS_ZOS
+  __ LoadRR(r1, r2);
+  __ LoadRR(r2, r3);
+  __ LoadRR(r3, r4);
+  int stack_space = 16;
+  stack_space += 5;
+  __ lay(r4, MemOperand(sp, -((stack_space *kPointerSize) + kStackPointerBias)));
+  __ StoreMultipleP(r5, r7,
+                    MemOperand(r4, kStackPointerBias + 19*kPointerSize));
+  // Load environment from slot 0 of fn desc.
+  __ LoadP(r5, MemOperand(r7));
+#if !defined(USE_SIMULATOR)
+  // Load function pointer from slot 1 of fn desc.
+  __ LoadP(r8, MemOperand(r7, kPointerSize));
+#else
+  __ LoadRR(r8, r7);
+#endif  // USE_SIMULATOR
+  Register target = r8;
+#else
+  Register target = r7;
+#endif
 
+  __ StoreReturnAddressAndCall(target);
+
+#if V8_OS_ZOS
+  // TODO(mcornac): r9 and r10 are used to store argc and argv on z/OS instead
+  // of r6 and r8 since r6 is not callee saved.
+  __ LoadRR(r6, r9);
+  __ LoadRR(r8, r10);
+  __ InitializeRootRegister();  // Rematerializing the root address in r10
+
+  if (result_size() == 1) {
+    __ LoadRR(r2, r3);
+  } else if (result_size() == 2){
+    __ LoadRR(r3, r2);
+    __ LoadRR(r2, r1);
+  } else {
+    __ LoadRR(r4, r3);
+    __ LoadRR(r3, r2);
+    __ LoadRR(r2, r1);
+  }
+#else
   // If return value is on the stack, pop it to registers.
   if (needs_return_buffer) {
     __ LoadRR(r2, r8);
     __ LoadP(r3, MemOperand(r2, kPointerSize));
     __ LoadP(r2, MemOperand(r2));
   }
+#endif
 
   // Check result for exception sentinel.
   Label exception_returned;
@@ -3044,14 +3135,39 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
   // r6 - next_address->kNextOffset
   // r7 - next_address->kLimitOffset
   // r8 - next_address->kLevelOffset
+#ifdef V8_OS_ZOS
+  Register prev_next_ = r14;
+#else
+  Register prev_next_ = r6;
+#endif
   __ Move(r9, next_address);
-  __ LoadP(r6, MemOperand(r9, kNextOffset));
+  __ LoadP(prev_next_, MemOperand(r9, kNextOffset));
   __ LoadP(r7, MemOperand(r9, kLimitOffset));
   __ LoadlW(r8, MemOperand(r9, kLevelOffset));
   __ AddP(r8, Operand(1));
   __ StoreW(r8, MemOperand(r9, kLevelOffset));
 
+#ifdef V8_OS_ZOS
+  //Shuffle the arguments from Linux arg register to XPLINK arg regs
+  __ LoadRR(r1 , r2);
+  if (function_address.is(r3)) {
+   __ LoadRR(r2, r3);
+  } else {
+   __ LoadRR(r2, r3);
+   __ LoadRR(r3, r4);
+  }
+
+  // Update System Stack Pointer with the appropriate XPLINK stack bias.
+  __ lay(r4, MemOperand(sp, -kStackPointerBias));
+  __ LoadRR(r10, r7);
+#endif
+
   __ StoreReturnAddressAndCall(scratch);
+
+#ifdef V8_OS_ZOS
+  __ LoadRR(r7, r10);
+  __ InitializeRootRegister();
+#endif
 
   Label promote_scheduled_exception;
   Label delete_allocated_handles;
@@ -3063,7 +3179,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
   __ bind(&return_value_loaded);
   // No more valid handles (the result handle was the last one). Restore
   // previous handle scope.
-  __ StoreP(r6, MemOperand(r9, kNextOffset));
+  __ StoreP(, MemOperand(r9, kNextOffset));
   if (__ emit_debug_code()) {
     __ LoadlW(r3, MemOperand(r9, kLevelOffset));
     __ CmpP(r3, r8);

@@ -82,12 +82,21 @@ class ContextualVariable {
   struct VarName                                  \
       : v8::internal::torque::ContextualVariable<VarName, __VA_ARGS__> {}
 
+#ifdef __MVS__
+#define DEFINE_CONTEXTUAL_VARIABLE(VarName)                                    \
+  template <>                                                                  \
+  V8_EXPORT_PRIVATE VarName::VariableType*& ContextualVariableTop<VarName>() { \
+    static VarName::VariableType* top = nullptr;                               \
+    return top;                                                                \
+  }
+#else
 #define DEFINE_CONTEXTUAL_VARIABLE(VarName)                                    \
   template <>                                                                  \
   V8_EXPORT_PRIVATE VarName::VariableType*& ContextualVariableTop<VarName>() { \
     static thread_local VarName::VariableType* top = nullptr;                  \
     return top;                                                                \
   }
+#endif
 
 // By inheriting from {ContextualClass} a class can become a contextual variable
 // of itself, which is very similar to a singleton.

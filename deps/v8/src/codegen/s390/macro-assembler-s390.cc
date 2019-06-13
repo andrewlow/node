@@ -198,6 +198,20 @@ void TurboAssembler::Call(Register target) {
   basr(r14, target);
 }
 
+void TurboAssembler::CallC(Register target) {
+   Label start;
+   bind(&start);
+#ifdef V8_OS_ZOS
+   //Branch to target via indirect branch
+   basr(r7, target);
+   nop(BASR_CALL_TYPE_NOP);
+   DCHECK_EQ(CallSize(target) + 2, SizeOfCodeGeneratedSince(&start));
+#else
+   basr (r14, target);
+   DCHECK_EQ(CallSize(target), SizeOfCodeGeneratedSince(&start));
+#endif
+}
+
 void MacroAssembler::CallJSEntry(Register target) {
   DCHECK(target == r4);
   Call(target);
@@ -1892,6 +1906,34 @@ void TurboAssembler::CallCFunctionHelper(Register function,
                                          int num_double_arguments) {
   DCHECK_LE(num_reg_arguments + num_double_arguments, kMaxCParameters);
   DCHECK(has_frame());
+  
+#if V8_OS_ZOS
+  LoadRR(r1, r2);
+  LoadRR(r2, r3);
+  LoadRR(r3, r4);
+
+  // XPLINK linkage requires args in r5,r6 to be passed on the stack.
+  // However, for DirectAPI C calls, there may not be stack slots
+  // for these 4th and 5th parameters if num_reg_arguments are less
+  // than 3.  In that case, we need to still preserve r5/r6 into
+  // register save area, as they are considered volatile in XPLINK.
+  if (num_reg_arguments == 4) {
+     StoreP(r5, MemOperand(sp, 19 * kPointerSize));
+     StoreP(r6, MemOperand(sp, 6 * kPointerSize));
+  } else if (num_reg_arguments >= 5) {
+     StoreMultipleP(r5, r6, MemOperand(sp, 19 * kPointerSize));
+  } else {
+     StoreMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
+  }
+
+  // XPLINK treats r7 as voliatile return register, but r14 as preserved
+  // Since Linux is the other way around, perserve r7 value in r14 across
+  // the call.
+  LoadRR(r14, r7);
+
+  // Set up the system stack pointer with the XPLINK bias.
+  lay(r4, MemOperand(sp, -kStackPointerBias));
+#endif
 
   // Save the frame pointer and PC so that the stack layout remains iterable,
   // even without an ExitFrame which normally exists between JS and C frames.
@@ -1907,6 +1949,10 @@ void TurboAssembler::CallCFunctionHelper(Register function,
     pop(scratch);
   }
 
+#if ABI_USES_FUNCTION_DESCRIPTORS && !defined(USE_SIMULATOR)
+  LoadMultipleP(r5, r6, MemOperand(function, 0));
+  Register dest = r6;
+#else
   // Just call directly. The function called cannot cause a GC, or
   // allow preemption, so the return address in the link register
   // stays correct.
@@ -1915,8 +1961,28 @@ void TurboAssembler::CallCFunctionHelper(Register function,
     Move(ip, function);
     dest = ip;
   }
+#endif
 
+#ifdef V8_OS_ZOS
+  CallC(dest);
+
+  // Restore r5-r7 from the appropriate stack locations (see notes above).
+  if (num_reg_arguments == 4) {
+     LoadP(r5, MemOperand(sp, 19 * kPointerSize));
+     LoadP(r6, MemOperand(sp, 6 * kPointerSize));
+  } else if (num_reg_arguments >= 5) {
+     LoadMultipleP(r5, r6, MemOperand(sp, 19 * kPointerSize));
+  } else {
+     LoadMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
+  }
+
+  LoadRR(r7, r14);
+
+  //Shuffle the result
+  LoadRR (r2,r3);
+#else
   Call(dest);
+#endif
 
   if (isolate() != nullptr) {
     // We don't unset the PC; the FP is the source of truth.
@@ -4417,14 +4483,25 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
   // being generated) is immovable or that the callee function cannot trigger
   // GC, since the callee function will return to it.
 
+#if V8_OS_ZOS
+    Register ra = r7;
+#else
+    Register ra = r14;
+#endif
+
   Label return_label;
-  larl(r14, &return_label);  // Generate the return addr of call later.
+  larl(ra, &return_label);  // Generate the return addr of call later.
+#if V8_OS_ZOS
+  lay(ra, MemOperand(ra, -2));
+#endif
   StoreP(r14, MemOperand(sp, kStackFrameRASlot * kPointerSize));
 
+#ifndef V8_OS_ZOS
   // zLinux ABI requires caller's frame to have sufficient space for callee
   // preserved regsiter save area.
   b(target);
   bind(&return_label);
+#endif
 }
 
 void TurboAssembler::CallForDeoptimization(Address target, int deopt_id) {
