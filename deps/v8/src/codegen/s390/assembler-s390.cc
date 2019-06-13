@@ -35,14 +35,14 @@
 // Copyright 2014 the V8 project authors. All rights reserved.
 
 #include "src/codegen/s390/assembler-s390.h"
-#include <sys/auxv.h>
 #include <set>
 #include <string>
 
 #if V8_TARGET_ARCH_S390
 
-#if V8_HOST_ARCH_S390
+#if V8_HOST_ARCH_S390 && !V8_OS_ZOS
 #include <elf.h>  // Required for auxv checks for STFLE support
+#include <sys/auxv.h>
 #endif
 
 #include "src/base/bits.h"
@@ -62,6 +62,9 @@ static unsigned CpuFeaturesImpliedByCompiler() {
 }
 
 static bool supportsCPUFeature(const char* feature) {
+#if V8_OS_ZOS
+  return false;
+#else
   static std::set<std::string>& features = *new std::set<std::string>();
   static std::set<std::string>& all_available_features =
       *new std::set<std::string>({"iesan3", "zarch", "stfle", "msa", "ldisp",
@@ -97,6 +100,7 @@ static bool supportsCPUFeature(const char* feature) {
   }
   USE(all_available_features);
   return features.find(feature) != features.end();
+#endif
 }
 
 #undef CHECK_AVAILABILITY_FOR
@@ -105,7 +109,7 @@ static bool supportsCPUFeature(const char* feature) {
 // Check whether Store Facility STFLE instruction is available on the platform.
 // Instruction returns a bit vector of the enabled hardware facilities.
 static bool supportsSTFLE() {
-#if V8_HOST_ARCH_S390
+#if V8_HOST_ARCH_S390 && !V8_OS_ZOS
   static bool read_tried = false;
   static uint32_t auxv_hwcap = 0;
 
@@ -172,6 +176,7 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
 
   static bool performSTFLE = supportsSTFLE();
 
+#if !V8_OS_ZOS //TODO - Add z/OS support
 // Need to define host, as we are generating inlined S390 assembly to test
 // for facilities.
 #if V8_HOST_ARCH_S390
@@ -234,6 +239,7 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
   USE(supportsCPUFeature);
   supported_ |= (1u << VECTOR_FACILITY);
   supported_ |= (1u << VECTOR_ENHANCE_FACILITY_1);
+#endif
 #endif
   supported_ |= (1u << FPU);
 }
@@ -458,6 +464,8 @@ int Assembler::target_at(int pos) {
       imm32 <<= 1;  // BR* + LARL treat immediate in # of halfwords
     if (imm32 == 0) return kEndOfChain;
     return pos + imm32;
+  } else if (TRAP4 == opcode) {
+    return kEndOfChain;
   } else if (BRXHG == opcode) {
     // offset is in bits 16-31 of 48 bit instruction
     instr = instr >> 16;
@@ -503,6 +511,12 @@ void Assembler::target_at_put(int pos, int target_pos, bool* is_branch) {
     instr &= (~static_cast<uint64_t>(0xFFFFFFFF));
     instr_at_put<SixByteInstr>(pos, instr | imm32);
     return;
+  } else if (TRAP4 == opcode) {
+   UNREACHABLE();
+   // CodePatcher patcher(((TurboAssembler *)(this))->isolate(), reinterpret_cast<byte *>(buffer_ + pos),
+   //             kPointerSize, CodePatcher:: DONT_FLUSH);
+   // patcher.masm()->dp(target_pos);
+    return;
   } else if (BRXHG == opcode) {
     // Immediate is in bits 16-31 of 48 bit instruction
     int32_t imm16 = target_pos - pos;
@@ -530,6 +544,9 @@ int Assembler::max_reach_from(int pos) {
                 // is_intn(x,32) doesn't work on 32-bit platforms.
                 // llilf: Emitted label constant, not part of
                 //        a branch (regexp PushBacktrack).
+  } else if (TRAP4 == opcode) {
+    return 0;   // we use a TRAP4 to indicate that a label address
+                // has been emitted here and there are no limits
   }
   DCHECK(false);
   return 16;
@@ -663,6 +680,17 @@ void Assembler::nop(int type) {
       // TODO(john.yan): Use a better NOP break
       oill(r3, Operand::Zero());
       break;
+#ifdef V8_OS_ZOS
+    case BASR_CALL_TYPE_NOP:
+      emit2bytes(0x0000);
+      break;
+    case BRAS_CALL_TYPE_NOP:
+      emit2bytes(0x0001);
+      break;
+    case BRASL_CALL_TYPE_NOP:
+      emit2bytes(0x0011);
+      break;
+#endif
     default:
       UNIMPLEMENTED();
   }
@@ -682,13 +710,18 @@ void Assembler::EnsureSpaceFor(int space_needed) {
   }
 }
 
-void Assembler::call(Handle<Code> target, RelocInfo::Mode rmode) {
+void Assembler::call(Handle<Code> target, RelocInfo::Mode rmode, Register link) {
   DCHECK(RelocInfo::IsCodeTarget(rmode));
   EnsureSpace ensure_space(this);
 
   RecordRelocInfo(rmode);
   int32_t target_index = AddCodeTarget(target);
-  brasl(r14, Operand(target_index));
+  brasl(link, Operand(target_index));
+#ifdef V8_OS_ZOS
+  if (link.code() == 7) {
+     nop(BRASL_CALL_TYPE_NOP);
+  }
+#endif
 }
 
 void Assembler::jump(Handle<Code> target, RelocInfo::Mode rmode,
@@ -800,9 +833,15 @@ void Assembler::emit_label_addr(Label* label) {
   CheckBuffer();
   RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
   int position = link(label);
-  DCHECK(label->is_bound());
-  // Keep internal references relative until EmitRelocations.
-  dp(position);
+  if (label->is_bound()) {
+      dp(position);
+  } else {
+      uintptr_t trap = TRAP4 << 16;
+#ifdef V8_TARGET_ARCH_S390X
+      trap = trap << 32;
+#endif
+      dp (trap);
+  }
 }
 
 void Assembler::EmitRelocations() {
@@ -848,6 +887,51 @@ Register UseScratchRegisterScope::Acquire() {
   *available &= ~reg.bit();
   return reg;
 }
+
+#ifdef V8_OS_ZOS
+void Assembler::function_descriptor() {
+#ifdef ABI_USES_FUNCTION_DESCRIPTORS
+  DCHECK(pc_offset() == 0);
+  Label code_start;
+  dp(0);
+  emit_label_addr(&code_start);
+  bind(&code_start);
+#endif
+}
+
+void Assembler::RelocateInternalReference(Address pc,
+                                          intptr_t delta,
+                                          Address code_start,
+                                          ICacheFlushMode icache_flush_mode) {
+  DCHECK(delta || code_start);
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  uintptr_t *fd = reinterpret_cast<uintptr_t*>(pc);
+  if (fd[0] == 0) {
+    // Function descriptor
+    if (delta) {
+      fd[1] += delta;
+    } else {
+      fd[1] = reinterpret_cast<uintptr_t>(code_start) + (2* kPointerSize);
+    }
+    return;
+  }
+#endif
+}
+
+int Assembler::DecodeInternalReference(Vector<char> buffer, Address pc) {
+#if ABI_USES_FUNCTION_DESCRIPTORS
+  uintptr_t *fd = reinterpret_cast<uintptr_t*>(pc);
+    // Function descriptor
+    SNPrintF(buffer,
+             "[%08" V8PRIxPTR ", %08" V8PRIxPTR "]"
+             "   function descriptor",
+             fd[0], fd[1]);
+  return kPointerSize * 2;
+#endif
+  return 0;
+}
+#endif
+
 }  // namespace internal
 }  // namespace v8
 #endif  // V8_TARGET_ARCH_S390

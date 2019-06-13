@@ -114,7 +114,7 @@ void TraceObject::InitializeForTesting(
     const char** arg_names, const uint8_t* arg_types,
     const uint64_t* arg_values,
     std::unique_ptr<v8::ConvertableToTraceFormat>* arg_convertables,
-    unsigned int flags, int pid, int tid, int64_t ts, int64_t tts,
+    unsigned int flags, int pid, ThreadId tid, int64_t ts, int64_t tts,
     uint64_t duration, uint64_t cpu_duration) {
   pid_ = pid;
   tid_ = tid;

@@ -55,7 +55,7 @@ void V8_EXPORT_PRIVATE ReleaseHandlerData(int index);
 
 #if V8_OS_WIN
 #define THREAD_LOCAL __declspec(thread)
-#elif V8_OS_ANDROID
+#elif V8_OS_ANDROID || V8_OS_ZOS
 // TODO(eholk): fix this before enabling for trap handlers for Android.
 #define THREAD_LOCAL
 #else

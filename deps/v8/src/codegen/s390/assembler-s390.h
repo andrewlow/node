@@ -40,7 +40,7 @@
 #ifndef V8_CODEGEN_S390_ASSEMBLER_S390_H_
 #define V8_CODEGEN_S390_ASSEMBLER_S390_H_
 #include <stdio.h>
-#if V8_HOST_ARCH_S390
+#if V8_HOST_ARCH_S390 && V8_OS_LINUX
 // elf.h include is required for auxv check for STFLE facility used
 // for hardware detection, which is sensible only on s390 hosts.
 #include <elf.h>
@@ -55,10 +55,18 @@
 #include "src/codegen/label.h"
 #include "src/codegen/s390/constants-s390.h"
 #include "src/codegen/s390/register-s390.h"
+#if V8_OS_ZOS
+// xlC defines cds instdlib.h
+#undef cds
+#endif
 #include "src/objects/smi.h"
 
+#ifdef V8_OS_ZOS
+#define ABI_USES_FUNCTION_DESCRIPTORS 1
+#define ABI_PASSES_HANDLES_IN_REGS 1
+#define ABI_RETURNS_OBJECTPAIR_IN_REGS 1
+#else
 #define ABI_USES_FUNCTION_DESCRIPTORS 0
-
 #define ABI_PASSES_HANDLES_IN_REGS 1
 
 // ObjectPair is defined under runtime/runtime-util.h.
@@ -74,6 +82,8 @@
 #define ABI_RETURNS_OBJECTPAIR_IN_REGS 0
 #else
 #define ABI_RETURNS_OBJECTPAIR_IN_REGS 1
+#endif
+
 #endif
 
 #define ABI_CALL_VIA_IP 1
@@ -1075,7 +1085,7 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
     basr(r14, r1);
   }
 
-  void call(Handle<Code> target, RelocInfo::Mode rmode);
+  void call(Handle<Code> target, RelocInfo::Mode rmode, Register link = r14);
   void jump(Handle<Code> target, RelocInfo::Mode rmode, Condition cond);
 
 // S390 instruction generation
@@ -1273,6 +1283,11 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
     NON_MARKING_NOP = 0,
     GROUP_ENDING_NOP,
     DEBUG_BREAK_NOP,
+#ifdef V8_OS_ZOS
+    BASR_CALL_TYPE_NOP,
+    BRAS_CALL_TYPE_NOP,
+    BRASL_CALL_TYPE_NOP,
+#endif
     // IC markers.
     PROPERTY_ACCESS_INLINED,
     PROPERTY_ACCESS_INLINED_CONTEXT,
@@ -1343,6 +1358,18 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   void EmitRelocations();
   void emit_label_addr(Label* label);
+
+#ifdef V8_OS_ZOS
+  //Generate function descriptor for z/OS
+  void function_descriptor();
+
+  static void RelocateInternalReference(Address pc, intptr_t delta,
+                                        Address code_start,
+                                        ICacheFlushMode icache_flush_mode =
+                                            FLUSH_ICACHE_IF_NEEDED);
+
+  static int DecodeInternalReference(Vector<char> buffer, Address pc);
+#endif
 
  public:
   byte* buffer_pos() const { return buffer_start_; }
