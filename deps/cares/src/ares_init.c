@@ -1453,6 +1453,11 @@ static int get_SuffixList_Windows(char **outptr)
 
 #endif
 
+#if defined(__MVS__)
+#include <assert.h>
+#include <resolv.h>
+#endif
+
 static int init_by_resolv_conf(ares_channel channel)
 {
 #if !defined(ANDROID) && !defined(__ANDROID__) && !defined(WATT32) && \
@@ -1486,6 +1491,56 @@ static int init_by_resolv_conf(ares_channel channel)
     /* Catch the case when all the above checks fail (which happens when there
        is no network card or the cable is unplugged) */
     status = ARES_EFILE;
+#elif defined(__MVS__)
+
+  static struct __res_state *res = 0;
+  if (0 == res) {
+    int rc = res_init();
+    while (-1 == rc && h_errno == TRY_AGAIN) {
+      rc = res_init();
+    }
+    if (-1 == rc) {
+      return ARES_ENOMEM;
+    }
+    res = __res();
+  }
+
+  int count4, count6;
+  __STATEEXTIPV6 *v6 = res->__res_extIPv6;
+  count4 = res->nscount;
+  if (v6) {
+    count6 = v6->__stat_nscount;
+  } else {
+    count6 = 0;
+  }
+
+  nservers = count4 + count6;
+  int i, j;
+  servers = ares_malloc(nservers * sizeof(struct server_state));
+  if (!servers)
+    return ARES_ENOMEM;
+
+  memset(servers, 0, nservers * sizeof(struct server_state));
+
+  for (i = 0; i < count4; ++i) {
+    struct sockaddr_in *addr_in = &(res->nsaddr_list[i]);
+    servers[i].addr.addrV4.s_addr = addr_in->sin_addr.s_addr;
+    servers[i].addr.family = AF_INET;
+    servers[i].addr.udp_port = addr_in->sin_port;
+    servers[i].addr.tcp_port = addr_in->sin_port;
+  }
+
+  for (j = 0; j < count6; ++j, ++i) {
+    struct sockaddr_in6 *addr_in = &(v6->__stat_nsaddr_list[j]);
+    assert(sizeof(servers[i].addr.addr.addr6) == sizeof(addr_in->sin6_addr));
+    memcpy(&(servers[i].addr.addr.addr6), &(addr_in->sin6_addr),
+           sizeof(addr_in->sin6_addr));
+    servers[i].addr.family = AF_INET6;
+    servers[i].addr.udp_port = addr_in->sin6_port;
+    servers[i].addr.tcp_port = addr_in->sin6_port;
+  }
+
+  status = ARES_EOF;
 
 #elif defined(__riscos__)
 
