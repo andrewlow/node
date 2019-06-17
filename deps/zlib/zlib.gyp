@@ -61,6 +61,12 @@
                 'USE_FILE32API'
               ],
             }],
+            ['OS=="zos"', {
+              'cflags': [
+                '-qexportall',
+                '-qascii',
+              ],
+            }],
           ],
         },
       ],
