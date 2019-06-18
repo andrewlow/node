@@ -2826,9 +2826,9 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   __ LoadRR(r8, r10);
   __ InitializeRootRegister();  // Rematerializing the root address in r10
 
-  if (result_size() == 1) {
+  if (result_size == 1) {
     __ LoadRR(r2, r3);
-  } else if (result_size() == 2){
+  } else if (result_size == 2){
     __ LoadRR(r3, r2);
     __ LoadRR(r2, r1);
   } else {
@@ -3150,7 +3150,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 #ifdef V8_OS_ZOS
   //Shuffle the arguments from Linux arg register to XPLINK arg regs
   __ LoadRR(r1 , r2);
-  if (function_address.is(r3)) {
+  if (function_address == r3) {
    __ LoadRR(r2, r3);
   } else {
    __ LoadRR(r2, r3);
@@ -3179,7 +3179,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
   __ bind(&return_value_loaded);
   // No more valid handles (the result handle was the last one). Restore
   // previous handle scope.
-  __ StoreP(, MemOperand(r9, kNextOffset));
+  __ StoreP(prev_next_, MemOperand(r9, kNextOffset));
   if (__ emit_debug_code()) {
     __ LoadlW(r3, MemOperand(r9, kLevelOffset));
     __ CmpP(r3, r8);

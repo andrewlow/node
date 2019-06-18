@@ -12,7 +12,7 @@
 #include "src/base/lazy-instance.h"
 #include "src/base/macros.h"
 
-#if V8_OS_POSIX && !V8_OS_CYGWIN && !V8_OS_FUCHSIA && !V8_OS_ZOS
+#if V8_OS_POSIX && !V8_OS_CYGWIN && !V8_OS_FUCHSIA
 #define USE_SIGNALS
 #endif
 
@@ -143,7 +143,11 @@ class V8_EXPORT_PRIVATE SamplerManager {
   // global lazy instance.
   friend class base::LeakyObject<SamplerManager>;
 
+#ifdef __MVS__
+  std::unordered_map<void*, SamplerList> sampler_map_;
+#else
   std::unordered_map<pthread_t, SamplerList> sampler_map_;
+#endif
   AtomicMutex samplers_access_counter_{false};
 
   DISALLOW_COPY_AND_ASSIGN(SamplerManager);

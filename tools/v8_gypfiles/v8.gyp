@@ -368,10 +368,18 @@
             '<(icu_gyp_path):icuuc',
           ],
         }, {
-           'sources!': [
-             '<(V8_ROOT)/src/builtins/builtins-intl-gen.cc',
-           ],
-         }],
+          'sources!': [
+            '<(V8_ROOT)/src/builtins/builtins-intl-gen.cc',
+          ],
+        }],
+        # Platforms that don't have Compare-And-Swap support need to link atomic
+        # library to implement atomic memory access
+        [ 'v8_current_cpu in ["mips", "mipsel", "mips64", "mips64el", "ppc", "ppc64", "s390", "s390x"] and OS!="zos"', {
+            'link_settings': {
+              'libraries': [ '-latomic', ],
+            },
+          },
+        ],
         ['OS=="win"', {
           'msvs_precompiled_header': '<(V8_ROOT)/../../tools/msvs/pch/v8_pch.h',
           'msvs_precompiled_source': '<(V8_ROOT)/../../tools/msvs/pch/v8_pch.cc',
