@@ -64,6 +64,12 @@
   process.on('uncaughtException', errorHandler)
   process.on('unhandledRejection', errorHandler)
 
+  if (process.platform === 'os390') {
+    process.env['_C89_CCMODE'] = '1'
+    process.env['_CC_CCMODE'] = '1'
+    process.env['_CXX_CCMODE'] = '1'
+  }
+
   if (conf.usage && npm.command !== 'help') {
     npm.argv.unshift(npm.command)
     npm.command = 'help'
