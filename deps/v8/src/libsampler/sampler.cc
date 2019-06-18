@@ -12,7 +12,11 @@
 #include <sys/time.h>
 #include <atomic>
 
-#if !V8_OS_QNX && !V8_OS_AIX
+void* ThreadKey(pthread_t& thread_id) {
+   return (void *)(&thread_id);
+}
+
+#if !V8_OS_QNX && !V8_OS_AIX && !V8_OS_ZOS
 #include <sys/syscall.h>  // NOLINT
 #endif
 
@@ -199,11 +203,19 @@ void SamplerManager::AddSampler(Sampler* sampler) {
   AtomicGuard atomic_guard(&samplers_access_counter_);
   DCHECK(sampler->IsActive());
   pthread_t thread_id = sampler->platform_data()->vm_tid();
+#ifdef __MVS__
+  auto it = sampler_map_.find(ThreadKey(thread_id));
+#else
   auto it = sampler_map_.find(thread_id);
+#endif
   if (it == sampler_map_.end()) {
     SamplerList samplers;
     samplers.push_back(sampler);
+#ifdef __MVS__
+    sampler_map_.emplace(ThreadKey(thread_id), std::move(samplers));
+#else
     sampler_map_.emplace(thread_id, std::move(samplers));
+#endif
   } else {
     SamplerList& samplers = it->second;
     auto it = std::find(samplers.begin(), samplers.end(), sampler);
@@ -215,7 +227,11 @@ void SamplerManager::RemoveSampler(Sampler* sampler) {
   AtomicGuard atomic_guard(&samplers_access_counter_);
   DCHECK(sampler->IsActive());
   pthread_t thread_id = sampler->platform_data()->vm_tid();
+#ifdef __MVS__
+  auto it = sampler_map_.find(ThreadKey(thread_id));
+#else
   auto it = sampler_map_.find(thread_id);
+#endif
   DCHECK_NE(it, sampler_map_.end());
   SamplerList& samplers = it->second;
   samplers.erase(std::remove(samplers.begin(), samplers.end(), sampler),
@@ -229,7 +245,11 @@ void SamplerManager::DoSample(const v8::RegisterState& state) {
   AtomicGuard atomic_guard(&samplers_access_counter_, false);
   if (!atomic_guard.is_success()) return;
   pthread_t thread_id = pthread_self();
+#ifdef __MVS__
+  auto it = sampler_map_.find(ThreadKey(thread_id));
+#else
   auto it = sampler_map_.find(thread_id);
+#endif
   if (it == sampler_map_.end()) return;
   SamplerList& samplers = it->second;
 

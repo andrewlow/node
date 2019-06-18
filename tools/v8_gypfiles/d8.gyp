@@ -18,6 +18,7 @@
         'v8.gyp:v8_libbase',
         'v8.gyp:v8_libplatform',
         'v8.gyp:generate_bytecode_builtins_list',
+        'v8.gyp:v8_snapshot',
       ],
       # Generated source files need this explicitly:
       'include_dirs+': [

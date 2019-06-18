@@ -1039,6 +1039,7 @@
          ],
          'cflags': [
            '-qasmlib=sys1.maclib:sys1.modgen',
+           '-qinline=:::300',
          ]
       }],
       ['(OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris" \
