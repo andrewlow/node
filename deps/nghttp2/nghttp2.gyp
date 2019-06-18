@@ -26,6 +26,12 @@
             },
           },
         }],
+        ['OS=="zos"', {
+          'defines': [
+            '_XOPEN_SOURCE_EXTENDED',
+            'HAVE_ARPA_INET_H'
+          ]
+        }],
         ['debug_nghttp2 == 1', {
           'defines': [ 'DEBUGBUILD=1' ]
         }]
