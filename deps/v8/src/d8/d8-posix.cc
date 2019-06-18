@@ -4,7 +4,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#ifndef __MVS__
 #include <netinet/ip.h>
+#endif
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -725,7 +727,10 @@ void Shell::UnsetEnvironment(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 char* Shell::ReadCharsFromTcpPort(const char* name, int* size_out) {
   DCHECK_GE(Shell::options.read_from_tcp_port, 0);
-
+#ifdef __MVS__
+   fprintf(stderr, "ReadhCharsFromTcpPort unimplemented on z/OS\n");
+   return nullptr;
+#else
   int sockfd = socket(PF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) {
     fprintf(stderr, "Failed to create IPv4 socket\n");
@@ -823,6 +828,7 @@ char* Shell::ReadCharsFromTcpPort(const char* name, int* size_out) {
   close(sockfd);
   *size_out = file_length;
   return chars;
+#endif
 }
 
 void Shell::AddOSMethods(Isolate* isolate, Local<ObjectTemplate> os_templ) {

@@ -284,7 +284,8 @@ void* OS::GetRandomMmapAddr() {
 }
 
 // TODO(bbudge) Move Cygwin and Fuchsia stuff into platform-specific files.
-#if !V8_OS_CYGWIN && !V8_OS_FUCHSIA && !V8_OS_ZOS
+#if !V8_OS_CYGWIN && !V8_OS_FUCHSIA
+#if !V8_OS_ZOS
 // static
 void* OS::Allocate(void* address, size_t size, size_t alignment,
                    MemoryPermission access) {
@@ -333,12 +334,16 @@ bool OS::Release(void* address, size_t size) {
   DCHECK_EQ(0, size % CommitPageSize());
   return munmap(address, size) == 0;
 }
+#endif
 
 // static
 bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
   DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
   DCHECK_EQ(0, size % CommitPageSize());
 
+#ifdef __MVS__
+  return true;	
+#else
   int prot = GetProtectionFromMemoryPermission(access);
   int ret = mprotect(address, size, prot);
   if (ret == 0 && access == OS::MemoryPermission::kNoAccess) {
@@ -358,11 +363,15 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
 #endif
 
   return ret == 0;
+#endif
 }
 
 bool OS::DiscardSystemPages(void* address, size_t size) {
   DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
   DCHECK_EQ(0, size % CommitPageSize());
+#if __MVS__
+  return true;
+#else
 #if defined(OS_MACOSX)
   // On OSX, MADV_FREE_REUSABLE has comparable behavior to MADV_FREE, but also
   // marks the pages with the reusable bit, which allows both Activity Monitor
@@ -386,6 +395,7 @@ bool OS::DiscardSystemPages(void* address, size_t size) {
 #endif
   }
   return ret == 0;
+#endif
 }
 
 // static
