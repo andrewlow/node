@@ -172,7 +172,10 @@
         }],
         [ 'OS=="zos"', {
           'include_dirs': [ 'config/zos' ],
-          'sources': [ 'config/zos/ares_config.h' ]
+          'sources': [ 'config/zos/ares_config.h' ],
+          'cflags': [
+            '-qascii'
+          ]
         }]
       ]
     }
