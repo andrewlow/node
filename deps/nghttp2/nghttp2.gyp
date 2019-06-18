@@ -30,6 +30,9 @@
           'defines': [
             '_XOPEN_SOURCE_EXTENDED',
             'HAVE_ARPA_INET_H'
+          ],
+          'cflags': [
+            '-qascii'
           ]
         }],
         ['debug_nghttp2 == 1', {
