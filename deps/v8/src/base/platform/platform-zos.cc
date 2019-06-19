@@ -585,6 +585,11 @@ bool OS::Free(void* address, const size_t size) {
   return result == 0;;
 }
 
+bool OS::Release(void* address, size_t size) {
+  DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
+  DCHECK_EQ(0, size % CommitPageSize());
+  return anon_munmap(address, size) == 0;
+}
 
 class ZOSTimezoneCache : public PosixTimezoneCache {
   const char * LocalTimezone(double time) override;
