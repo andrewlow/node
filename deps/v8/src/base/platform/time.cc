@@ -14,6 +14,9 @@
 #include <mach/mach_time.h>
 #include <pthread.h>
 #endif
+#if V8_OS_ZOS
+#include "zos.h"
+#endif
 
 #include <cstring>
 #include <ostream>

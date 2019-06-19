@@ -943,6 +943,9 @@
           },
         }],
         ['OS=="zos"', {
+          'include_dirs+': [
+            '<(V8_ROOT)/../zoslib/include',
+          ],
           'sources': [
             '<(V8_ROOT)/src/base/debug/stack_trace_posix.cc',
             '<(V8_ROOT)/src/base/platform/platform-zos.cc',
