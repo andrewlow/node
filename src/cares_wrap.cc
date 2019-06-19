@@ -35,6 +35,10 @@
 #include <vector>
 #include <unordered_set>
 
+#ifdef __MVS__
+#include <unistd.h>
+#endif
+
 #ifdef __POSIX__
 # include <netdb.h>
 #endif  // __POSIX__
@@ -42,7 +46,8 @@
 #if defined(__ANDROID__) || \
     defined(__MINGW32__) || \
     defined(__OpenBSD__) || \
-    defined(_MSC_VER)
+    defined(_MSC_VER)    || \
+    defined(__MVS__)
 
 # include <nameser.h>
 #else

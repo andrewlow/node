@@ -45,6 +45,10 @@
 # include <io.h>
 #endif
 
+#ifdef __MVS__
+#include <unistd.h>
+#endif
+
 #include <memory>
 
 namespace node {
@@ -857,7 +861,11 @@ static void InternalModuleStat(const FunctionCallbackInfo<Value>& args) {
   int rc = uv_fs_stat(env->event_loop(), &req, *path, nullptr);
   if (rc == 0) {
     const uv_stat_t* const s = static_cast<const uv_stat_t*>(req.ptr);
+#ifdef __MVS__
+    rc = !!(S_ISDIR(s->st_mode));
+#else
     rc = !!(s->st_mode & S_IFDIR);
+#endif
   }
   uv_fs_req_cleanup(&req);
 

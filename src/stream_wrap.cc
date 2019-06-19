@@ -34,6 +34,10 @@
 #include <cstring>  // memcpy()
 #include <climits>  // INT_MAX
 
+#ifdef __MVS__
+#include <unistd.h>
+#endif
+
 
 namespace node {
 
@@ -186,6 +190,16 @@ bool LibuvStreamWrap::IsClosing() {
 
 AsyncWrap* LibuvStreamWrap::GetAsyncWrap() {
   return static_cast<AsyncWrap*>(this);
+}
+
+
+bool LibuvStreamWrap::IsPipe() {
+  return is_named_pipe();
+}
+
+
+bool LibuvStreamWrap::IsTTY() {
+  return is_tty();
 }
 
 

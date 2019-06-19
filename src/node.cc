@@ -23,6 +23,12 @@
 
 // ========== local headers ==========
 
+#ifdef __MVS__
+#include <ctest.h>
+#include "node_watchdog.h"
+#include "util.h"
+#endif
+
 #include "debug_utils.h"
 #include "env-inl.h"
 #include "memory_tracker-inl.h"
@@ -101,6 +107,17 @@
 #ifdef __PASE__
 #include <sys/ioctl.h>  // ioctl
 #endif
+
+#ifdef __MVS__
+#include <list>
+#include <setjmp.h>
+#include <strings.h>
+#include <sys/__getipc.h>
+#include <sys/msg.h>
+#include <sys/sem.h>
+#include <unistd.h>
+#endif
+
 // ========== global C++ headers ==========
 
 #include <cerrno>
@@ -151,6 +168,99 @@ bool v8_is_profiling = false;
 // node_v8_platform-inl.h
 struct V8Platform v8_platform;
 }  // namespace per_process
+
+#ifdef __MVS__
+static uv_thread_t signalHandlerThread;
+static int signalHandlerExit;
+
+class OS390ThreadManager {
+public:
+  static void Destroy(int sig) {
+    uv_queue_work(NULL, NULL, NULL, NULL);
+    SigintWatchdogHelper::GetInstance()->StopThread();
+    msgctl(uv_backend_fd(uv_default_loop()), IPC_RMID, NULL);
+  }
+  ~OS390ThreadManager() {
+    Destroy(0);
+  }
+};
+
+static void ReleaseResourcesOnExit(void * arg) {
+  IPCQPROC buf;
+  int rc;
+  int uid = getuid();
+  int pid = getpid();
+  int stop = -1;
+  int others = 0; // temp
+  rc = __getipc(0, &buf, sizeof(buf), IPCQMSG);
+  while (rc != -1 && stop != buf.msg.ipcqmid) {
+    if (stop == -1)
+      stop = buf.msg.ipcqmid;
+    if (buf.msg.ipcqpcp.uid == uid) {
+      if (buf.msg.ipcqkey == 0) {
+        if (buf.msg.ipcqlrpid == pid) {
+          msgctl(buf.msg.ipcqmid, IPC_RMID, 0);
+        } else if (others && kill(buf.msg.ipcqlrpid, 0) == -1 &&
+                   kill(buf.msg.ipcqlspid, 0) == -1) {
+          msgctl(buf.msg.ipcqmid, IPC_RMID, 0);
+        }
+      }
+    }
+    rc = __getipc(rc, &buf, sizeof(buf), IPCQMSG);
+  }
+}
+
+typedef struct {
+  int signum;
+  struct sigaction saved;
+} sig_save;
+
+static sig_save siglist[] = {
+  {
+    SIGINT,
+  },
+  {
+    SIGABRT,
+  },
+  {
+    SIGTERM,
+  },
+  {
+    SIGABND,
+  },
+};
+
+void termination_handler(int signum) {
+  struct sigaction new_action;
+  for (int i = 0; i < (sizeof(siglist) / sizeof(sig_save)); ++i) {
+    if (signum == siglist[i].signum) {
+      ReleaseResourcesOnExit(nullptr);
+      raise(signum);
+      return;
+    }
+  }
+}
+
+void SignalHandlerThread(void* data) {
+  struct sigaction sa;
+  int old;
+
+  CHECK_EQ(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &old), 0);
+  CHECK_EQ(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old),0);
+
+  while(!signalHandlerExit) {
+    CHECK_EQ(pause(),-1);
+    CHECK_EQ(errno,EINTR);
+  }
+  OS390ThreadManager::Destroy(signalHandlerExit);
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = SIG_DFL;
+  CHECK_EQ(sigaction(signalHandlerExit, &sa, nullptr), 0);
+  if (signalHandlerExit == SIGABRT)
+    abort();
+  raise(signalHandlerExit);
+}
+#endif
 
 void SignalExit(int signo) {
   ResetStdio();
@@ -573,6 +683,7 @@ inline void PlatformInit() {
 
   RegisterSignalHandler(SIGINT, SignalExit, true);
   RegisterSignalHandler(SIGTERM, SignalExit, true);
+  RegisterSignalHandler(SIGABRT, SignalExit, true);
 
   // Raise the open file descriptor limit.
   struct rlimit lim;
@@ -727,6 +838,10 @@ int ProcessGlobalArgs(std::vector<std::string>* args,
     V8::SetFlagsFromCommandLine(&argc, &v8_args_as_char_ptr[0], true);
     v8_args_as_char_ptr.resize(argc);
   }
+
+#ifdef __MVS__
+  V8::SetFlagsFromString("--nohard_abort", 14);
+#endif
 
   // Anything that's still in v8_argv is not a V8 or a node option.
   for (size_t i = 1; i < v8_args_as_char_ptr.size(); i++)
@@ -1036,10 +1151,22 @@ void TearDownOncePerProcess() {
 }
 
 int Start(int argc, char** argv) {
+#ifdef __MVS__
+  OS390ThreadManager threadPoolObj;
+#endif
+
   InitializationResult result = InitializeOncePerProcess(argc, argv);
   if (result.early_return) {
     return result.exit_code;
   }
+
+#ifdef __MVS__
+  signalHandlerExit = 0;
+  sigset_t set;
+  sigfillset(&set);
+  uv_thread_create(&signalHandlerThread, SignalHandlerThread, NULL);
+  CHECK_EQ(0, pthread_sigmask(SIG_BLOCK, &set, NULL));
+#endif
 
   {
     Isolate::CreateParams params;
@@ -1059,6 +1186,35 @@ int Start(int argc, char** argv) {
         indexes = NodeMainInstance::GetIsolateDataIndexes();
       }
     }
+
+#ifdef __MVS__
+    static char altstack[SIGSTKSZ + 4096*1024];
+    stack_t ss = {.ss_size = SIGSTKSZ, .ss_sp = altstack};
+    struct sigaction new_action;
+    new_action.sa_handler = termination_handler;
+    int rc = sigaltstack(&ss, 0);
+    if (rc == 0) {
+      new_action.sa_flags = SA_RESETHAND | SA_ONSTACK;
+    } else {
+      perror("sigaltstack");
+      new_action.sa_flags = SA_RESETHAND;
+    }
+#if SKIPPING_FOR_SAVSTACK
+    for (int i = 0; i < (sizeof(siglist) / sizeof(sig_save)); ++i) {
+      sigaction(siglist[i].signum, NULL, &(siglist[i].saved));
+      if (siglist[i].saved.sa_handler != SIG_IGN) {
+        sigfillset(&new_action.sa_mask);
+        sigaction(siglist[i].signum, &new_action, NULL);
+      }
+    }
+#endif // SKIPPING_FOR_SAVSTACK
+    new_action.sa_handler = SIG_IGN;
+    sigfillset(&new_action.sa_mask);
+    sigaction(SIGPIPE, &new_action, NULL);
+    new_action.sa_handler = SIG_IGN;
+    sigfillset(&new_action.sa_mask);
+    sigaction(SIGCHLD, &new_action, NULL);
+#endif // __MVS__
 
     NodeMainInstance main_instance(&params,
                                    uv_default_loop(),

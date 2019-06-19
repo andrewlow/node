@@ -59,6 +59,8 @@ class TLSWrap : public AsyncWrap,
   // Implement StreamBase:
   bool IsAlive() override;
   bool IsClosing() override;
+  bool IsPipe() override;
+  bool IsTTY() override;
   bool IsIPCPipe() override;
   int GetFD() override;
   ShutdownWrap* CreateShutdownWrap(

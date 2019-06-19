@@ -28,6 +28,10 @@
 
 #include <cstring>
 
+#ifdef __MVS__
+#include <unistd.h>
+#endif
+
 
 namespace node {
 
