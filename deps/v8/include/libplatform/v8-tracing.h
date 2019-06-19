@@ -30,12 +30,6 @@ namespace tracing {
 class TraceEventListener;
 class JSONTraceEventListener;
 
-#if defined(V8_OS_ZOS)
-typedef pthread_t ThreadId;
-#else
-typedef int ThreadId;
-#endif
-
 const int kTraceMaxNumArgs = 2;
 
 class V8_PLATFORM_EXPORT TraceObject {
@@ -65,11 +59,11 @@ class V8_PLATFORM_EXPORT TraceObject {
       const char** arg_names, const uint8_t* arg_types,
       const uint64_t* arg_values,
       std::unique_ptr<v8::ConvertableToTraceFormat>* arg_convertables,
-      unsigned int flags, int pid, ThreadId tid, int64_t ts, int64_t tts,
+      unsigned int flags, int pid, pthread_t tid, int64_t ts, int64_t tts,
       uint64_t duration, uint64_t cpu_duration);
 
   int pid() const { return pid_; }
-  ThreadId tid() const { return tid_; }
+  pthread_t tid() const { return tid_; }
   char phase() const { return phase_; }
   const uint8_t* category_enabled_flag() const {
     return category_enabled_flag_;
@@ -93,7 +87,7 @@ class V8_PLATFORM_EXPORT TraceObject {
 
  private:
   int pid_;
-  ThreadId tid_;
+  pthread_t tid_;
   char phase_;
   const char* name_;
   const char* scope_;
