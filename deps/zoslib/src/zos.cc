@@ -1,10 +1,9 @@
 #define _AE_BIMODAL 1
 #undef _ENHANCED_ASCII_EXT
-#define _ENHANCED_ASCII_EXT 0x42020010
+#define _ENHANCED_ASCII_EXT 0xFFFFFFFF
 #define _XOPEN_SOURCE 600
 #define _OPEN_SYS_FILE_EXT 1
 #define __ZOS_CC
-#include "zos.h"
 #include <_Ccsid.h>
 #include <_Nascii.h>
 #include <__le_api.h>
@@ -13,7 +12,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iconv.h>
-#include <mutex>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -24,29 +22,35 @@
 #include <sys/msg.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
+#include "zos.h"
 static int __debug_mode = 0;
 #if ' ' != 0x20
 #error not build with correct codeset
 #endif
 
 int __argc = 1;
-char **__argv;
-char **__argv_a;
+char** __argv;
+char** __argv_a;
 extern void __settimelimit(int secs);
 
-static inline void *__convert_one_to_one(const void *table, void *dst,
-                                         size_t size, const void *src) {
-  void *rst = dst;
+static inline void* __convert_one_to_one(const void* table,
+                                         void* dst,
+                                         size_t size,
+                                         const void* src) {
+  void* rst = dst;
   __asm(" troo 2,%2,b'0001' \n jo *-4 \n"
         : "+NR:r3"(size), "+NR:r2"(dst), "+r"(src)
         : "NR:r1"(table)
         : "r0", "r1", "r2", "r3");
   return rst;
 }
-static inline unsigned strlen_ae(const unsigned char *str, int *code_page,
-                                 int max_len, int *ambiguous) {
+static inline unsigned strlen_ae(const unsigned char* str,
+                                 int* code_page,
+                                 int max_len,
+                                 int* ambiguous) {
   static int last_ccsid = 819;
   static const unsigned char _tab_a[256] __attribute__((aligned(8))) = {
       1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -76,7 +80,7 @@ static inline unsigned strlen_ae(const unsigned char *str, int *code_page,
   };
   unsigned long bytes;
   unsigned long code_out;
-  const unsigned char *start;
+  const unsigned char* start;
 
   bytes = max_len;
   code_out = 0;
@@ -163,39 +167,39 @@ static const unsigned char __iso88591_ibm1047[256]
         0x8c, 0x49, 0xcd, 0xce, 0xcb, 0xcf, 0xcc, 0xe1, 0x70, 0xdd, 0xde, 0xdb,
         0xdc, 0x8d, 0x8e, 0xdf};
 
-extern "C" void *_convert_e2a(void *dst, const void *src, size_t size) {
+extern "C" void* _convert_e2a(void* dst, const void* src, size_t size) {
   int ccsid;
   int am;
-  unsigned len = strlen_ae((unsigned char *)src, &ccsid, size, &am);
+  unsigned len = strlen_ae((unsigned char*)src, &ccsid, size, &am);
   if (ccsid == 819) {
     memcpy(dst, src, size);
     return dst;
   }
   return __convert_one_to_one(__ibm1047_iso88591, dst, size, src);
 }
-extern "C" void *_convert_a2e(void *dst, const void *src, size_t size) {
+extern "C" void* _convert_a2e(void* dst, const void* src, size_t size) {
   int ccsid;
   int am;
-  unsigned len = strlen_ae((unsigned char *)src, &ccsid, size, &am);
+  unsigned len = strlen_ae((unsigned char*)src, &ccsid, size, &am);
   if (ccsid == 1047) {
     memcpy(dst, src, size);
     return dst;
   }
   return __convert_one_to_one(__iso88591_ibm1047, dst, size, src);
 }
-extern "C" int __guess_ae(const void *src, size_t size) {
+extern "C" int __guess_ae(const void* src, size_t size) {
   int ccsid;
   int am;
-  unsigned len = strlen_ae((unsigned char *)src, &ccsid, size, &am);
+  unsigned len = strlen_ae((unsigned char*)src, &ccsid, size, &am);
   return ccsid;
 }
 
-extern char **environ; // this would be the ebcdic one
+extern char** environ;  // this would be the ebcdic one
 
-extern "C" char **__get_environ_np(void) {
-  static char **__environ = 0;
+extern "C" char** __get_environ_np(void) {
+  static char** __environ = 0;
   static long __environ_size = 0;
-  char **start = environ;
+  char** start = environ;
   int cnt = 0;
   int size = 0;
   int len = 0;
@@ -205,19 +209,19 @@ extern "C" char **__get_environ_np(void) {
     ++start;
     ++cnt;
   }
-  arysize = (cnt + 1) * sizeof(void *);
+  arysize = (cnt + 1) * sizeof(void*);
   size += arysize;
   if (__environ) {
     if (__environ_size < size) {
       free(__environ);
       __environ_size = size;
-      __environ = (char **)malloc(__environ_size);
+      __environ = (char**)malloc(__environ_size);
     }
   } else {
     __environ_size = size;
-    __environ = (char **)malloc(__environ_size);
+    __environ = (char**)malloc(__environ_size);
   }
-  char *p = (char *)__environ;
+  char* p = (char*)__environ;
   p += arysize;
   int i;
   start = environ;
@@ -232,18 +236,18 @@ extern "C" char **__get_environ_np(void) {
   return __environ;
 }
 
-int __setenv_a(const char *, const char *, int);
+int __setenv_a(const char*, const char*, int);
 #pragma map(__setenv_a, "\174\174A00188")
 extern "C" void __xfer_env(void) {
-  char **start = __get_environ_np();
+  char** start = __get_environ_np();
   int i;
   int len;
-  char *str;
-  char *a_str;
+  char* str;
+  char* a_str;
   while (*start) {
     str = *start;
     len = strlen(str);
-    a_str = (char *)alloca(len + 1);
+    a_str = (char*)alloca(len + 1);
     memcpy(a_str, str, len);
     a_str[len] = 0;
     for (i = 0; i < len; ++i) {
@@ -273,19 +277,19 @@ extern "C" int __chgfdccsid(int fd, unsigned short ccsid) {
   }
   return __fchattr(fd, &attr, sizeof(attr));
 }
-static void ledump(const char *title) {
+static void ledump(const char* title) {
   __auto_ascii _a;
-  __cdump_a((char *)title);
+  __cdump_a((char*)title);
 }
 #if DEBUG_ONLY
-extern "C" size_t __e2a_l(char *bufptr, size_t szLen) {
+extern "C" size_t __e2a_l(char* bufptr, size_t szLen) {
   int ccsid;
   int am;
   if (0 == bufptr) {
     errno = EINVAL;
     return -1;
   }
-  unsigned len = strlen_ae((const unsigned char *)bufptr, &ccsid, szLen, &am);
+  unsigned len = strlen_ae((const unsigned char*)bufptr, &ccsid, szLen, &am);
 
   if (ccsid == 819) {
     if (__debug_mode && !am) {
@@ -302,14 +306,14 @@ extern "C" size_t __e2a_l(char *bufptr, size_t szLen) {
   __convert_one_to_one(__ibm1047_iso88591, bufptr, szLen, bufptr);
   return szLen;
 }
-extern "C" size_t __a2e_l(char *bufptr, size_t szLen) {
+extern "C" size_t __a2e_l(char* bufptr, size_t szLen) {
   int ccsid;
   int am;
   if (0 == bufptr) {
     errno = EINVAL;
     return -1;
   }
-  unsigned len = strlen_ae((const unsigned char *)bufptr, &ccsid, szLen, &am);
+  unsigned len = strlen_ae((const unsigned char*)bufptr, &ccsid, szLen, &am);
 
   if (ccsid == 1047) {
     if (__debug_mode && !am) {
@@ -325,14 +329,14 @@ extern "C" size_t __a2e_l(char *bufptr, size_t szLen) {
   __convert_one_to_one(__iso88591_ibm1047, bufptr, szLen, bufptr);
   return szLen;
 }
-extern "C" size_t __e2a_s(char *string) {
+extern "C" size_t __e2a_s(char* string) {
   if (0 == string) {
     errno = EINVAL;
     return -1;
   }
   return __e2a_l(string, strlen(string));
 }
-extern "C" size_t __a2e_s(char *string) {
+extern "C" size_t __a2e_s(char* string) {
   if (0 == string) {
     errno = EINVAL;
     return -1;
@@ -341,8 +345,8 @@ extern "C" size_t __a2e_s(char *string) {
 }
 #endif
 
-static void __console(const void *p_in, int len_i) {
-  const unsigned char *p = (const unsigned char *)p_in;
+static void __console(const void* p_in, int len_i) {
+  const unsigned char* p = (const unsigned char*)p_in;
   int len = len_i;
   while (p[len] == 0x15 && len > 0) {
     --len;
@@ -352,7 +356,7 @@ static void __console(const void *p_in, int len_i) {
     unsigned short flags;
     unsigned char msgarea[130];
   } wtob_t;
-  wtob_t *m = (wtob_t *)__malloc31(134);
+  wtob_t* m = (wtob_t*)__malloc31(134);
   while (len > 126) {
     m->sz = 130;
     m->flags = 0x8000;
@@ -381,9 +385,9 @@ static void __console(const void *p_in, int len_i) {
   }
   free(m);
 }
-extern "C" int __console_printf(const char *fmt, ...) {
+extern "C" int __console_printf(const char* fmt, ...) {
   va_list ap;
-  char *buf;
+  char* buf;
   int len;
   va_start(ap, fmt);
   va_list ap1;
@@ -393,39 +397,38 @@ extern "C" int __console_printf(const char *fmt, ...) {
   int bytes;
   int ccsid;
   int am;
-  strlen_ae((const unsigned char *)fmt, &ccsid, strlen(fmt) + 1, &am);
+  strlen_ae((const unsigned char*)fmt, &ccsid, strlen(fmt) + 1, &am);
   int mode;
   if (ccsid == 819) {
     mode = __ae_thread_swapmode(__AE_ASCII_MODE);
     bytes = __vsnprintf_a(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_a(buf, bytes + 1, fmt, ap2);
     __a2e_l(buf, len);
   } else {
     mode = __ae_thread_swapmode(__AE_EBCDIC_MODE);
     bytes = __vsnprintf_e(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_e(buf, bytes + 1, fmt, ap2);
   }
   va_end(ap2);
   va_end(ap1);
   va_end(ap);
-  if (len < 0)
-    goto quit;
+  if (len < 0) goto quit;
   __console(buf, len);
 quit:
   __ae_thread_swapmode(mode);
   return len;
 }
 
-extern "C" int vdprintf(int fd, const char *fmt, va_list ap) {
+extern "C" int vdprintf(int fd, const char* fmt, va_list ap) {
   int ccsid;
   int am;
-  strlen_ae((const unsigned char *)fmt, &ccsid, strlen(fmt) + 1, &am);
+  strlen_ae((const unsigned char*)fmt, &ccsid, strlen(fmt) + 1, &am);
   int mode;
   int len;
   int bytes;
-  char *buf;
+  char* buf;
   va_list ap1;
   va_list ap2;
   va_copy(ap1, ap);
@@ -433,24 +436,23 @@ extern "C" int vdprintf(int fd, const char *fmt, va_list ap) {
   if (ccsid == 819) {
     mode = __ae_thread_swapmode(__AE_ASCII_MODE);
     bytes = __vsnprintf_a(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_a(buf, bytes + 1, fmt, ap2);
   } else {
     mode = __ae_thread_swapmode(__AE_EBCDIC_MODE);
     bytes = __vsnprintf_e(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_e(buf, bytes + 1, fmt, ap2);
   }
-  if (len == -1)
-    goto quit;
+  if (len == -1) goto quit;
   len = write(fd, buf, len);
 quit:
   __ae_thread_swapmode(mode);
   return len;
 }
-extern "C" int dprintf(int fd, const char *fmt, ...) {
+extern "C" int dprintf(int fd, const char* fmt, ...) {
   va_list ap;
-  char *buf;
+  char* buf;
   int len;
   va_start(ap, fmt);
   va_list ap1;
@@ -460,72 +462,71 @@ extern "C" int dprintf(int fd, const char *fmt, ...) {
   int bytes;
   int ccsid;
   int am;
-  strlen_ae((const unsigned char *)fmt, &ccsid, strlen(fmt) + 1, &am);
+  strlen_ae((const unsigned char*)fmt, &ccsid, strlen(fmt) + 1, &am);
   int mode;
   if (ccsid == 819) {
     mode = __ae_thread_swapmode(__AE_ASCII_MODE);
     bytes = __vsnprintf_a(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_a(buf, bytes + 1, fmt, ap2);
   } else {
     mode = __ae_thread_swapmode(__AE_EBCDIC_MODE);
     bytes = __vsnprintf_e(0, 0, fmt, ap1);
-    buf = (char *)alloca(bytes + 1);
+    buf = (char*)alloca(bytes + 1);
     len = __vsnprintf_e(buf, bytes + 1, fmt, ap2);
   }
   va_end(ap2);
   va_end(ap1);
   va_end(ap);
-  if (len == -1)
-    goto quit;
+  if (len == -1) goto quit;
   len = write(fd, buf, len);
 quit:
   __ae_thread_swapmode(mode);
   return len;
 }
 
-extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
-                         const char *format, ...);
+extern void __dump_title(
+    int fd, const void* addr, size_t len, size_t bw, const char* format, ...);
 
-extern void __dump(int fd, const void *addr, size_t len, size_t bw) {
+extern void __dump(int fd, const void* addr, size_t len, size_t bw) {
   __dump_title(fd, addr, len, bw, 0);
 }
 
-extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
-                         const char *format, ...) {
-  static const unsigned char *atbl = (unsigned char *)"................"
-                                                      "................"
-                                                      " !\"#$%&'()*+,-./"
-                                                      "0123456789:;<=>?"
-                                                      "@ABCDEFGHIJKLMNO"
-                                                      "PQRSTUVWXYZ[\\]^_"
-                                                      "`abcdefghijklmno"
-                                                      "pqrstuvwxyz{|}~."
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      "................";
-  static const unsigned char *etbl = (unsigned char *)"................"
-                                                      "................"
-                                                      "................"
-                                                      "................"
-                                                      " ...........<(+|"
-                                                      "&.........!$*);^"
-                                                      "-/.........,%_>?"
-                                                      ".........`:#@'=\""
-                                                      ".abcdefghi......"
-                                                      ".jklmnopqr......"
-                                                      ".~stuvwxyz...[.."
-                                                      ".............].."
-                                                      "{ABCDEFGHI......"
-                                                      "}JKLMNOPQR......"
-                                                      "\\.STUVWXYZ......"
-                                                      "0123456789......";
-  const unsigned char *p = (const unsigned char *)addr;
+extern void __dump_title(
+    int fd, const void* addr, size_t len, size_t bw, const char* format, ...) {
+  static const unsigned char* atbl = (unsigned char*)"................"
+                                                     "................"
+                                                     " !\"#$%&'()*+,-./"
+                                                     "0123456789:;<=>?"
+                                                     "@ABCDEFGHIJKLMNO"
+                                                     "PQRSTUVWXYZ[\\]^_"
+                                                     "`abcdefghijklmno"
+                                                     "pqrstuvwxyz{|}~."
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     "................";
+  static const unsigned char* etbl = (unsigned char*)"................"
+                                                     "................"
+                                                     "................"
+                                                     "................"
+                                                     " ...........<(+|"
+                                                     "&.........!$*);^"
+                                                     "-/.........,%_>?"
+                                                     ".........`:#@'=\""
+                                                     ".abcdefghi......"
+                                                     ".jklmnopqr......"
+                                                     ".~stuvwxyz...[.."
+                                                     ".............].."
+                                                     "{ABCDEFGHI......"
+                                                     "}JKLMNOPQR......"
+                                                     "\\.STUVWXYZ......"
+                                                     "0123456789......";
+  const unsigned char* p = (const unsigned char*)addr;
   if (format) {
     va_list ap;
     va_start(ap, format);
@@ -538,7 +539,7 @@ extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
     bw = 16;
   }
   unsigned char line[2048];
-  const unsigned char *buffer;
+  const unsigned char* buffer;
   long offset = 0;
   long sz = 0;
   long b = 0;
@@ -549,17 +550,15 @@ extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
     sz = (len > (bw - 1)) ? bw : len;
     buffer = p + offset;
     b = 0;
-    b += __snprintf_a((char *)line + b, 2048 - b, "%*p:", 16, buffer);
+    b += __snprintf_a((char*)line + b, 2048 - b, "%*p:", 16, buffer);
     for (i = 0; i < sz; ++i) {
-      if ((i & 3) == 0)
-        line[b++] = ' ';
+      if ((i & 3) == 0) line[b++] = ' ';
       c = buffer[i];
       line[b++] = "0123456789abcdef"[(0xf0 & c) >> 4];
       line[b++] = "0123456789abcdef"[(0x0f & c)];
     }
     for (; i < bw; ++i) {
-      if ((i & 3) == 0)
-        line[b++] = ' ';
+      if ((i & 3) == 0) line[b++] = ' ';
       line[b++] = ' ';
       line[b++] = ' ';
     }
@@ -600,17 +599,19 @@ extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
 
 __auto_ascii::__auto_ascii(void) {
   ascii_mode = __isASCII();
-  if (ascii_mode == 0)
-    __ae_thread_swapmode(__AE_ASCII_MODE);
+  if (ascii_mode == 0) __ae_thread_swapmode(__AE_ASCII_MODE);
 }
 __auto_ascii::~__auto_ascii(void) {
-  if (ascii_mode == 0)
-    __ae_thread_swapmode(__AE_EBCDIC_MODE);
+  if (ascii_mode == 0) __ae_thread_swapmode(__AE_EBCDIC_MODE);
 }
 
-static void init_tf_parms_t(__tf_parms_t *parm, char *pu_name_buf, size_t len1,
-                            char *entry_name_buf, size_t len2,
-                            char *stmt_id_buf, size_t len3) {
+static void init_tf_parms_t(__tf_parms_t* parm,
+                            char* pu_name_buf,
+                            size_t len1,
+                            char* entry_name_buf,
+                            size_t len2,
+                            char* stmt_id_buf,
+                            size_t len3) {
   _FEEDBACK fc;
   parm->__tf_pu_name.__tf_buff = pu_name_buf;
   parm->__tf_pu_name.__tf_bufflen = len1;
@@ -630,9 +631,9 @@ static void init_tf_parms_t(__tf_parms_t *parm, char *pu_name_buf, size_t len1,
   }
 }
 
-static int backtrace_w(void **buffer, int size);
+static int backtrace_w(void** buffer, int size);
 
-extern "C" int backtrace(void **buffer, int size) {
+extern "C" int backtrace(void** buffer, int size) {
   int mode;
   int result;
   mode = __ae_thread_swapmode(__AE_ASCII_MODE);
@@ -641,8 +642,8 @@ extern "C" int backtrace(void **buffer, int size) {
   return result;
 }
 
-int backtrace_w(void **input_buffer, int size) {
-  void **buffer = input_buffer;
+int backtrace_w(void** input_buffer, int size) {
+  void** buffer = input_buffer;
   __tf_parms_t tbck_parms;
   _FEEDBACK fc;
   int rc = 0;
@@ -672,45 +673,49 @@ int backtrace_w(void **input_buffer, int size) {
   return rc;
 }
 
-static void backtrace_symbols_w(void *const *buffer, int size, int fd,
-                                char ***return_string);
+static void backtrace_symbols_w(void* const* buffer,
+                                int size,
+                                int fd,
+                                char*** return_string);
 
-extern "C" char **backtrace_symbols(void *const *buffer, int size) {
+extern "C" char** backtrace_symbols(void* const* buffer, int size) {
   int mode;
-  char **result;
+  char** result;
   mode = __ae_thread_swapmode(__AE_ASCII_MODE);
   backtrace_symbols_w(buffer, size, -1, &result);
   __ae_thread_swapmode(mode);
   return result;
 }
-void backtrace_symbols_w(void *const *buffer, int size, int fd,
-                         char ***return_string) {
+void backtrace_symbols_w(void* const* buffer,
+                         int size,
+                         int fd,
+                         char*** return_string) {
   int sz;
-  char *return_buff;
-  char **table;
-  char *stringpool;
-  char *buff_end;
+  char* return_buff;
+  char** table;
+  char* stringpool;
+  char* buff_end;
   __tf_parms_t tbck_parms;
   char pu_name[256];
   char entry_name[256];
   char stmt_id[256];
-  char *return_addr;
+  char* return_addr;
   _FEEDBACK fc;
   int rc = 0;
   int i;
   int cnt;
   int inst;
-  void *caller_dsa = 0;
-  void *caller_inst = 0;
+  void* caller_dsa = 0;
+  void* caller_inst = 0;
 
-  sz = ((size + 1) * 300); // estimate
+  sz = ((size + 1) * 300);  // estimate
   if (fd == -1) {
-    return_buff = (char *)malloc(sz);
+    return_buff = (char*)malloc(sz);
   }
   while (return_buff != 0 || (return_buff == 0 && fd != -1)) {
     if (fd == -1) {
-      table = (char **)return_buff;
-      stringpool = return_buff + ((size + 1) * sizeof(void *));
+      table = (char**)return_buff;
+      stringpool = return_buff + ((size + 1) * sizeof(void*));
       buff_end = return_buff + sz;
     }
     init_tf_parms_t(&tbck_parms, pu_name, 256, entry_name, 256, stmt_id, 256);
@@ -732,56 +737,77 @@ void backtrace_symbols_w(void *const *buffer, int size, int fd,
       }
       caller_dsa = tbck_parms.__tf_caller_dsa_addr;
       caller_inst = tbck_parms.__tf_caller_call_instruction;
-      inst = *(char *)(tbck_parms.__tf_caller_call_instruction);
+      inst = *(char*)(tbck_parms.__tf_caller_call_instruction);
       if (inst == 0xa7) {
         // BRAS
-        return_addr = 6 + (char *)tbck_parms.__tf_caller_call_instruction;
+        return_addr = 6 + (char*)tbck_parms.__tf_caller_call_instruction;
       } else {
         // BASR
-        return_addr = 4 + (char *)tbck_parms.__tf_caller_call_instruction;
+        return_addr = 4 + (char*)tbck_parms.__tf_caller_call_instruction;
       }
       if (tbck_parms.__tf_call_instruction) {
         if (pu_name[0]) {
           if (fd == -1)
-            cnt = __snprintf_a(stringpool, buff_end - stringpool,
-                               "%s:%s (%s+0x%lx) [0x%p]", pu_name, stmt_id,
+            cnt = __snprintf_a(stringpool,
+                               buff_end - stringpool,
+                               "%s:%s (%s+0x%lx) [0x%p]",
+                               pu_name,
+                               stmt_id,
                                entry_name,
-                               (char *)tbck_parms.__tf_call_instruction -
-                                   (char *)tbck_parms.__tf_entry_addr,
+                               (char*)tbck_parms.__tf_call_instruction -
+                                   (char*)tbck_parms.__tf_entry_addr,
                                return_addr);
           else
-            dprintf(fd, "%s:%s (%s+0x%lx) [0x%p]\n", pu_name, stmt_id,
+            dprintf(fd,
+                    "%s:%s (%s+0x%lx) [0x%p]\n",
+                    pu_name,
+                    stmt_id,
                     entry_name,
-                    (char *)tbck_parms.__tf_call_instruction -
-                        (char *)tbck_parms.__tf_entry_addr,
+                    (char*)tbck_parms.__tf_call_instruction -
+                        (char*)tbck_parms.__tf_entry_addr,
                     return_addr);
 
         } else {
           if (fd == -1)
-            cnt = __snprintf_a(stringpool, buff_end - stringpool,
-                               "(%s+0x%lx) [0x%p]", entry_name,
-                               (char *)tbck_parms.__tf_call_instruction -
-                                   (char *)tbck_parms.__tf_entry_addr,
+            cnt = __snprintf_a(stringpool,
+                               buff_end - stringpool,
+                               "(%s+0x%lx) [0x%p]",
+                               entry_name,
+                               (char*)tbck_parms.__tf_call_instruction -
+                                   (char*)tbck_parms.__tf_entry_addr,
                                return_addr);
           else
-            dprintf(fd, "(%s+0x%lx) [0x%p]\n", entry_name,
-                    (char *)tbck_parms.__tf_call_instruction -
-                        (char *)tbck_parms.__tf_entry_addr,
+            dprintf(fd,
+                    "(%s+0x%lx) [0x%p]\n",
+                    entry_name,
+                    (char*)tbck_parms.__tf_call_instruction -
+                        (char*)tbck_parms.__tf_entry_addr,
                     return_addr);
         }
       } else {
         if (pu_name[0]) {
           if (fd == -1)
-            cnt = __snprintf_a(stringpool, buff_end - stringpool,
-                               "%s:%s (%s) [0x%p]", pu_name, stmt_id,
-                               entry_name, return_addr);
+            cnt = __snprintf_a(stringpool,
+                               buff_end - stringpool,
+                               "%s:%s (%s) [0x%p]",
+                               pu_name,
+                               stmt_id,
+                               entry_name,
+                               return_addr);
           else
-            dprintf(fd, "%s:%s (%s) [0x%p]\n", pu_name, stmt_id, entry_name,
+            dprintf(fd,
+                    "%s:%s (%s) [0x%p]\n",
+                    pu_name,
+                    stmt_id,
+                    entry_name,
                     return_addr);
         } else {
           if (fd == -1)
-            cnt = __snprintf_a(stringpool, buff_end - stringpool, "(%s) [0x%p]",
-                               entry_name, return_addr);
+            cnt = __snprintf_a(stringpool,
+                               buff_end - stringpool,
+                               "(%s) [0x%p]",
+                               entry_name,
+                               return_addr);
           else
             dprintf(fd, "(%s) [0x%p]\n", entry_name, return_addr);
         }
@@ -804,25 +830,24 @@ void backtrace_symbols_w(void *const *buffer, int size, int fd,
       }
       free(return_buff);
       sz += (size * 300);
-      return_buff = (char *)malloc(sz);
+      return_buff = (char*)malloc(sz);
     } else
       return;
   }
 }
 
-extern "C" void backtrace_symbols_fd(void *const *buffer, int size, int fd) {
+extern "C" void backtrace_symbols_fd(void* const* buffer, int size, int fd) {
   int mode;
   mode = __ae_thread_swapmode(__AE_ASCII_MODE);
   backtrace_symbols_w(buffer, size, fd, 0);
   __ae_thread_swapmode(mode);
 }
 
-void __abend(int comp_code, unsigned reason_code, int flat_byte, void *plist) {
+void __abend(int comp_code, unsigned reason_code, int flat_byte, void* plist) {
   unsigned long r15 = reason_code;
   unsigned long r1;
-  void *__ptr32 r0 = plist;
-  if (flat_byte == -1)
-    flat_byte = 0x84;
+  void* __ptr32 r0 = plist;
+  if (flat_byte == -1) flat_byte = 0x84;
   r1 = (flat_byte << 24) + (0x00ffffff & comp_code);
   __asm(" SVC 13\n" : : "NR:r0"(r0), "NR:r1"(r1), "NR:r15"(r15) :);
 }
@@ -851,50 +876,47 @@ static const unsigned char ascii_to_lower[256] __attribute__((aligned(8))) = {
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb,
     0xfc, 0xfd, 0xfe, 0xff};
 
-int strcasecmp_ignorecp(const char *a, const char *b) {
+int strcasecmp_ignorecp(const char* a, const char* b) {
   int len_a = strlen(a);
   int len_b = strlen(b);
 
-  if (len_a != len_b)
-    return len_a - len_b;
-  if (!memcmp(a, b, len_a))
-    return 0;
-  char *a_new = (char *)_convert_e2a(alloca(len_a + 1), a, len_a + 1);
-  char *b_new = (char *)_convert_e2a(alloca(len_b + 1), b, len_b + 1);
+  if (len_a != len_b) return len_a - len_b;
+  if (!memcmp(a, b, len_a)) return 0;
+  char* a_new = (char*)_convert_e2a(alloca(len_a + 1), a, len_a + 1);
+  char* b_new = (char*)_convert_e2a(alloca(len_b + 1), b, len_b + 1);
   __convert_one_to_one(ascii_to_lower, a_new, len_a, a_new);
   __convert_one_to_one(ascii_to_lower, b_new, len_b, a_new);
   return strcmp(a_new, b_new);
 }
 
-int strncasecmp_ignorecp(const char *a, const char *b, size_t n) {
+int strncasecmp_ignorecp(const char* a, const char* b, size_t n) {
   int ccsid_a, ccsid_b;
   int am_a, am_b;
-  unsigned len_a = strlen_ae((unsigned char *)a, &ccsid_a, n, &am_a);
-  unsigned len_b = strlen_ae((unsigned char *)b, &ccsid_b, n, &am_b);
-  char *a_new;
-  char *b_new;
-  if (len_a != len_b)
-    return len_a - len_b;
+  unsigned len_a = strlen_ae((unsigned char*)a, &ccsid_a, n, &am_a);
+  unsigned len_b = strlen_ae((unsigned char*)b, &ccsid_b, n, &am_b);
+  char* a_new;
+  char* b_new;
+  if (len_a != len_b) return len_a - len_b;
 
   if (ccsid_a != 819) {
-    a_new = (char *)__convert_one_to_one(__ibm1047_iso88591, alloca(len_a + 1),
-                                         len_a, a);
+    a_new = (char*)__convert_one_to_one(
+        __ibm1047_iso88591, alloca(len_a + 1), len_a, a);
     a_new[len_a] = 0;
-    a_new = (char *)__convert_one_to_one(ascii_to_lower, a_new, len_a, a_new);
+    a_new = (char*)__convert_one_to_one(ascii_to_lower, a_new, len_a, a_new);
   } else {
-    a_new = (char *)__convert_one_to_one(ascii_to_lower, alloca(len_a + 1),
-                                         len_a, a);
+    a_new = (char*)__convert_one_to_one(
+        ascii_to_lower, alloca(len_a + 1), len_a, a);
     a_new[len_a] = 0;
   }
 
   if (ccsid_b != 819) {
-    b_new = (char *)__convert_one_to_one(__ibm1047_iso88591, alloca(len_b + 1),
-                                         len_b, b);
+    b_new = (char*)__convert_one_to_one(
+        __ibm1047_iso88591, alloca(len_b + 1), len_b, b);
     b_new[len_b] = 0;
-    b_new = (char *)__convert_one_to_one(ascii_to_lower, b_new, len_b, b_new);
+    b_new = (char*)__convert_one_to_one(ascii_to_lower, b_new, len_b, b_new);
   } else {
-    b_new = (char *)__convert_one_to_one(ascii_to_lower, alloca(len_b + 1),
-                                         len_b, b);
+    b_new = (char*)__convert_one_to_one(
+        ascii_to_lower, alloca(len_b + 1), len_b, b);
     b_new[len_b] = 0;
   }
 
@@ -909,7 +931,7 @@ class __csConverter {
   iconv_t cv;
   int valid;
 
-public:
+ public:
   __csConverter(int fr_ccsid, int to_ccsid) : fr_id(fr_ccsid), to_id(to_ccsid) {
     valid = 0;
     if (0 != __toCSName(fr_id, fr_name)) {
@@ -927,23 +949,22 @@ public:
   }
   int is_valid(void) { return valid; }
   ~__csConverter(void) {
-    if (valid)
-      iconv_close(cv);
+    if (valid) iconv_close(cv);
   }
-  size_t iconv(char **inbuf, size_t *inbytesleft, char **outbuf,
-               size_t *outbytesleft) {
+  size_t iconv(char** inbuf,
+               size_t* inbytesleft,
+               char** outbuf,
+               size_t* outbytesleft) {
     return ::iconv(cv, inbuf, inbytesleft, outbuf, outbytesleft);
   }
-  int conv(char *out, size_t outsize, const char *in, size_t insize) {
+  int conv(char* out, size_t outsize, const char* in, size_t insize) {
     size_t o_len = outsize;
     size_t i_len = insize;
-    char *p = (char *)in;
-    char *q = out;
-    if (i_len == 0)
-      return 0;
+    char* p = (char*)in;
+    char* q = out;
+    if (i_len == 0) return 0;
     int converted = ::iconv(cv, &p, &i_len, &q, &o_len);
-    if (converted == -1)
-      return -1;
+    if (converted == -1) return -1;
     if (i_len == 0) {
       return outsize - o_len;
     }
@@ -959,8 +980,7 @@ static void cleanupmsgq(int others) {
   int stop = -1;
   rc = __getipc(0, &buf, sizeof(buf), IPCQMSG);
   while (rc != -1 && stop != buf.msg.ipcqmid) {
-    if (stop == -1)
-      stop = buf.msg.ipcqmid;
+    if (stop == -1) stop = buf.msg.ipcqmid;
     if (buf.msg.ipcqpcp.uid == uid) {
       if (buf.msg.ipcqkey == 0) {
         if (buf.msg.ipcqlrpid == pid) {
@@ -975,12 +995,12 @@ static void cleanupmsgq(int others) {
   }
 }
 class __init {
-public:
+ public:
   __init() {
     // initialization
-    unsigned long *x =
-        (unsigned long *)((char *****__ptr32 *)1208)[0][11][1][113][149];
-    __argv = (char **)x[1];
+    unsigned long* x =
+        (unsigned long*)((char***** __ptr32*)1208)[0][11][1][113][149];
+    __argv = (char**)x[1];
     if ((unsigned long)(__argv) < 0x00000000FFFFFFFFUL) {
       __argc = 0;
     } else {
@@ -993,14 +1013,14 @@ public:
     int i;
 
     int bytes = 0;
-    char *strbuf;
+    char* strbuf;
     for (i = 0; i < __argc; ++i) {
-      bytes += sizeof(void *);
+      bytes += sizeof(void*);
       bytes += (1 + strlen(__argv[i]));
     }
-    bytes += sizeof(void *);
-    __argv_a = (char **)malloc(bytes);
-    strbuf = ((char *)__argv_a) + ((__argc + 1) * sizeof(void *));
+    bytes += sizeof(void*);
+    __argv_a = (char**)malloc(bytes);
+    strbuf = ((char*)__argv_a) + ((__argc + 1) * sizeof(void*));
 
     for (i = 0; i < __argc; ++i) {
       int l = strlen(__argv[i]);
@@ -1010,15 +1030,15 @@ public:
       strbuf += (l + 1);
     }
     __argv_a[i] = 0;
-    char *cu = __getenv_a("__IPC_CLEANUP");
+    char* cu = __getenv_a("__IPC_CLEANUP");
     if (cu && !memcmp(cu, "1", 2)) {
       cleanupmsgq(1);
     }
-    char *dbg = __getenv_a("__NODERUNDEBUG");
+    char* dbg = __getenv_a("__NODERUNDEBUG");
     if (dbg && !memcmp(dbg, "1", 2)) {
       __debug_mode = 1;
     }
-    char *tl = __getenv_a("__NODERUNTIMELIMIT");
+    char* tl = __getenv_a("__NODERUNTIMELIMIT");
     if (tl) {
       int sec = __atoi_a(tl);
       if (sec > 0) {
@@ -1035,11 +1055,15 @@ static __init __a;
 static __csConverter utf16_to_8(1208, 1200);
 static __csConverter utf8_to_16(1200, 1208);
 
-extern "C" int conv_utf8_utf16(char *out, size_t outsize, const char *in,
+extern "C" int conv_utf8_utf16(char* out,
+                               size_t outsize,
+                               const char* in,
                                size_t insize) {
   return utf8_to_16.conv(out, outsize, in, insize);
 }
-extern "C" int conv_utf16_utf8(char *out, size_t outsize, const char *in,
+extern "C" int conv_utf16_utf8(char* out,
+                               size_t outsize,
+                               const char* in,
                                size_t insize) {
   return utf16_to_8.conv(out, outsize, in, insize);
 }
@@ -1054,8 +1078,8 @@ unsigned long __clock(void) {
   __stckf(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
-static void *_timer(void *parm) {
-  timer_parm_t *tp = (timer_parm_t *)parm;
+static void* _timer(void* parm) {
+  timer_parm_t* tp = (timer_parm_t*)parm;
   unsigned long t0 = __clock();
   unsigned long t1 = t0;
   while ((t1 - t0) < ((tp->secs) * 1000000000)) {
@@ -1073,7 +1097,7 @@ extern void __settimelimit(int secs) {
   pthread_t tid;
   pthread_attr_t attr;
   int rc;
-  timer_parm_t *tp = (timer_parm_t *)malloc(sizeof(timer_parm_t));
+  timer_parm_t* tp = (timer_parm_t*)malloc(sizeof(timer_parm_t));
   tp->secs = secs;
   tp->tid = pthread_self();
   rc = pthread_attr_init(&attr);
@@ -1088,51 +1112,63 @@ extern void __settimelimit(int secs) {
   }
   pthread_attr_destroy(&attr);
 }
-extern "C" void __setdebug(int v) { __debug_mode = v; }
-extern "C" int __indebug(void) { return __debug_mode; }
-extern "C" char **__getargv(void) { return __argv; }
-extern "C" char **__getargv_a(void) { return __argv_a; }
-extern "C" int __getargc(void) { return __argc; }
-
-extern "C" void *__dlcb_next(void *last) {
-  if (last == 0) {
-    return ((char *****__ptr32 *)1208)[0][11][1][113][193];
-  }
-  return ((char **)last)[0];
+extern "C" void __setdebug(int v) {
+  __debug_mode = v;
 }
-extern "C" int __dlcb_entry_name(char *buf, int size, void *dlcb) {
+extern "C" int __indebug(void) {
+  return __debug_mode;
+}
+extern "C" char** __getargv(void) {
+  return __argv;
+}
+extern "C" char** __getargv_a(void) {
+  return __argv_a;
+}
+extern "C" int __getargc(void) {
+  return __argc;
+}
+
+extern "C" void* __dlcb_next(void* last) {
+  if (last == 0) {
+    return ((char***** __ptr32*)1208)[0][11][1][113][193];
+  }
+  return ((char**)last)[0];
+}
+extern "C" int __dlcb_entry_name(char* buf, int size, void* dlcb) {
   unsigned short n;
-  char *name;
-  if (dlcb == 0)
-    return 0;
-  n = ((unsigned short *)dlcb)[44];
-  name = ((char **)dlcb)[12];
+  char* name;
+  if (dlcb == 0) return 0;
+  n = ((unsigned short*)dlcb)[44];
+  name = ((char**)dlcb)[12];
   return __snprintf_a(
-      buf, size, "%-.*s", n,
+      buf,
+      size,
+      "%-.*s",
+      n,
       __convert_one_to_one(__ibm1047_iso88591, alloca(n + 1), n, name));
 }
-extern "C" void *__dlcb_entry_addr(void *dlcb) {
-  if (dlcb == 0)
-    return 0;
-  char *addr = ((char **)dlcb)[2];
+extern "C" void* __dlcb_entry_addr(void* dlcb) {
+  if (dlcb == 0) return 0;
+  char* addr = ((char**)dlcb)[2];
   return addr;
 }
 
-static int return_abspath(char *out, int size, const char *path_file) {
+static int return_abspath(char* out, int size, const char* path_file) {
   char buffer[1025];
-  char *res = 0;
-  if (path_file[0] != '/')
-    res = __realpath_a(path_file, buffer);
+  char* res = 0;
+  if (path_file[0] != '/') res = __realpath_a(path_file, buffer);
   return __snprintf_a(out, size, "%s", res ? buffer : path_file);
 }
 
-extern "C" int __find_file_in_path(char *out, int size, const char *envvar,
-                                   const char *file) {
-  char *start = (char *)envvar;
+extern "C" int __find_file_in_path(char* out,
+                                   int size,
+                                   const char* envvar,
+                                   const char* file) {
+  char* start = (char*)envvar;
   char path[1025];
   char real_path[1025];
   char path_file[1025];
-  char *p = path;
+  char* p = path;
   int len = 0;
   struct stat st;
   while (*start && (p < (path + 1024))) {
@@ -1164,18 +1200,26 @@ extern "C" int __find_file_in_path(char *out, int size, const char *envvar,
   return 0;
 }
 
-static char *__ptr32 *__ptr32 __base(void) {
-  static char *__ptr32 *__ptr32 res = 0;
+static char* __ptr32* __ptr32 __base(void) {
+  static char* __ptr32* __ptr32 res = 0;
   if (res == 0) {
-    res = ((char *__ptr32 *__ptr32 *__ptr32 *__ptr32 *)16)[0][136][6];
+    res = ((char* __ptr32* __ptr32* __ptr32* __ptr32*)16)[0][136][6];
   }
   return res;
 }
-static void __bpx4kil(int pid, int signal, void *signal_options,
-                      int *return_value, int *return_code, int *reason_code) {
-  void *reg15 = __base()[308 / 4]; // BPX4KIL offset is 308
-  void *argv[] = {&pid,         &signal,     signal_options,
-                  return_value, return_code, reason_code}; // os style parm list
+static void __bpx4kil(int pid,
+                      int signal,
+                      void* signal_options,
+                      int* return_value,
+                      int* return_code,
+                      int* reason_code) {
+  void* reg15 = __base()[308 / 4];  // BPX4KIL offset is 308
+  void* argv[] = {&pid,
+                  &signal,
+                  signal_options,
+                  return_value,
+                  return_code,
+                  reason_code};  // os style parm list
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
 }
 
@@ -1183,13 +1227,12 @@ static void __bpx4kil(int pid, int signal, void *signal_options,
 extern "C" int kill(int pid, int sig) {
   int rv, rc, rn;
   __bpx4kil(pid, sig, 0, &rv, &rc, &rn);
-  if (rv != 0)
-    errno = rc;
+  if (rv != 0) errno = rc;
   return rv;
 }
 
 struct IntHash {
-  size_t operator()(const int &n) const { return n * 0x54edcfac64d7d667L; }
+  size_t operator()(const int& n) const { return n * 0x54edcfac64d7d667L; }
 };
 
 typedef unsigned long fd_attribute;
@@ -1200,7 +1243,7 @@ class fdAttributeCache {
   std::unordered_map<int, fd_attribute, IntHash> cache;
   std::mutex access_lock;
 
-public:
+ public:
   fd_attribute get_attribute(int fd) {
     std::lock_guard<std::mutex> guard(access_lock);
     cursor_t c = cache.find(fd);
@@ -1233,7 +1276,7 @@ enum notagread {
 } notagread;
 
 static enum notagread get_no_tag_read_behaviour(void) {
-  char *ntr = __getenv_a("__UNTAGGED_READ_MODE");
+  char* ntr = __getenv_a("__UNTAGGED_READ_MODE");
   if (ntr && !strcmp(ntr, "DEFAULT")) {
     return __NO_TAG_READ_DEFAULT;
   } else if (ntr && !strcmp(ntr, "WARN")) {
@@ -1243,28 +1286,27 @@ static enum notagread get_no_tag_read_behaviour(void) {
   } else if (ntr && !strcmp(ntr, "STRICT")) {
     return __NO_TAG_READ_STRICT;
   }
-  return __NO_TAG_READ_DEFAULT; // defualt
+  return __NO_TAG_READ_DEFAULT;  // defualt
 }
 static int no_tag_read_behaviour = get_no_tag_read_behaviour();
 
-extern "C" void __fd_close(int fd) { fdcache.unset_attribute(fd); }
+extern "C" void __fd_close(int fd) {
+  fdcache.unset_attribute(fd);
+}
 extern "C" int __file_needs_conversion(int fd) {
-  if (no_tag_read_behaviour == __NO_TAG_READ_STRICT)
-    return 0;
-  if (no_tag_read_behaviour == __NO_TAG_READ_V6)
-    return 1;
+  if (no_tag_read_behaviour == __NO_TAG_READ_STRICT) return 0;
+  if (no_tag_read_behaviour == __NO_TAG_READ_V6) return 1;
   unsigned long attr = fdcache.get_attribute(fd);
   if (attr == 0x0000000000020000UL) {
     return 1;
   }
   return 0;
 }
-extern "C" int __file_needs_conversion_init(const char *name, int fd) {
+extern "C" int __file_needs_conversion_init(const char* name, int fd) {
   char buf[4096];
   off_t off;
   int cnt;
-  if (no_tag_read_behaviour == __NO_TAG_READ_STRICT)
-    return 0;
+  if (no_tag_read_behaviour == __NO_TAG_READ_STRICT) return 0;
   if (no_tag_read_behaviour == __NO_TAG_READ_V6) {
     fdcache.set_attribute(fd, 0x0000000000020000UL);
     return 1;
@@ -1281,14 +1323,14 @@ extern "C" int __file_needs_conversion_init(const char *name, int fd) {
     if (cnt > 8) {
       int ccsid;
       int am;
-      unsigned len = strlen_ae((unsigned char *)buf, &ccsid, cnt, &am);
+      unsigned len = strlen_ae((unsigned char*)buf, &ccsid, cnt, &am);
       if (ccsid == 1047) {
         if (no_tag_read_behaviour == __NO_TAG_READ_DEFAULT_WITHWARNING) {
-          const char *filename = "(null)";
+          const char* filename = "(null)";
           if (name) {
             int len = strlen(name);
             filename =
-                (const char *)_convert_e2a(alloca(len + 1), name, len + 1);
+                (const char*)_convert_e2a(alloca(len + 1), name, len + 1);
           }
           dprintf(2,
                   "Warning: File \"%s\"is untagged and seems to contain EBCDIC "
@@ -1298,7 +1340,12 @@ extern "C" int __file_needs_conversion_init(const char *name, int fd) {
         fdcache.set_attribute(fd, 0x0000000000020000UL);
         return 1;
       }
-    }       // seekable files
-  }         // seekable files
-  return 0; // not seekable
+    }        // seekable files
+  }          // seekable files
+  return 0;  // not seekable
+}
+extern "C" unsigned long __mach_absolute_time(void) {
+  unsigned long long value, sec, nsec;
+  __stckf(&value);
+  return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
