@@ -277,6 +277,14 @@ void SigintWatchdogHelper::Unregister(SigintWatchdog* wd) {
 }
 
 
+void SigintWatchdogHelper::StopThread() {
+  if (has_running_thread_ == false)
+    return;
+  start_stop_count_ = 0;
+  Stop();
+}
+
+
 SigintWatchdogHelper::SigintWatchdogHelper()
     : start_stop_count_(0),
       has_pending_signal_(false) {

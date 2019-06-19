@@ -27,6 +27,11 @@
 #include <cstring>
 #include <cstdlib>
 
+#ifdef __MVS__
+#include <regex>
+#include <unistd.h>
+#endif
+
 namespace node {
 
 using v8::Array;

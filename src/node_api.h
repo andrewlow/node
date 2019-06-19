@@ -6,6 +6,10 @@
     // Building native module against node
     #define NAPI_EXTERN __declspec(dllimport)
   #endif
+#else
+  #ifdef __MVS__
+    #define NAPI_EXTERN extern
+  #endif
 #endif
 #include "js_native_api.h"
 #include "node_api_types.h"

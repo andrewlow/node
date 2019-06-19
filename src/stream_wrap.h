@@ -42,6 +42,8 @@ class LibuvStreamWrap : public HandleWrap, public StreamBase {
   int GetFD() override;
   bool IsAlive() override;
   bool IsClosing() override;
+  bool IsPipe() override;
+  bool IsTTY() override;
   bool IsIPCPipe() override;
 
   // JavaScript functions
@@ -71,6 +73,10 @@ class LibuvStreamWrap : public HandleWrap, public StreamBase {
 
   inline bool is_tcp() const {
     return stream()->type == UV_TCP;
+  }
+
+  inline bool is_tty() const {
+    return stream()->type == UV_TTY;
   }
 
   ShutdownWrap* CreateShutdownWrap(v8::Local<v8::Object> object) override;

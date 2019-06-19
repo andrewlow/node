@@ -13,6 +13,10 @@
 
 #include <climits>  // INT_MAX
 
+#ifdef __MVS__
+#include <unistd.h>
+#endif
+
 namespace node {
 
 using v8::Array;
@@ -329,6 +333,16 @@ MaybeLocal<Value> StreamBase::CallJSOnreadMethod(ssize_t nread,
   Local<Value> onread = wrap->object()->GetInternalField(kOnReadFunctionField);
   CHECK(onread->IsFunction());
   return wrap->MakeCallback(onread.As<Function>(), arraysize(argv), argv);
+}
+
+
+bool StreamBase::IsPipe() {
+  return false;
+}
+
+
+bool StreamBase::IsTTY() {
+  return false;
 }
 
 
