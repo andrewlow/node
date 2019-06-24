@@ -125,7 +125,7 @@
             },
           },
           'conditions': [
-            ['OS!="aix" and node_shared=="false"', {
+            ['OS!="aix" and OS!="zos" and node_shared=="false"', {
               'ldflags': [
                 '-Wl,--whole-archive',
                 '<(obj_dir)/deps/zlib/<(STATIC_LIB_PREFIX)zlib<(STATIC_LIB_SUFFIX)',
@@ -165,7 +165,7 @@
             },
           },
           'conditions': [
-            ['OS!="aix" and node_shared=="false"', {
+            ['OS!="aix" and OS!="zos" and node_shared=="false"', {
               'ldflags': [
                 '-Wl,--whole-archive',
                 '<(obj_dir)/deps/uv/<(STATIC_LIB_PREFIX)uv<(STATIC_LIB_SUFFIX)',
@@ -303,20 +303,22 @@
     [ 'OS=="linux" and '
       'target_arch=="x64" and '
       'node_use_large_pages=="true" and '
-      'node_use_large_pages_script_lld=="false"', {
-      'ldflags': [
-        '-Wl,-T',
-        '<!(realpath src/large_pages/ld.implicit.script)',
-      ]
-    }],
-    [ 'OS=="linux" and '
-      'target_arch=="x64" and '
-      'node_use_large_pages=="true" and '
       'node_use_large_pages_script_lld=="true"', {
       'ldflags': [
         '-Wl,-T',
         '<!(realpath src/large_pages/ld.implicit.script.lld)',
       ]
+    }],
+    [ 'OS=="zos"', {
+      'conditions': [
+        [ 'v8_enable_i18n_support==1', {
+          'libraries': [
+            '<(OBJ_DIR)/tools/icu/libicui18n.a',
+            '<(OBJ_DIR)/tools/icu/libicuucx.a',
+            '<(OBJ_DIR)/tools/icu/libicudata.a',
+          ],
+        }],
+      ],
     }],
     [ 'node_use_openssl=="true"', {
       'defines': [ 'HAVE_OPENSSL=1' ],
