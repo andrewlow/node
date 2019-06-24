@@ -13,9 +13,6 @@
 namespace v8 {
 namespace internal {
 
-const int LayoutDescriptor::kBitsInSmiLayout =
-      SmiValuesAre32Bits() ? 32 : kSmiValueSize - 1;
-
 Handle<LayoutDescriptor> LayoutDescriptor::New(
     Isolate* isolate, Handle<Map> map, Handle<DescriptorArray> descriptors,
     int num_descriptors) {
