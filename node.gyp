@@ -267,6 +267,9 @@
       }, {
         'use_openssl_def%': 0,
       }],
+      [ 'OS=="zos"', {
+        'node_intermediate_lib_type': 'shared_library',
+      }],
     ],
   },
 
@@ -374,7 +377,7 @@
             },
           },
           'conditions': [
-            ['OS != "aix" and OS != "mac"', {
+            ['OS != "aix" and OS != "mac" and OS != "zos"', {
               'ldflags': [
                 '-Wl,--whole-archive',
                 '<(obj_dir)/<(STATIC_LIB_PREFIX)<(node_core_target_name)<(STATIC_LIB_SUFFIX)',
