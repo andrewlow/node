@@ -99,8 +99,7 @@ class V8_EXPORT_PRIVATE LayoutDescriptor : public ByteArray {
 
  private:
   // Exclude sign-bit to simplify encoding.
-  static constexpr int kBitsInSmiLayout =
-      SmiValuesAre32Bits() ? 32 : kSmiValueSize - 1;
+  const int kBitsInSmiLayout;
 
   static const int kBitsPerLayoutWord = 32;
 
