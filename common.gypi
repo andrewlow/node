@@ -541,6 +541,9 @@
           '-qEXPORTALL',
           '-qASM',
         ],
+        'cflags_cc': [
+          '-qxclang=-std=c++1y',
+        ],
         'ldflags': [
           '-q64',
         ],
