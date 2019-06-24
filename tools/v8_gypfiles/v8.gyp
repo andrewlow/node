@@ -364,6 +364,11 @@
             '<(V8_ROOT)/src/builtins/ppc/builtins-ppc.cc',
           ],
         }],
+        ['OS=="zos"', {
+          'sources': [
+            '<(V8_ROOT)/src/code-stub-assembler_part2.cc', # Temporary, until RTC defect 161453 is fixed
+          ],
+        }],
         ['v8_target_arch=="s390x"', {
           'sources': [
             '<(V8_ROOT)/src/builtins/s390/builtins-s390.cc',

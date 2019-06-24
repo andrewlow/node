@@ -6270,6 +6270,7 @@ TNode<BoolT> CodeStubAssembler::IsCell(SloppyTNode<HeapObject> object) {
   return TaggedEqual(LoadMap(object), CellMapConstant());
 }
 
+#ifndef __MVS__
 TNode<BoolT> CodeStubAssembler::IsCode(SloppyTNode<HeapObject> object) {
   return HasInstanceType(object, CODE_TYPE);
 }
@@ -14160,6 +14161,51 @@ void PrototypeCheckAssembler::CheckAndBranch(TNode<HeapObject> prototype,
     Goto(if_unmodified);
   }
 }
+#endif // __MVS__
+
+#ifdef __MVS__
+TNode<Uint32T> CodeStubAssembler::LoadDetailsByKeyIndex(
+    TNode<DescriptorArray> container, TNode<IntPtrT> key_index) {
+  const int kKeyToDetails =
+      DescriptorArray::ToDetailsIndex(0) - DescriptorArray::ToKeyIndex(0);
+  return Unsigned(
+      LoadAndUntagToWord32ArrayElement(container, DescriptorArray::kHeaderSize,
+                                       key_index, kKeyToDetails * kTaggedSize));
+}
+TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
+    TNode<DescriptorArray> container, TNode<IntPtrT> descriptor_entry) {
+  return Unsigned(LoadAndUntagToWord32ArrayElement(
+      container, DescriptorArray::kHeaderSize,
+      DescriptorEntryToIndex(descriptor_entry),
+      DescriptorArray::ToDetailsIndex(0) * kTaggedSize));
+}
+TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
+    TNode<DescriptorArray> container, int descriptor_entry) {
+  return Unsigned(LoadAndUntagToWord32ArrayElement(
+      container, DescriptorArray::kHeaderSize, IntPtrConstant(0),
+      DescriptorArray::ToDetailsIndex(descriptor_entry) * kTaggedSize));
+}
+template <>
+TNode<Uint32T> CodeStubAssembler::NumberOfEntries<TransitionArray>(
+    TNode<TransitionArray> transitions) {
+  TNode<IntPtrT> length = LoadAndUntagWeakFixedArrayLength(transitions);
+  return Select<Uint32T>(
+      UintPtrLessThan(length, IntPtrConstant(TransitionArray::kFirstIndex)),
+      [=] { return Unsigned(Int32Constant(0)); },
+      [=] {
+        return Unsigned(LoadAndUntagToWord32ArrayElement(
+            transitions, WeakFixedArray::kHeaderSize,
+            IntPtrConstant(TransitionArray::kTransitionLengthIndex)));
+      });
+}
+TNode<Uint32T> CodeStubAssembler::DescriptorArrayGetDetails(
+    TNode<DescriptorArray> descriptors, TNode<Uint32T> descriptor_number) {
+  const int details_offset = DescriptorArray::ToDetailsIndex(0) * kTaggedSize;
+  return Unsigned(LoadAndUntagToWord32ArrayElement(
+      descriptors, DescriptorArray::kHeaderSize,
+      EntryIndexToIndex<DescriptorArray>(descriptor_number), details_offset));
+}
+#endif
 
 }  // namespace internal
 }  // namespace v8
