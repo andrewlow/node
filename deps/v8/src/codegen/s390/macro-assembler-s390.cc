@@ -198,6 +198,10 @@ void TurboAssembler::Call(Register target) {
   basr(r14, target);
 }
 
+int TurboAssembler::CallSize(Register target) { 
+    return 2; // BASR
+}  
+
 void TurboAssembler::CallC(Register target) {
    Label start;
    bind(&start);

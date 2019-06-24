@@ -145,6 +145,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   void JumpIfEqual(Register x, int32_t y, Label* dest);
   void JumpIfLessThan(Register x, int32_t y, Label* dest);
 
+  static int CallSize(Register target);
   void Call(Register target);
   void CallC(Register target);
   void Call(Address target, RelocInfo::Mode rmode, Condition cond = al);
