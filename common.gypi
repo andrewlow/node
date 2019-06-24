@@ -513,37 +513,37 @@
         ]
       }],
       ['OS == "zos"', {
-         'defines': [
-           '_XOPEN_SOURCE_EXTENDED',
-           '_UNIX03_THREADS',
-           '_UNIX03_WITHDRAWN',
-           '_UNIX03_SOURCE',
-           '_OPEN_SYS_SOCK_IPV6',
-           '_POSIX_SOURCE',
-           '_OPEN_SYS',
-           '_OPEN_SYS_IF_EXT',
-           '_OPEN_SYS_SOCK_IPV6',
-           '_OPEN_MSGQ_EXT',
-           'PATH_MAX=255'
-           '_LARGE_TIME_API'
-           '_ALL_SOURCE',
-           '__IBMCPP_TR1__',
-           'NODE_PLATFORM="os390"',
-           'PATH_MAX=_POSIX_PATH_MAX',
-         ], 
-         'cflags': [
-           '-q64',
-           '-Wc,DLL',
-           '-qARCH=9',
-           '-qASCII',
-           '-qTUNE=10',
-           '-qENUM=INT',
-           '-qEXPORTALL',
-           '-qASM',
-           ],
-           'ldflags': [
-            '-q64',
-           ],
+        'defines': [
+          '_XOPEN_SOURCE_EXTENDED',
+          '_UNIX03_THREADS',
+          '_UNIX03_WITHDRAWN',
+          '_UNIX03_SOURCE',
+          '_OPEN_SYS_SOCK_IPV6',
+          '_POSIX_SOURCE',
+          '_OPEN_SYS',
+          '_OPEN_SYS_IF_EXT',
+          '_OPEN_SYS_SOCK_IPV6',
+          '_OPEN_MSGQ_EXT',
+          'PATH_MAX=255',
+          '_LARGE_TIME_API',
+          '_ALL_SOURCE',
+          '__IBMCPP_TR1__',
+          'NODE_PLATFORM="os390"',
+          'PATH_MAX=_POSIX_PATH_MAX',
+        ],
+        'cflags': [
+          '-q64',
+          '-Wc,DLL',
+          '-qARCH=9',
+          '-qASCII',
+          '-qTUNE=10',
+          '-qENUM=INT',
+          '-qEXPORTALL',
+          '-qASM',
+        ],
+        'ldflags': [
+          '-q64',
+        ],
       }],
       ['node_shared_openssl!="true"', {
         # `OPENSSL_THREADS` is defined via GYP for openSSL for all architectures.
