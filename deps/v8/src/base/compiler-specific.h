@@ -99,7 +99,7 @@
 #if ((!defined(V8_CC_GNU) && !defined(V8_CC_MSVC) &&                      \
       !defined(V8_TARGET_ARCH_MIPS) && !defined(V8_TARGET_ARCH_MIPS64) && \
       !defined(V8_TARGET_ARCH_PPC) && !defined(V8_TARGET_ARCH_PPC64)) ||  \
-     (defined(__clang__) && __cplusplus > 201300L))
+     (defined(__clang__) && __cplusplus > 201300L)) && !defined(V8_OS_ZOS)
 #define V8_NOEXCEPT noexcept
 #else
 #define V8_NOEXCEPT
