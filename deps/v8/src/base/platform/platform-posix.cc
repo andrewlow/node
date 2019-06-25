@@ -424,6 +424,11 @@ void OS::Abort() {
     V8_IMMEDIATE_CRASH();
   }
 
+#ifdef __MVS__
+  // Send SIGABRT to main thread to do cleanup.
+  raise(SIGABRT);
+#endif
+
   // Redirect to std abort to signal abnormal program termination.
   abort();
 }
@@ -779,7 +784,9 @@ static void* ThreadEntry(void* arg) {
   // one).
   { MutexGuard lock_guard(&thread->data()->thread_creation_mutex_); }
   SetThreadName(thread->name());
+#ifndef V8_OS_ZOS
   DCHECK_NE(thread->data()->thread_, kNoThread);
+#endif
   thread->NotifyStartedAndRun();
   return nullptr;
 }
@@ -825,7 +832,9 @@ void Thread::Start() {
   DCHECK_EQ(0, result);
   result = pthread_attr_destroy(&attr);
   DCHECK_EQ(0, result);
+#ifndef V8_OS_ZOS
   DCHECK_NE(data_->thread_, kNoThread);
+#endif
   USE(result);
 }
 

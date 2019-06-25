@@ -31,6 +31,7 @@ extern int __chgfdccsid(int fd, unsigned short ccsid);
 extern void __dump(int fd, const void *addr, size_t len, size_t bw);
 extern void __dump_title(int fd, const void *addr, size_t len, size_t bw,
                          const char *, ...);
+extern void display_backtrace(int fd);
 extern int backtrace(void **buffer, int size);
 extern char **backtrace_symbols(void *const *buffer, int size);
 extern void backtrace_symbols_fd(void *const *buffer, int size, int fd);
