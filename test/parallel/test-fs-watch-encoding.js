@@ -19,6 +19,10 @@ const common = require('../common');
 if (common.isAIX)
   common.skip('folder watch capability is limited in AIX.');
 
+// fs-watch on folders also have limited capability in z/OS.
+if (common.isZOS)
+  common.skip('folder watch capability is limited in z/OS.');
+
 const fs = require('fs');
 const path = require('path');
 

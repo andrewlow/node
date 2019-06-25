@@ -3,6 +3,9 @@ const common = require('../../common');
 if (common.isWindows && (process.env.PROCESSOR_ARCHITEW6432 !== undefined))
   common.skip('doesn\'t work on WOW64');
 
+if (common.isZOS)
+  common.skip('doesn\'t work on z/OS');
+
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
