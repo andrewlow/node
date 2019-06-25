@@ -512,10 +512,9 @@ void Assembler::target_at_put(int pos, int target_pos, bool* is_branch) {
     instr_at_put<SixByteInstr>(pos, instr | imm32);
     return;
   } else if (TRAP4 == opcode) {
-   UNREACHABLE();
-   // CodePatcher patcher(((TurboAssembler *)(this))->isolate(), reinterpret_cast<byte *>(buffer_ + pos),
-   //             kPointerSize, CodePatcher:: DONT_FLUSH);
-   // patcher.masm()->dp(target_pos);
+    //TODO: The constructor has been marked as deleted.  Need to revisit if we need this.
+    //MacroAssembler masm = MacroAssembler(((TurboAssembler *)(this))->isolate(), reinterpret_cast<byte *>(buffer_start_ + pos), Assembler::kGap + kPointerSize, CodeObjectRequired::kNo);
+	//masm.dp(target_pos);
     return;
   } else if (BRXHG == opcode) {
     // Immediate is in bits 16-31 of 48 bit instruction
@@ -562,7 +561,9 @@ void Assembler::bind_to(Label* L, int pos) {
     int maxReach = max_reach_from(fixup_pos);
 #endif
     next(L);  // call next before overwriting link with target at fixup_pos
-    DCHECK(is_intn(offset, maxReach));
+    if (maxReach != 0) {
+      DCHECK(is_intn(offset, maxReach));
+    }
     target_at_put(fixup_pos, pos, &is_branch);
   }
   L->bind_to(pos);

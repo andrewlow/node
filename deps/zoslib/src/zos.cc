@@ -843,6 +843,12 @@ extern "C" void backtrace_symbols_fd(void* const* buffer, int size, int fd) {
   __ae_thread_swapmode(mode);
 }
 
+extern "C" void __display_backtrace(int fd) {
+  void *buffer[4096];
+  int nptrs = backtrace(buffer, 4096);
+  backtrace_symbols_fd(buffer, nptrs, fd);
+}
+
 void __abend(int comp_code, unsigned reason_code, int flat_byte, void* plist) {
   unsigned long r15 = reason_code;
   unsigned long r1;
@@ -1221,6 +1227,11 @@ static void __bpx4kil(int pid,
                   return_code,
                   reason_code};  // os style parm list
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+}
+
+extern "C" void abort(void) {
+  __display_backtrace(STDERR_FILENO);
+  kill(getpid(), SIGABRT);
 }
 
 // overriding LE's kill when linked statically
