@@ -178,16 +178,23 @@ void PopulateJSONWriter(TraceWriter* writer) {
   tracing_controller->StartTracing(trace_config);
 
   TraceObject trace_object;
+#ifdef V8_OS_ZOS
+    pthread_t threadId1 = {22};
+    pthread_t threadId2 = {66};
+#else
+    int threadId1 = 22;
+    int threadId2 = 66;
+#endif
   trace_object.InitializeForTesting(
       'X', tracing_controller->GetCategoryGroupEnabled("v8-cat"), "Test0",
       v8::internal::tracing::kGlobalScope, 42, 0x1234, 0, nullptr, nullptr,
-      nullptr, nullptr, TRACE_EVENT_FLAG_HAS_ID, 11, 22, 100, 50, 33, 44);
+      nullptr, nullptr, TRACE_EVENT_FLAG_HAS_ID, 11, threadId1, 100, 50, 33, 44);
   writer->AppendTraceEvent(&trace_object);
   trace_object.InitializeForTesting(
       'Y', tracing_controller->GetCategoryGroupEnabled("v8-cat"), "Test1",
       v8::internal::tracing::kGlobalScope, 43, 0x5678, 0, nullptr, nullptr,
       nullptr, nullptr, TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT,
-      55, 66, 110, 55, 77, 88);
+      55, threadId2, 110, 55, 77, 88);
   writer->AppendTraceEvent(&trace_object);
   tracing_controller->StopTracing();
   i::V8::SetPlatformForTesting(old_platform);

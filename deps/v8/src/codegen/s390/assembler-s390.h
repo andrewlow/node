@@ -1360,7 +1360,7 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   void emit_label_addr(Label* label);
 
 #ifdef V8_OS_ZOS
-  //Generate function descriptor for z/OS
+  // Generate function descriptor for z/OS
   void function_descriptor();
 
   static void RelocateInternalReference(Address pc, intptr_t delta,
