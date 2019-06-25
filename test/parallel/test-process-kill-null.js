@@ -20,11 +20,16 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 'use strict';
+const common = require('../common');
 const { mustCall } = require('../common');
 const assert = require('assert');
 const { spawn } = require('child_process');
 
-const cat = spawn('cat');
+let cat;
+if (common.isZOS)
+  cat = spawn('cat', ['-u']);
+else
+  cat = spawn('cat');
 
 assert.ok(process.kill(cat.pid, 0));
 

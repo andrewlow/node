@@ -110,6 +110,7 @@ const isFreeBSD = process.platform === 'freebsd';
 const isOpenBSD = process.platform === 'openbsd';
 const isLinux = process.platform === 'linux';
 const isOSX = process.platform === 'darwin';
+const isZOS = process.platform === 'os390';
 
 const rootDir = isWindows ? 'c:\\' : '/';
 
@@ -234,6 +235,9 @@ function platformTimeout(ms) {
 
   if (isAIX)
     return multipliers.two * ms; // Default localhost speed is slower on AIX
+
+  if (isZOS)
+    return multipliers.two * ms; // Default localhost speed is slower on z/OS
 
   if (process.arch !== 'arm')
     return ms;
@@ -440,7 +444,7 @@ function nodeProcessAborted(exitCode, signal) {
   // greater than 256, and thus the exit code emitted with the 'exit'
   // event is null and the signal is set to either SIGILL, SIGTRAP,
   // or SIGABRT (depending on the compiler).
-  const expectedSignals = ['SIGILL', 'SIGTRAP', 'SIGABRT'];
+  let expectedSignals = ['SIGILL', 'SIGTRAP', 'SIGABRT'];
 
   // On Windows, 'aborts' are of 2 types, depending on the context:
   // (i) Forced access violation, if --abort-on-uncaught-exception is on
@@ -449,6 +453,11 @@ function nodeProcessAborted(exitCode, signal) {
   // raising SIGABRT exiting with ambiguous exit code '3' by default
   if (isWindows)
     expectedExitCodes = [0xC0000005, 134];
+
+  if (isZOS) {
+    expectedExitCodes = [131];
+    expectedSignals = ['SIGABRT'];
+  }
 
   // When using --abort-on-uncaught-exception, V8 will use
   // base::OS::Abort to terminate the process.
@@ -765,6 +774,7 @@ module.exports = {
   isOSX,
   isSunOS,
   isWindows,
+  isZOS,
   localIPv6Hosts,
   mustCall,
   mustCallAtLeast,
