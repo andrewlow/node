@@ -38,8 +38,12 @@ const server = http.createServer(function(req, res) {
   res.end(body);
 });
 
+let localhost = '127.0.0.1';
+if (common.isZOS)
+  localhost = 'localhost';
+
 function runAb(opts, callback) {
-  const command = `ab ${opts} http://127.0.0.1:${server.address().port}/`;
+  const command = `ab ${opts} http://${localhost}:${server.address().port}/`;
   exec(command, function(err, stdout, stderr) {
     if (err) {
       if (/ab|apr/i.test(stderr)) {
