@@ -4,6 +4,10 @@
 
 #include "tracing/traced_value.h"
 
+#ifdef __MVS__
+#define MVS_PARTIAL_LOCALE_SUPPORT 1
+#endif
+
 #if defined(NODE_HAVE_I18N_SUPPORT)
 #include <unicode/utf8.h>
 #include <unicode/utypes.h>
