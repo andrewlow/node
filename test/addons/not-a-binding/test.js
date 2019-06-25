@@ -2,5 +2,10 @@
 const common = require('../../common');
 const assert = require('assert');
 
-const re = /^Error: Module did not self-register: '.*[\\/]binding\.node'\.$/;
+let re = /^Error: Module did not self-register: '.*[\\/]binding\.node'\.$/;
+
+if (common.isZOS) {
+  re = /^Error: CEE3552S/;
+}
+
 assert.throws(() => require(`./build/${common.buildType}/binding`), re);
