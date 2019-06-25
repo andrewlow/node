@@ -1,5 +1,9 @@
 'use strict';
 const common = require('../common');
+
+if (common.isZOS)
+  common.skip('z/OS does not support setting ttl for IPv4');
+
 const assert = require('assert');
 const dgram = require('dgram');
 const socket = dgram.createSocket('udp4');

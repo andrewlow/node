@@ -32,6 +32,9 @@ if (common.isIBMi)
 if (common.isWindows)
   common.skip('not reliable on Windows');
 
+if (common.isZOS)
+  common.skip('no privileged port on z/OS');
+
 if (process.getuid() === 0)
   common.skip('as this test should not be run as `root`');
 
