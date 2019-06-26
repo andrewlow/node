@@ -8,6 +8,9 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#ifdef __MVS__
+#include "zos.h"
+#endif
 
 #include "src/base/debug/stack_trace.h"
 #include "src/base/platform/platform.h"
@@ -177,6 +180,10 @@ void V8_Fatal(const char* format, ...) {
   v8::base::OS::PrintError("\n#\n#\n#\n#FailureMessage Object: %p", &message);
 
   if (v8::base::g_print_stack_trace) v8::base::g_print_stack_trace();
+
+#if V8_OS_ZOS
+  __display_backtrace(STDERR_FILENO);
+#endif
 
   fflush(stderr);
   v8::base::OS::Abort();

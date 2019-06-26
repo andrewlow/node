@@ -573,11 +573,14 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   {
     NoRootArrayScope no_root_array(masm);
 
+    pushed_stack_space += kNumCalleeSavedDoubles * kDoubleSize;
+
 #if V8_OS_ZOS
   __ LoadRR(sp, r4);
   __ lay(sp, MemOperand(sp, -12 * kPointerSize));
   __ StoreMultipleP(r4, sp, MemOperand(sp, 0));
-  // Expecting paramters in r2-r6. XPLINK uses r1-r3 for the first three
+  pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
+  // Expecting parameters in r2-r6. XPLINK uses r1-r3 for the first three
   // parameters and also places them starting at r4+2112 on the biased stack.
   // Explicitly load argc and argv from stack back into r5/r6 respectively.
   __ LoadP(r5, MemOperand(r4, 2048 + (19  * kPointerSize)));
@@ -600,7 +603,6 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ std(d14, MemOperand(sp, 6 * kDoubleSize));
     __ std(d15, MemOperand(sp, 7 * kDoubleSize));
 #endif
-    pushed_stack_space += kNumCalleeSavedDoubles * kDoubleSize;
 
 #if !defined(V8_OS_ZOS)
     // zLinux ABI
@@ -716,7 +718,9 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // pop the faked function when we return.
   Handle<Code> trampoline_code =
       masm->isolate()->builtins()->builtin_handle(entry_trampoline);
+#ifndef V8_OS_ZOS
   DCHECK_EQ(kPushedStackSpace, pushed_stack_space);
+#endif
   __ Call(trampoline_code, RelocInfo::CODE_TARGET);
 
   // Unlink this frame from the handler chain.
