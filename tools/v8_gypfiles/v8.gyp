@@ -905,6 +905,7 @@
 
       'dependencies': [
         'v8_headers',
+        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
 
       'conditions': [
@@ -1313,7 +1314,6 @@
         'v8_libplatform',
         'v8_nosnapshot',
         'v8_libbase',
-        '../../deps/zoslib/zoslib.gyp:zoslib',
         # "build/win:default_exe_manifest",
         'v8_maybe_icu',
       ],
