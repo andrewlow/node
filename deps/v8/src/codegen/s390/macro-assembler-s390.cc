@@ -4498,14 +4498,12 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
 #if V8_OS_ZOS
   lay(ra, MemOperand(ra, -2));
 #endif
-  StoreP(r14, MemOperand(sp, kStackFrameRASlot * kPointerSize));
+  StoreP(ra, MemOperand(sp, kStackFrameRASlot * kPointerSize));
 
-#ifndef V8_OS_ZOS
   // zLinux ABI requires caller's frame to have sufficient space for callee
   // preserved regsiter save area.
   b(target);
   bind(&return_label);
-#endif
 }
 
 void TurboAssembler::CallForDeoptimization(Address target, int deopt_id) {
