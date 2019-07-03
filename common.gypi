@@ -524,12 +524,11 @@
           '_OPEN_SYS_IF_EXT',
           '_OPEN_SYS_SOCK_IPV6',
           '_OPEN_MSGQ_EXT',
-          'PATH_MAX=255',
           '_LARGE_TIME_API',
           '_ALL_SOURCE',
           '__IBMCPP_TR1__',
           'NODE_PLATFORM="os390"',
-          'PATH_MAX=_POSIX_PATH_MAX',
+          'PATH_MAX=1023',
         ],
         'cflags': [
           '-q64',

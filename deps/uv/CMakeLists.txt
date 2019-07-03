@@ -333,7 +333,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "OS/390")
-  list(APPEND uv_defines PATH_MAX=255)
+  list(APPEND uv_defines PATH_MAX=1023)
   list(APPEND uv_defines _AE_BIMODAL)
   list(APPEND uv_defines _ALL_SOURCE)
   list(APPEND uv_defines _LARGE_TIME_API)

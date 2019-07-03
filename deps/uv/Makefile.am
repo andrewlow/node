@@ -355,7 +355,7 @@ test_run_tests_CFLAGS += -D_UNIX03_THREADS \
                          -D_ALL_SOURCE \
                          -D_LARGE_TIME_API \
                          -D_OPEN_SYS_FILE_EXT \
-                         -DPATH_MAX=255 \
+                         -DPATH_MAX=1023 \
                          -qCHARS=signed \
                          -qXPLINK \
                          -qFLOAT=IEEE
@@ -527,7 +527,7 @@ libuv_la_CFLAGS += -D_UNIX03_THREADS \
                    -D_OPEN_SYS_SOCK_IPV6 \
                    -D_OPEN_SYS_FILE_EXT \
                    -DUV_PLATFORM_SEM_T=int \
-                   -DPATH_MAX=255 \
+                   -DPATH_MAX=1023 \
                    -qCHARS=signed \
                    -qXPLINK \
                    -qFLOAT=IEEE
