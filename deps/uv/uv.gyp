@@ -28,7 +28,7 @@
           '_LARGE_TIME_API',
           '_OPEN_SYS_FILE_EXT',
           '_AE_BIMODAL',
-          'PATH_MAX=255'
+          'PATH_MAX=1023'
         ],
       }, {
         'shared_zos_defines': [ ],
