@@ -589,8 +589,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ LoadRR(r4, r3);
   __ LoadRR(r3, r2);
   __ LoadRR(r2, r1);
-#else
+#endif
+
     // saving floating point registers
+#if V8_TARGET_ARCH_S390X
     // 64bit ABI requires f8 to f15 be saved
     // http://refspecs.linuxbase.org/ELF/zSeries/lzsabi0_zSeries.html
     __ lay(sp, MemOperand(sp, -8 * kDoubleSize));
@@ -602,6 +604,12 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ std(d13, MemOperand(sp, 5 * kDoubleSize));
     __ std(d14, MemOperand(sp, 6 * kDoubleSize));
     __ std(d15, MemOperand(sp, 7 * kDoubleSize));
+#else
+  // 31bit ABI requires you to store f4 and f6:
+  // http://refspecs.linuxbase.org/ELF/zSeries/lzsabi0_s390.html#AEN417
+  __ lay(sp, MemOperand(sp, -2 * kDoubleSize));
+  __ std(d4, MemOperand(sp));
+  __ std(d6, MemOperand(sp, kDoubleSize));
 #endif
 
 #if !defined(V8_OS_ZOS)
@@ -624,6 +632,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     // C calling convention. The first argument is passed in r2.
     __ LoadRR(kRootRegister, r2);
 #endif
+
   }
 
   // save r6 to r1
@@ -718,9 +727,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // pop the faked function when we return.
   Handle<Code> trampoline_code =
       masm->isolate()->builtins()->builtin_handle(entry_trampoline);
-#ifndef V8_OS_ZOS
   DCHECK_EQ(kPushedStackSpace, pushed_stack_space);
-#endif
   __ Call(trampoline_code, RelocInfo::CODE_TARGET);
 
   // Unlink this frame from the handler chain.
