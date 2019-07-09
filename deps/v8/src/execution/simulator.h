@@ -134,6 +134,12 @@ class GeneratedCode {
                                         0};
     Signature* fn = reinterpret_cast<Signature*>(function_desc);
     return fn(args...);
+#elif V8_OS_ZOS
+    volatile void* function_desc[2];
+	asm(" stg 5,%0 " : "=m"(function_desc[0]) : :);
+	function_desc[1] = (void*)fn_ptr_;
+    Signature* fn = (Signature*)(&function_desc[0]);
+    return fn(args...);
 #else
     return fn_ptr_(args...);
 #endif  // V8_OS_AIX

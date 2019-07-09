@@ -565,10 +565,6 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
   Label invoke, handler_entry, exit;
 
-#ifdef V8_OS_ZOS
-  __ function_descriptor();
-#endif
-
   int pushed_stack_space = 0;
   {
     NoRootArrayScope no_root_array(masm);
