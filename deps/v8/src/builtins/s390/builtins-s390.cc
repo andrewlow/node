@@ -579,8 +579,14 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // Expecting parameters in r2-r6. XPLINK uses r1-r3 for the first three
   // parameters and also places them starting at r4+2112 on the biased stack.
   // Explicitly load argc and argv from stack back into r5/r6 respectively.
+
+  // TODO: problem determination
   __ LoadP(r5, MemOperand(r4, 2048 + (19  * kPointerSize)));
   __ LoadP(r6, MemOperand(r4, 2048 + (20  * kPointerSize)));
+  // 
+
+  __ LoadP(r0, MemOperand(r4, 2048 + (21  * kPointerSize)));
+  __ StoreP(r0, MemOperand(sp, 20 * kPointerSize));
 
   __ LoadRR(r4, r3);
   __ LoadRR(r3, r2);
@@ -624,10 +630,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
 
+#endif
     // Initialize the root register.
     // C calling convention. The first argument is passed in r2.
     __ LoadRR(kRootRegister, r2);
-#endif
 
   }
 
@@ -2831,7 +2837,8 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // of r6 and r8 since r6 is not callee saved.
   __ LoadRR(r6, r9);
   __ LoadRR(r8, r10);
-  __ InitializeRootRegister();  // Rematerializing the root address in r10
+  
+  // TODO: problem determination  __ InitializeRootRegister();  // Rematerializing the root address in r10
 
   if (result_size == 1) {
     __ LoadRR(r2, r3);
@@ -3173,7 +3180,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 
 #ifdef V8_OS_ZOS
   __ LoadRR(r7, r10);
-  __ InitializeRootRegister();
+  // TODO: problem determination __ InitializeRootRegister();
 #endif
 
   Label promote_scheduled_exception;
