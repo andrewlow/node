@@ -630,8 +630,6 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
 #endif
-
-#endif
     // Initialize the root register.
     // C calling convention. The first argument is passed in r2.
     __ LoadRR(kRootRegister, r2);
@@ -738,14 +736,14 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ bind(&exit);  // r2 holds result
 
 // Test code to call C function
-#if 0
+#if IGOR
   {
     FrameScope frame(masm, StackFrame::MANUAL);
-    __ PushSafepointRegisters();
+    //__ PushSafepointRegisters();
    // __ PrepareCallCFunction(1, r2);
    // __ Move(r2, ExternalReference::isolate_address(masm->isolate()));
     __ CallCFunction(ExternalReference::debug_zos(), 0);
-    __ PopSafepointRegisters();
+    //__ PopSafepointRegisters();
   }
 #endif
 
