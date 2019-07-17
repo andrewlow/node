@@ -271,9 +271,13 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
       *__le_savstack_async_addr = __new;
       __asm(" lgr %0,4\n" : "=r"(__new[0])::);
 #endif
+	printf("Before failure\n");
+	  
       value = Object(stub_entry.Call(isolate->isolate_data()->isolate_root(),
                                      orig_func, func, recv, params.argc, argv));
 #if __MVS__
+	printf("After failure\n");
+	  
       *__le_savstack_async_addr = __old;
 #endif
     } else {

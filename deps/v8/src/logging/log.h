@@ -239,6 +239,7 @@ class Logger : public CodeEventListener {
   V8_EXPORT_PRIVATE void TimerEvent(StartEnd se, const char* name);
 
   static void EnterExternal(Isolate* isolate);
+  static void DebugZOS(Isolate* isolate);
   static void LeaveExternal(Isolate* isolate);
 
   static void DefaultEventLoggerSentinel(const char* name, int event) {}

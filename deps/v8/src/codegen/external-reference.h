@@ -149,6 +149,7 @@ class StatsCounter;
   V(libc_memcpy_function, "libc_memcpy")                                      \
   V(libc_memmove_function, "libc_memmove")                                    \
   V(libc_memset_function, "libc_memset")                                      \
+  V(debug_zos, "Logger::DebugZOS")                                            \
   V(mod_two_doubles_operation, "mod_two_doubles")                             \
   V(mutable_big_int_absolute_add_and_canonicalize_function,                   \
     "MutableBigInt_AbsoluteAddAndCanonicalize")                               \
