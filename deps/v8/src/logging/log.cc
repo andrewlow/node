@@ -1042,6 +1042,12 @@ bool Logger::is_logging() {
   return is_logging_;
 }
 
+// static
+void Logger::DebugZOS(Isolate* isolate) {
+	static int x = 0;
+	printf("In zOS: %d\n", x++);
+}
+
 // Instantiate template methods.
 #define V(TimerName, expose)                                           \
   template void TimerEventScope<TimerEvent##TimerName>::LogTimerEvent( \

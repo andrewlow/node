@@ -124,12 +124,11 @@ class GeneratedCode {
 
   DISABLE_CFI_ICALL Return Call(Args... args) {
     // When running without a simulator we call the entry directly.
-#if V8_OS_AIX
-    // AIX ABI requires function descriptors (FD).  Artificially create a pseudo
     // FD to ensure correct dispatch to generated code.  The 'volatile'
     // declaration is required to avoid the compiler from not observing the
     // alias of the pseudo FD to the function pointer, and hence, optimizing the
     // pseudo FD declaration/initialization away.
+#if V8_OS_AIX
     volatile Address function_desc[] = {reinterpret_cast<Address>(fn_ptr_), 0,
                                         0};
     Signature* fn = reinterpret_cast<Signature*>(function_desc);

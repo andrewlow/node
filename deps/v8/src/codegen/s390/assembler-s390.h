@@ -597,6 +597,21 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   S390_RI_A_OPCODE_LIST(DECLARE_S390_RI_A_INSTRUCTIONS)
 #undef DECLARE_S390_RI_A_INSTRUCTIONS
 
+inline void i_format(Opcode opcode, int f1) {
+  uint32_t op1 = opcode;
+  emit2bytes(getfield<uint32_t, 2, 0, 8>(op1) |
+             getfield<uint32_t, 2, 8, 16>(f1));
+}
+
+#define DECLARE_S390_I_INSTRUCTIONS(name, op_name, op_value)       \
+  void name(const Operand& i2) {                                   \
+    DCHECK(is_uint12(op_name));                                    \
+    DCHECK(is_uint16(i2.immediate()) || is_int16(i2.immediate())); \
+    i_format(op_name, i2.immediate());                             \
+  }
+  S390_I_OPCODE_LIST(DECLARE_S390_I_INSTRUCTIONS)
+#undef DECLARE_S390_I_INSTRUCTIONS
+
 #define DECLARE_S390_RI_B_INSTRUCTIONS(name, op_name, op_value)       \
   void name(Register r1, const Operand& imm) {                        \
     /* 2nd argument encodes # of halfwords, so divide by 2. */        \
