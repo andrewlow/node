@@ -264,6 +264,7 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
       Address** argv = reinterpret_cast<Address**>(params.argv);
       RuntimeCallTimerScope timer(isolate, RuntimeCallCounterId::kJS_Execution);
 #if __MVS__
+	printf("Before Call\n");
       char *__new[1];
       char **__old;
       char ***__le_savstack_async_addr = (42 + ((char ****__ptr32 *)1208)[0][11]);
@@ -271,14 +272,11 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
       *__le_savstack_async_addr = __new;
       __asm(" lgr %0,4\n" : "=r"(__new[0])::);
 #endif
-	printf("Before failure\n");
-	  
       value = Object(stub_entry.Call(isolate->isolate_data()->isolate_root(),
                                      orig_func, func, recv, params.argc, argv));
 #if __MVS__
-	printf("After failure\n");
-	  
       *__le_savstack_async_addr = __old;
+	printf("After Call\n");
 #endif
     } else {
       DCHECK_EQ(Execution::Target::kRunMicrotasks, params.execution_target);
