@@ -569,28 +569,18 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   {
     NoRootArrayScope no_root_array(masm);
 
-    pushed_stack_space += kNumCalleeSavedDoubles * kDoubleSize;
 
 #if V8_OS_ZOS
-  __ LoadRR(sp, r4);
-  __ lay(sp, MemOperand(sp, -12 * kPointerSize));
-  __ StoreMultipleP(r4, sp, MemOperand(sp, 0));
-  pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
-  // Expecting parameters in r2-r6. XPLINK uses r1-r3 for the first three
-  // parameters and also places them starting at r4+2112 on the biased stack.
-  // Explicitly load argc and argv from stack back into r5/r6 respectively.
-
-  // TODO: problem determination
-  __ LoadP(r5, MemOperand(r4, 2048 + (19  * kPointerSize)));
-  __ LoadP(r6, MemOperand(r4, 2048 + (20  * kPointerSize)));
-  // 
-
-  __ LoadP(r0, MemOperand(r4, 2048 + (21  * kPointerSize)));
-  __ StoreP(r0, MemOperand(sp, 20 * kPointerSize));
-
-  __ LoadRR(r4, r3);
-  __ LoadRR(r3, r2);
-  __ LoadRR(r2, r1);
+    __ StoreMultipleP(r4, sp,  MemOperand(r4, 1472));
+    __ lay(r4, MemOperand(r4,-576));
+    __ LoadRR(sp, r4);
+    __ LoadRR(r4, r3);
+    __ LoadRR(r3, r2);
+    __ LoadRR(r2, r1);
+    __ LoadP(r5, MemOperand(sp, 2048 + 728)); // arg4
+    __ LoadP(r6, MemOperand(sp, 2048 + 736)); // arg5
+    __ LoadP(r0, MemOperand(sp, 2048 + 744)); // arg6
+    __ StoreP(r0, MemOperand(sp, 160)); // arg6
 #endif
 
     // saving floating point registers
@@ -606,15 +596,11 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ std(d13, MemOperand(sp, 5 * kDoubleSize));
     __ std(d14, MemOperand(sp, 6 * kDoubleSize));
     __ std(d15, MemOperand(sp, 7 * kDoubleSize));
+    pushed_stack_space += kNumCalleeSavedDoubles * kDoubleSize;
 #else
-  // 31bit ABI requires you to store f4 and f6:
-  // http://refspecs.linuxbase.org/ELF/zSeries/lzsabi0_s390.html#AEN417
-  __ lay(sp, MemOperand(sp, -2 * kDoubleSize));
-  __ std(d4, MemOperand(sp));
-  __ std(d6, MemOperand(sp, kDoubleSize));
+  #error 31 bit 
 #endif
 
-#if !defined(V8_OS_ZOS)
     // zLinux ABI
     //    Incoming parameters:
     //          r2: root register value
@@ -629,11 +615,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ lay(sp, MemOperand(sp, -10 * kPointerSize));
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
-#endif
+
     // Initialize the root register.
     // C calling convention. The first argument is passed in r2.
     __ LoadRR(kRootRegister, r2);
-
   }
 
   // save r6 to r1
@@ -767,10 +752,8 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ lay(sp, MemOperand(sp, -EntryFrameConstants::kCallerFPOffset));
 
   // Reload callee-saved preserved regs, return address reg (r14) and sp
-#if !defined(V8_OS_ZOS)  
   __ LoadMultipleP(r6, sp, MemOperand(sp, 0));
   __ la(sp, MemOperand(sp, 10 * kPointerSize));
-#endif
 
 // saving floating point registers
 #if V8_TARGET_ARCH_S390X
@@ -794,8 +777,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
 #ifdef V8_OS_ZOS
   __ LoadRR(r3, r2);
-  __ LoadMultipleP(r4, sp, MemOperand(sp, 0));
-  __ lay(sp, MemOperand(sp, 12 * kPointerSize));
+  __ LoadMultipleP(r4, sp, MemOperand(sp, 2048));
   __ b(r7);
 #else
   __ b(r14);
