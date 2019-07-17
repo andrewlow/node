@@ -629,6 +629,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ lay(sp, MemOperand(sp, -10 * kPointerSize));
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
+#endif
 
 #endif
     // Initialize the root register.
@@ -735,6 +736,18 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // Unlink this frame from the handler chain.
   __ PopStackHandler();
   __ bind(&exit);  // r2 holds result
+
+// Test code to call C function
+#if 0
+  {
+    FrameScope frame(masm, StackFrame::MANUAL);
+    __ PushSafepointRegisters();
+   // __ PrepareCallCFunction(1, r2);
+   // __ Move(r2, ExternalReference::isolate_address(masm->isolate()));
+    __ CallCFunction(ExternalReference::debug_zos(), 0);
+    __ PopSafepointRegisters();
+  }
+#endif
 
   // Check if the current stack frame is marked as the outermost JS frame.
   Label non_outermost_js_2;
@@ -2772,9 +2785,9 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // Store a copy of argc, argv in callee-saved registers for later.
 #ifdef V8_OS_ZOS
   __ LoadRR(r9, r2);
-  __ LoadRR(r10, r3);
+  __ LoadRR(r14, r3);
   // r2, r9: number of arguments including receiver  (C callee-saved)
-  // r3, r10: pointer to the first argument
+  // r3, r13: pointer to the first argument
   // r7: pointer to builtin function descriptor (C callee-saved)
   // r8: pointer to builtin function (C callee-saved)
 #else
@@ -2833,13 +2846,11 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   __ StoreReturnAddressAndCall(target);
 
 #if V8_OS_ZOS
-  // TODO(mcornac): r9 and r10 are used to store argc and argv on z/OS instead
+  // TODO(mcornac): r9 and r13 are used to store argc and argv on z/OS instead
   // of r6 and r8 since r6 is not callee saved.
   __ LoadRR(r6, r9);
-  __ LoadRR(r8, r10);
-  
   // TODO: problem determination  __ InitializeRootRegister();  // Rematerializing the root address in r10
-
+  __ LoadRR(r8, r14);
   if (result_size == 1) {
     __ LoadRR(r2, r3);
   } else if (result_size == 2){
@@ -3173,14 +3184,14 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 
   // Update System Stack Pointer with the appropriate XPLINK stack bias.
   __ lay(r4, MemOperand(sp, -kStackPointerBias));
-  __ LoadRR(r10, r7);
+  __ LoadRR(r14, r7);
 #endif
 
   __ StoreReturnAddressAndCall(scratch);
 
 #ifdef V8_OS_ZOS
-  __ LoadRR(r7, r10);
   // TODO: problem determination __ InitializeRootRegister();
+  __ LoadRR(r7, r14);
 #endif
 
   Label promote_scheduled_exception;
