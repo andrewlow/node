@@ -613,7 +613,11 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     //    General convention is to also save r14 (return addr) and
     //    sp/r15 as well in a single STM/STMG
     __ lay(sp, MemOperand(sp, -10 * kPointerSize));
+#if V8_OS_ZOS
+// no need to save
+#else
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
+#endif
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
 
     // Initialize the root register.
@@ -752,7 +756,11 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ lay(sp, MemOperand(sp, -EntryFrameConstants::kCallerFPOffset));
 
   // Reload callee-saved preserved regs, return address reg (r14) and sp
+#if V8_OS_ZOS
+// no need to restore
+#else
   __ LoadMultipleP(r6, sp, MemOperand(sp, 0));
+#endif
   __ la(sp, MemOperand(sp, 10 * kPointerSize));
 
 // saving floating point registers
