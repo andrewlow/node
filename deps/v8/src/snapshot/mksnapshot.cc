@@ -19,6 +19,8 @@
 #include "src/snapshot/snapshot.h"
 #include "src/snapshot/startup-serializer.h"
 
+#include "zos.h"
+
 namespace {
 
 class SnapshotFileWriter {
@@ -112,6 +114,9 @@ class SnapshotFileWriter {
       i::PrintF("Unable to open file \"%s\" for writing.\n", filename);
       exit(1);
     }
+#ifdef V8_OS_ZOS
+    __chgfdccsid(fileno(fp), 819);
+#endif
     return fp;
   }
 
