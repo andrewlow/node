@@ -398,6 +398,7 @@
     {
       'target_name': 'v8_snapshot',
       'type': 'static_library',
+      'asmflags': ['-m GOFF'],
       'toolsets': ['target'],
       'conditions': [
         ['want_separate_host_toolset', {

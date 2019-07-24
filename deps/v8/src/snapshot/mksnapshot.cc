@@ -63,8 +63,17 @@ class SnapshotFileWriter {
 
     FILE* fp = GetFileDescriptorOrDie(snapshot_cpp_path_);
 
+#ifdef V8_OS_ZOS
+    // Create a .S file to accompany the snapshot C++ source file
+    char buffer[PATH_MAX];
+    strcat(buffer, snapshot_cpp_path_);
+    strcat(buffer,".S");
+
+    FILE* fp_asm = GetFileDescriptorOrDie(buffer);
+#endif
+
     WriteSnapshotFilePrefix(fp);
-    WriteSnapshotFileData(fp, blob);
+    WriteSnapshotFileData(fp, fp_asm, blob);
     WriteSnapshotFileSuffix(fp);
 
     fclose(fp);
@@ -87,12 +96,18 @@ class SnapshotFileWriter {
     fprintf(fp, "}  // namespace v8\n");
   }
 
-  static void WriteSnapshotFileData(FILE* fp,
+  static void WriteSnapshotFileData(FILE* fp, FILE* fp_asm,
                                     const i::Vector<const i::byte>& blob) {
+#ifdef V8_OS_ZOS
+    fprintf(fp, "void* __blob_data;\n");
+    fprintf(fp, "byte* blob_data = (byte*)(&__blob_data);\n");
+    WriteBinaryContentsAsCArray(fp_asm, blob);
+#else
     fprintf(fp,
             "alignas(kPointerAlignment) static const byte blob_data[] = {\n");
     WriteBinaryContentsAsCArray(fp, blob);
     fprintf(fp, "};\n");
+#endif
     fprintf(fp, "static const int blob_size = %d;\n", blob.length());
     fprintf(fp, "static const v8::StartupData blob =\n");
     fprintf(fp, "{ (const char*) blob_data, blob_size };\n");
@@ -100,12 +115,38 @@ class SnapshotFileWriter {
 
   static void WriteBinaryContentsAsCArray(
       FILE* fp, const i::Vector<const i::byte>& blob) {
+#ifdef V8_OS_ZOS
+    fprintf(fp, "&C SETC '_NJSDATA'\n");
+    fprintf(fp, " SYSSTATE AMODE64=YES,ARCHLVL=2\n");
+    fprintf(fp, "&C CSECT\n");
+    fprintf(fp, "&C AMODE 64\n");
+    fprintf(fp, "&C RMODE ANY\n");
+    fprintf(fp, "&C XATTR LINKAGE(XPLINK),PSECT(PART1)\n");
+    fprintf(fp, "&suffix SETA &suffix+1\n");
+    fprintf(fp, "CEECWSA LOCTR\n");
+    fprintf(fp, "AL&suffix ALIAS C'__blob_data'\n");
+    fprintf(fp, "C_WSA64 CATTR DEFLOAD,RMODE(64),PART(AL&suffix)\n");
+    fprintf(fp, "AL&suffix XATTR REF(DATA),LINKAGE(XPLINK),SCOPE(EXPORT)\n");
+    for (int i = 0; i < blob.length(); i++) {
+        if ((i % 32) == 0)  {
+            if (i > 0)
+                fprintf(fp, "'\n");
+            fprintf(fp, " DC X'");
+        }
+        fprintf(fp, "%02x", static_cast<unsigned char>(blob.at(i)) & 0xff);
+    }
+    fprintf(fp, "'\n");
+    fprintf(fp, "C_WSA64 CATTR PART(PART1)\n");
+    fprintf(fp, "LBL&suffix DC AD(AL&suffix)\n");
+    fprintf(fp, " END");
+#else
     for (int i = 0; i < blob.length(); i++) {
       if ((i & 0x1F) == 0x1F) fprintf(fp, "\n");
       if (i > 0) fprintf(fp, ",");
       fprintf(fp, "%u", static_cast<unsigned char>(blob.at(i)));
     }
     fprintf(fp, "\n");
+#endif
   }
 
   static FILE* GetFileDescriptorOrDie(const char* filename) {

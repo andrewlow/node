@@ -110,7 +110,7 @@
     'v8_enable_fast_mksnapshot%': 0,
 
     # Enable embedded builtins.
-    'v8_enable_embedded_builtins%': 1,
+    'v8_enable_embedded_builtins%': 0,
 
     # Enable the registration of unwinding info for Windows/x64.
     'v8_win64_unwinding_info%': 1,
