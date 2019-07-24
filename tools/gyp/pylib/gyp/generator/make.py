@@ -298,7 +298,9 @@ all_deps :=
 
 %(make_global_settings)s
 
+ASM.target ?= %(ASM.target)s 
 CC.target ?= %(CC.target)s
+ASMFLAGS.target ?= $(ASMFLAGS)
 CFLAGS.target ?= $(CPPFLAGS) $(CFLAGS)
 CXX.target ?= %(CXX.target)s
 CXXFLAGS.target ?= $(CPPFLAGS) $(CXXFLAGS)
@@ -311,7 +313,9 @@ LINK ?= $(CXX.target)
 
 # TODO(evan): move all cross-compilation logic to gyp-time so we don't need
 # to replicate this environment fallback in make as well.
+ASM.host ?= %(ASM.host)s
 CC.host ?= %(CC.host)s
+ASMFLAGS.host ?= $(ASMFLAGS_host)
 CFLAGS.host ?= $(CPPFLAGS_host) $(CFLAGS_host)
 CXX.host ?= %(CXX.host)s
 CXXFLAGS.host ?= $(CPPFLAGS_host) $(CXXFLAGS_host)
@@ -383,6 +387,8 @@ endef
 # Command definitions:
 # - cmd_foo is the actual command to run;
 # - quiet_cmd_foo is the brief-output summary of the command.
+quiet_cmd_asm = ASM($(TOOLSET)) $@
+cmd_asm = $(ASM.$(TOOLSET)) -m GOFF $(GYP_ASMFLAGS) $(ASMFLAGS.$(TOOLSET)) -o $@ $<
 
 quiet_cmd_cc = CC($(TOOLSET)) $@
 cmd_cc = $(CC.$(TOOLSET)) -o $@ $< $(GYP_CFLAGS) $(DEPFLAGS) $(CFLAGS.$(TOOLSET)) -c
@@ -582,8 +588,8 @@ COMPILABLE_EXTENSIONS = {
   '.cc': 'cxx',
   '.cpp': 'cxx',
   '.cxx': 'cxx',
-  '.s': 'cc',
-  '.S': 'cc',
+  '.s': 'asm',
+  '.S': 'asm',
 }
 
 def Compilable(filename):
@@ -2115,6 +2121,8 @@ def GenerateOutput(target_list, target_dicts, data, params):
 
   if flavor == 'zos':
     header_params.update({
+    'ASM.host':   GetEnvironFallback(('ASM_host', 'ASM'), 'as'),
+    'ASM.target':   GetEnvironFallback(('ASM_target', 'ASM'), 'as'),
     'CC.target':   GetEnvironFallback(('CC_target', 'CC'), 'njsc'),
     'CXX.target':  GetEnvironFallback(('CXX_target', 'CXX'), 'njsc++'),
     'CC.host':     GetEnvironFallback(('CC_host', 'CC'), 'njsc'),
@@ -2138,7 +2146,7 @@ def GenerateOutput(target_list, target_dicts, data, params):
     if wrapper:
       value = '%s %s' % (wrapper, value)
       del wrappers[key]
-    if key in ('CC', 'CC.host', 'CXX', 'CXX.host'):
+    if key in ('ASM', 'ASM.host', 'CC', 'CC.host', 'CXX', 'CXX.host'):
       make_global_settings += (
           'ifneq (,$(filter $(origin %s), undefined default))\n' % key)
       # Let gyp-time envvars win over global settings.
