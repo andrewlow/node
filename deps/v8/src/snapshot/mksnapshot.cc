@@ -65,11 +65,16 @@ class SnapshotFileWriter {
 
 #ifdef V8_OS_ZOS
     // Create a .S file to accompany the snapshot C++ source file
-    char buffer[PATH_MAX];
-    strcat(buffer, snapshot_cpp_path_);
-    strcat(buffer,".S");
+    char snapshot_asm_path[PATH_MAX] = {0};
 
-    FILE* fp_asm = GetFileDescriptorOrDie(buffer);
+    // Strip extension 
+    const char *filename_dot = strrchr(snapshot_cpp_path_, '.');
+    int offset = filename_dot - snapshot_cpp_path_;
+
+    strncpy(snapshot_asm_path, snapshot_cpp_path_, offset);
+    strcat(snapshot_asm_path, "_hlasm.S");
+
+    FILE* fp_asm = GetFileDescriptorOrDie(snapshot_asm_path);
 #endif
 
     WriteSnapshotFilePrefix(fp);
@@ -84,6 +89,9 @@ class SnapshotFileWriter {
     fprintf(fp, "#include \"src/init/v8.h\"\n");
     fprintf(fp, "#include \"src/base/platform/platform.h\"\n\n");
     fprintf(fp, "#include \"src/snapshot/snapshot.h\"\n\n");
+#ifdef V8_OS_ZOS
+    fprintf(fp, "extern void* __blob_data;\n");
+#endif
     fprintf(fp, "namespace v8 {\n");
     fprintf(fp, "namespace internal {\n\n");
   }
@@ -99,7 +107,6 @@ class SnapshotFileWriter {
   static void WriteSnapshotFileData(FILE* fp, FILE* fp_asm,
                                     const i::Vector<const i::byte>& blob) {
 #ifdef V8_OS_ZOS
-    fprintf(fp, "void* __blob_data;\n");
     fprintf(fp, "byte* blob_data = (byte*)(&__blob_data);\n");
     WriteBinaryContentsAsCArray(fp_asm, blob);
 #else
@@ -150,7 +157,11 @@ class SnapshotFileWriter {
   }
 
   static FILE* GetFileDescriptorOrDie(const char* filename) {
+#ifdef V8_OS_ZOS
+    FILE* fp = v8::base::OS::FOpen(filename, "w");
+#else
     FILE* fp = v8::base::OS::FOpen(filename, "wb");
+#endif
     if (fp == nullptr) {
       i::PrintF("Unable to open file \"%s\" for writing.\n", filename);
       exit(1);
