@@ -17,7 +17,7 @@
         '_AE_BIMODAL',
         'PATH_MAX=1023'
       ],
-      'cflags': ['-q64', '-fexec-charset=ISO8859-1', '-qexportall', '-Wno-missing-field-initializers'],
+      'cflags': ['-q64', '-fexec-charset=ISO8859-1', '-qexportall', '-Wno-missing-field-initializers', '-qasmlib=//\\\'SYS1.MACLIB\\\''],
       'direct_dependent_settings': {
         'include_dirs': ['include'],
       },
