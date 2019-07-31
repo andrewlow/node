@@ -318,13 +318,10 @@
         'NODE_WANT_INTERNALS=1',
       ],
 
-      'includes': [
-        'node.gypi'
-      ],
-
       'include_dirs': [
         'src',
-        'deps/v8/include'
+        'deps/v8/include',
+        'deps/uv/include',
       ],
 
       'sources': [
@@ -1199,11 +1196,9 @@
       'dependencies': [
         '<(node_lib_target_name)',
         'deps/histogram/histogram.gyp:histogram',
+        'tools/v8_gypfiles/v8.gyp:v8_libplatform',
+        'tools/v8_gypfiles/v8.gyp:v8_libbase',
         'deps/uvwasi/uvwasi.gyp:uvwasi',
-      ],
-
-      'includes': [
-        'node.gypi'
       ],
 
       'include_dirs': [
