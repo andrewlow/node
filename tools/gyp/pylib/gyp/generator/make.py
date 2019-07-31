@@ -952,7 +952,14 @@ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(obj)/%%%s FORCE_DO_CMD
       # libraries, but until everything is made cross-compile safe, also use
       # target libraries.
       # TODO(piman): when everything is cross-compile safe, remove lib.target
-      self.WriteLn('cmd_%s = LD_LIBRARY_PATH=$(builddir)/lib.host:'
+      if self.flavor == 'zos':
+        self.WriteLn('cmd_%s = LIBPATH=$(builddir)/lib.host:'
+                   '$(builddir)/lib.target:$(builddir)/obj.target:$$LIBPATH; '
+                   'export LIBPATH; '
+                   '%s%s'
+                   % (name, cd_action, command))
+      else:
+        self.WriteLn('cmd_%s = LD_LIBRARY_PATH=$(builddir)/lib.host:'
                    '$(builddir)/lib.target:$$LD_LIBRARY_PATH; '
                    'export LD_LIBRARY_PATH; '
                    '%s%s'
@@ -1093,17 +1100,30 @@ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(obj)/%%%s FORCE_DO_CMD
         # libraries, but until everything is made cross-compile safe, also use
         # target libraries.
         # TODO(piman): when everything is cross-compile safe, remove lib.target
-        self.WriteLn(
-            "cmd_%(name)s_%(count)d = LD_LIBRARY_PATH="
+        if self.flavor == 'zos':
+          self.WriteLn(
+              "cmd_%(name)s_%(count)d = LIBPATH="
+              "$(builddir)/lib.host:$(builddir)/lib.target:$(builddir)/obj.target:$$LIBPATH; "
+              "export LIBPATH; "
+              "%(cd_action)s%(mkdirs)s%(action)s" % {
+            'action': action,
+            'cd_action': cd_action,
+            'count': count,
+            'mkdirs': mkdirs,
+            'name': name,
+          })
+        else:
+          self.WriteLn(
+              "cmd_%(name)s_%(count)d = LD_LIBRARY_PATH="
               "$(builddir)/lib.host:$(builddir)/lib.target:$$LD_LIBRARY_PATH; "
               "export LD_LIBRARY_PATH; "
               "%(cd_action)s%(mkdirs)s%(action)s" % {
-          'action': action,
-          'cd_action': cd_action,
-          'count': count,
-          'mkdirs': mkdirs,
-          'name': name,
-        })
+            'action': action,
+            'cd_action': cd_action,
+            'count': count,
+            'mkdirs': mkdirs,
+            'name': name,
+          })
         self.WriteLn(
             'quiet_cmd_%(name)s_%(count)d = RULE %(name)s_%(count)d $@' % {
           'count': count,
