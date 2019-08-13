@@ -136,31 +136,6 @@ public:
         libpath << ":" << &parent[0] << "/obj.target/";
         libpath << ":" << &parent2[0] << "/lib/";
         setenv("LIBPATH", libpath.str().c_str(), 1);
-
-        char *error;
-        p = dlopen("libnode.so", RTLD_NOW);
-        if (!p) {
-          error = dlerror();
-          fprintf(stderr, "dlopen:%s\n", error);
-          assert(p);
-        }
-
-        void (*__xfer_env_p)(void) = (void (*)(void))dlsym(p, "__xfer_env");
-        if (!__xfer_env_p) {
-          error = dlerror();
-          fprintf(stderr, "dlsym:__xfer_env:%s\n", error);
-          assert(p);
-        }
-        
-        __xfer_env_p();
-        void (*__chgfdccsid_p)(int, int) =
-            (void (*)(int, int))dlsym(p, "__chgfdccsid");
-        if (!__chgfdccsid_p) {
-          error = dlerror();
-          fprintf(stderr, "dlsym:__chgfdccsid:%s\n", error);
-          assert(p);
-        }
-
         break;
       }
     }
