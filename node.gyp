@@ -1232,10 +1232,6 @@
         'deps/histogram/histogram.gyp:histogram',
       ],
 
-      'includes': [
-        'node.gypi'
-      ],
-
       'include_dirs': [
         'src',
         'tools/msvs/genfiles',
@@ -1260,6 +1256,15 @@
             'Dbghelp.lib',
             'winmm.lib',
             'Ws2_32.lib',
+          ],
+        }],
+        [ 'node_use_v8_platform=="true"', {
+          'defines': [
+            'NODE_USE_V8_PLATFORM=1',
+          ],
+        }, {
+          'defines': [
+            'NODE_USE_V8_PLATFORM=0',
           ],
         }],
       ],

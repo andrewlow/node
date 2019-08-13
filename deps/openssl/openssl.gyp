@@ -31,6 +31,11 @@
         }, {
           'includes': ['./openssl_asm_avx2.gypi'],
         }],
+        ['OS=="zos"', {
+          'cflags': [
+            '-qcsect=openssl'
+          ]
+        }],
       ],
       'direct_dependent_settings': {
         'include_dirs': [ 'openssl/include']
