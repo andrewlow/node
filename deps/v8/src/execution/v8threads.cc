@@ -144,12 +144,12 @@ bool ThreadManager::RestoreThread() {
 
 void ThreadManager::Lock() {
   mutex_.Lock();
-  mutex_owner_.store(ThreadId::Current(), std::memory_order_relaxed);
+  mutex_owner_.store(ThreadId::Current().ToInteger(), std::memory_order_relaxed);
   DCHECK(IsLockedByCurrentThread());
 }
 
 void ThreadManager::Unlock() {
-  mutex_owner_.store(ThreadId::Invalid(), std::memory_order_relaxed);
+  mutex_owner_.store(ThreadId::Invalid().ToInteger(), std::memory_order_relaxed);
   mutex_.Unlock();
 }
 
@@ -214,7 +214,7 @@ ThreadState* ThreadState::Next() {
 // be distinguished from not having a thread id at all (since NULL is
 // defined as 0.)
 ThreadManager::ThreadManager(Isolate* isolate)
-    : mutex_owner_(ThreadId::Invalid()),
+    : mutex_owner_(ThreadId::Invalid().ToInteger()),
       lazily_archived_thread_(ThreadId::Invalid()),
       lazily_archived_thread_state_(nullptr),
       free_anchor_(nullptr),
