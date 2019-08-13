@@ -42,7 +42,11 @@ class FeedbackCell : public Struct {
                                 TORQUE_GENERATED_FEEDBACK_CELL_FIELDS)
 
   static const int kUnalignedSize = kSize;
+#ifdef V8_OS_ZOS
+  static const int kAlignedSize = static_cast<int>(int{kSize} + (kObjectAlignment - 1)) & -kObjectAlignment;
+#else
   static const int kAlignedSize = RoundUp<kObjectAlignment>(int{kSize});
+#endif
 
   inline void clear_padding();
   inline void reset();
