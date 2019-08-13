@@ -1544,8 +1544,13 @@ NativeModuleModificationScope::~NativeModuleModificationScope() {
 }
 
 namespace {
+#ifdef V8_OS_ZOS
+// TODO(z/OS): no support for thread_local. Must be handled properly.
+WasmCodeRefScope* current_code_refs_scope = nullptr;
+#else
 thread_local WasmCodeRefScope* current_code_refs_scope = nullptr;
-}  // namespace
+#endif
+} // namespace
 
 WasmCodeRefScope::WasmCodeRefScope()
     : previous_scope_(current_code_refs_scope) {
