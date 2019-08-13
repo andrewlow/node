@@ -651,7 +651,9 @@ NativeModule::NativeModule(WasmEngine* engine, const WasmFeatures& enabled,
 
   uint32_t num_wasm_functions = module_->num_declared_functions;
   if (num_wasm_functions > 0) {
-    code_table_.reset(new WasmCode* [num_wasm_functions] {});
+    WasmCode** wasm_functions = new WasmCode* [num_wasm_functions];
+    memset(wasm_functions, 0, sizeof(WasmCode*) * num_wasm_functions);
+    code_table_.reset(wasm_functions);
 
     WasmCodeRefScope code_ref_scope;
     jump_table_ = CreateEmptyJumpTable(
@@ -662,7 +664,8 @@ NativeModule::NativeModule(WasmEngine* engine, const WasmFeatures& enabled,
 void NativeModule::ReserveCodeTableForTesting(uint32_t max_functions) {
   WasmCodeRefScope code_ref_scope;
   DCHECK_LE(num_functions(), max_functions);
-  WasmCode** new_table = new WasmCode* [max_functions] {};
+  WasmCode** new_table = new WasmCode* [max_functions];
+  memset(new_table, 0, sizeof(WasmCode*) * max_functions);
   if (module_->num_declared_functions > 0) {
     memcpy(new_table, code_table_.get(),
            module_->num_declared_functions * sizeof(*new_table));
