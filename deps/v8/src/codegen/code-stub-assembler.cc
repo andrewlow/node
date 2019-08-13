@@ -14172,6 +14172,7 @@ TNode<Uint32T> CodeStubAssembler::LoadDetailsByKeyIndex(
       LoadAndUntagToWord32ArrayElement(container, DescriptorArray::kHeaderSize,
                                        key_index, kKeyToDetails * kTaggedSize));
 }
+
 TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
     TNode<DescriptorArray> container, TNode<IntPtrT> descriptor_entry) {
   return Unsigned(LoadAndUntagToWord32ArrayElement(
@@ -14179,12 +14180,14 @@ TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
       DescriptorEntryToIndex(descriptor_entry),
       DescriptorArray::ToDetailsIndex(0) * kTaggedSize));
 }
+
 TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
     TNode<DescriptorArray> container, int descriptor_entry) {
   return Unsigned(LoadAndUntagToWord32ArrayElement(
       container, DescriptorArray::kHeaderSize, IntPtrConstant(0),
       DescriptorArray::ToDetailsIndex(descriptor_entry) * kTaggedSize));
 }
+
 template <>
 TNode<Uint32T> CodeStubAssembler::NumberOfEntries<TransitionArray>(
     TNode<TransitionArray> transitions) {
@@ -14198,6 +14201,7 @@ TNode<Uint32T> CodeStubAssembler::NumberOfEntries<TransitionArray>(
             IntPtrConstant(TransitionArray::kTransitionLengthIndex)));
       });
 }
+
 TNode<Uint32T> CodeStubAssembler::DescriptorArrayGetDetails(
     TNode<DescriptorArray> descriptors, TNode<Uint32T> descriptor_number) {
   const int details_offset = DescriptorArray::ToDetailsIndex(0) * kTaggedSize;
