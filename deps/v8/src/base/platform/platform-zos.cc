@@ -179,4 +179,7 @@ inline int GetFirstFlagFrom(const char* format_e, int start = 0) {
   return flag_pos;
 }
 
-} }  // namespace v8::base
+void OS::AdjustSchedulingParams() {}
+
+}  // namespace base
+}  // namespace v8

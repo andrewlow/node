@@ -1320,7 +1320,6 @@
       'target_name': 'mksnapshot',
       'type': 'executable',
       'dependencies': [
-        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
         'v8_base_without_compiler',
         'v8_compiler_for_mksnapshot',
         'v8_init',
@@ -1329,12 +1328,13 @@
         'v8_libbase',
         # "build/win:default_exe_manifest",
         'v8_maybe_icu',
-      ],
-      'sources': [
-        '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"mksnapshot.*?sources = ")',
+        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
       'include_dirs+': [
         '<(V8_ROOT)/../zoslib/include',
+      ],
+      'sources': [
+        '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"mksnapshot.*?sources = ")',
       ],
       'conditions': [
         ['want_separate_host_toolset', {

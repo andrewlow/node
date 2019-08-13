@@ -14,7 +14,7 @@
       'target_name': 'd8',
       'type': 'executable',
       'dependencies': [
-        'v8.gyp:v8_base',
+        'v8.gyp:v8_base_without_compiler',
         'v8.gyp:v8_init',
         'v8.gyp:v8_libplatform',
         'v8.gyp:generate_bytecode_builtins_list',
