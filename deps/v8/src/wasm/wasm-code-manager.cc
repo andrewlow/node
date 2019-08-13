@@ -689,7 +689,9 @@ NativeModule::NativeModule(WasmEngine* engine, const WasmFeatures& enabled,
       CompilationState::New(*shared_this, std::move(async_counters));
   DCHECK_NOT_NULL(module_);
   if (module_->num_declared_functions > 0) {
-    code_table_.reset(new WasmCode* [module_->num_declared_functions] {});
+    WasmCode** wasm_functions = new WasmCode* [module_->num_declared_functions];
+    memset(wasm_functions, 0, sizeof(WasmCode*) * module_->num_declared_functions);
+    code_table_.reset(wasm_functions);
   }
   AddCodeSpace(code_allocator_.GetSingleCodeRegion());
 }
@@ -697,7 +699,8 @@ NativeModule::NativeModule(WasmEngine* engine, const WasmFeatures& enabled,
 void NativeModule::ReserveCodeTableForTesting(uint32_t max_functions) {
   WasmCodeRefScope code_ref_scope;
   DCHECK_LE(num_functions(), max_functions);
-  WasmCode** new_table = new WasmCode* [max_functions] {};
+  WasmCode** new_table = new WasmCode* [max_functions];
+  memset(new_table, 0, sizeof(WasmCode*) * max_functions);
   if (module_->num_declared_functions > 0) {
     memcpy(new_table, code_table_.get(),
            module_->num_declared_functions * sizeof(*new_table));
