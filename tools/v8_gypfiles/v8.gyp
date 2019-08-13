@@ -685,6 +685,7 @@
         'generate_bytecode_builtins_list',
         'run_torque',
         'v8_maybe_icu',
+        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
       'includes': ['inspector.gypi'],
       'direct_dependent_settings': {
@@ -925,7 +926,7 @@
             '<(V8_ROOT)/src/base/platform/platform-posix.h',
           ],
           'conditions': [
-            ['OS != "aix" and OS != "solaris"', {
+            ['OS != "aix" and OS != "solaris" and OS != "zos"', {
               'sources': [
                 '<(V8_ROOT)/src/base/platform/platform-posix-time.cc',
                 '<(V8_ROOT)/src/base/platform/platform-posix-time.h',
@@ -1312,6 +1313,7 @@
       'target_name': 'mksnapshot',
       'type': 'executable',
       'dependencies': [
+        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
         'v8_base_without_compiler',
         'v8_compiler_for_mksnapshot',
         'v8_init',
