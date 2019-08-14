@@ -33,7 +33,6 @@ static int __debug_mode = 0;
 
 int __argc = 1;
 char** __argv;
-char** __argv_a;
 extern void __settimelimit(int secs);
 
 static inline void* __convert_one_to_one(const void* table,
@@ -1016,26 +1015,6 @@ class __init {
         __argc = x[0];
       }
     }
-    int i;
-
-    int bytes = 0;
-    char* strbuf;
-    for (i = 0; i < __argc; ++i) {
-      bytes += sizeof(void*);
-      bytes += (1 + strlen(__argv[i]));
-    }
-    bytes += sizeof(void*);
-    __argv_a = (char**)malloc(bytes);
-    strbuf = ((char*)__argv_a) + ((__argc + 1) * sizeof(void*));
-
-    for (i = 0; i < __argc; ++i) {
-      int l = strlen(__argv[i]);
-      __argv_a[i] = strbuf;
-      _convert_e2a(strbuf, __argv[i], l);
-      strbuf[l] = 0;
-      strbuf += (l + 1);
-    }
-    __argv_a[i] = 0;
     char* cu = __getenv_a("__IPC_CLEANUP");
     if (cu && !memcmp(cu, "1", 2)) {
       cleanupmsgq(1);
@@ -1054,7 +1033,6 @@ class __init {
   }
   ~__init() {
     cleanupmsgq(0);
-    free(__argv_a);
   }
 };
 static __init __a;
@@ -1126,9 +1104,6 @@ extern "C" int __indebug(void) {
 }
 extern "C" char** __getargv(void) {
   return __argv;
-}
-extern "C" char** __getargv_a(void) {
-  return __argv_a;
 }
 extern "C" int __getargc(void) {
   return __argc;
