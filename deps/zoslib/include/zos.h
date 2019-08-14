@@ -48,7 +48,6 @@ extern int __console_printf(const char* fmt, ...);
 extern int __indebug(void);
 extern void __setdebug(int);
 extern char** __getargv(void);
-extern char** __getargv_a(void);
 extern int __getargc(void);
 
 extern void* __dlcb_next(void* last);
