@@ -236,7 +236,7 @@
     'node_mksnapshot_exec': '<(PRODUCT_DIR)/<(EXECUTABLE_PREFIX)node_mksnapshot<(EXECUTABLE_SUFFIX)',
     'mkcodecache_exec': '<(PRODUCT_DIR)/<(EXECUTABLE_PREFIX)mkcodecache<(EXECUTABLE_SUFFIX)',
     'conditions': [
-      [ 'node_shared=="true"', {
+      [ 'OS!="zos"' and 'node_shared=="true"', {
         'node_target_type%': 'shared_library',
         'conditions': [
           ['OS=="aix"', {
@@ -259,8 +259,10 @@
       }, {
         'use_openssl_def%': 0,
       }],
-      [ 'OS=="zos"', {
+      [ 'OS=="zos" and node_shared=="true"', {
         'node_intermediate_lib_type': 'shared_library',
+      }, {
+        'node_intermediate_lib_type': 'static_library',
       }],
     ],
   },
@@ -702,7 +704,7 @@
             'src/node_code_cache_stub.cc',
           ]
         }],
-        [ 'node_shared=="true" and node_module_version!="" and OS!="win"', {
+        [ 'node_shared=="true" and node_module_version!="" and OS!="win" and OS!="zos"', {
           'product_extension': '<(shlib_suffix)',
           'xcode_settings': {
             'LD_DYLIB_INSTALL_NAME':
@@ -1144,7 +1146,7 @@
         [ 'OS=="win" and node_shared=="true"', {
           'type': 'none',
         }],
-        [ 'node_shared=="true"', {
+        [ 'node_shared=="true" and OS!="zos"', {
           'xcode_settings': {
             'OTHER_LDFLAGS': [ '-Wl,-rpath,@loader_path', ],
           },
