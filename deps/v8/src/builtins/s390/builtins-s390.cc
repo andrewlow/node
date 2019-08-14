@@ -2773,7 +2773,7 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // Store a copy of argc, argv in callee-saved registers for later.
 #ifdef V8_OS_ZOS
   __ LoadRR(r9, r2);
-  __ LoadRR(r14, r3);
+  __ LoadRR(r13, r3);
   // r2, r9: number of arguments including receiver  (C callee-saved)
   // r3, r13: pointer to the first argument
   // r7: pointer to builtin function descriptor (C callee-saved)
@@ -2838,7 +2838,7 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // of r6 and r8 since r6 is not callee saved.
   __ LoadRR(r6, r9);
   // TODO: problem determination  __ InitializeRootRegister();  // Rematerializing the root address in r10
-  __ LoadRR(r8, r14);
+  __ LoadRR(r8, r13);
   if (result_size == 1) {
     __ LoadRR(r2, r3);
   } else if (result_size == 2){
@@ -3172,14 +3172,21 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 
   // Update System Stack Pointer with the appropriate XPLINK stack bias.
   __ lay(r4, MemOperand(sp, -kStackPointerBias));
-  __ LoadRR(r14, r7);
+  __ LoadRR(r13, r7);
 #endif
 
-  __ StoreReturnAddressAndCall(scratch);
+#ifdef V8_OS_ZOS
+ // Load function pointer from slot 1 of fn desc.
+ __ LoadP(ip, MemOperand(scratch, kPointerSize));
+ // Load environment from slot 0 of fn desc.
+ __ LoadP(r5, MemOperand(scratch, 0));
+ __ StoreReturnAddressAndCall(ip);
+#else
+ __ StoreReturnAddressAndCall(scratch);
+#endif
 
 #ifdef V8_OS_ZOS
-  // TODO: problem determination __ InitializeRootRegister();
-  __ LoadRR(r7, r14);
+  __ LoadRR(r7, r13);
 #endif
 
   Label promote_scheduled_exception;
