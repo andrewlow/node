@@ -28,13 +28,12 @@
 #include <builtins.h>
 #include <termios.h>
 #include <sys/msg.h>
+#include "zos.h"
 #if defined(__clang__)
 #include "csrsic.h"
 #else
 #include "//'SYS1.SAMPLIB(CSRSIC)'"
 #endif
-
-#include "zos.h"
 
 #define CVT_PTR           0x10
 #define PSA_PTR           0x00
@@ -146,16 +145,6 @@ uint64_t uv__hrtime(uv_clocktype_t type) {
   return timestamp / TOD_RES;
 }
 
-
-/*
-    Get the exe path.
-*/
-static int getexe(char* buf, size_t len) {
-  uv__strscpy(buf, __getargv()[0], len);
-  return 0;
-}
-
-
 /*
  * We could use a static buffer for the path manipulations that we need outside
  * of the function, but this function could be called by multiple consumers and
@@ -173,9 +162,7 @@ int uv_exepath(char* buffer, size_t* size) {
   if (buffer == NULL || size == NULL || *size == 0)
     return UV_EINVAL;
 
-  res = getexe(args, sizeof(args));
-  if (res < 0)
-    return UV_EINVAL;
+  strncpy(args, __getargv()[0], PATH_MAX);
 
   /*
    * Possibilities for args:
