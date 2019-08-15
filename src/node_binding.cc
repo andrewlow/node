@@ -245,7 +245,12 @@ using v8::Value;
 // Globals per process
 static node_module* modlist_internal;
 static node_module* modlist_linked;
+#ifdef __MVS__
+// TODO(z/OS): no support for thread_local. Must be handled properly.
+static node_module* thread_local_modpending;
+#else
 static thread_local node_module* thread_local_modpending;
+#endif
 
 // This is set by node::Init() which is used by embedders
 bool node_is_initialized = false;
