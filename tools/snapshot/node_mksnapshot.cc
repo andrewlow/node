@@ -27,7 +27,11 @@ int main(int argc, char* argv[]) {
   }
 
   std::ofstream out;
+#ifdef __MVS__
+  out.open(argv[1], std::ios::out);
+#else
   out.open(argv[1], std::ios::out | std::ios::binary);
+#endif
   if (!out.is_open()) {
     std::cerr << "Cannot open " << argv[1] << "\n";
     return 1;
