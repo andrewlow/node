@@ -165,8 +165,11 @@ int uv_tty_init(uv_loop_t* loop, uv_tty_t* tty, int fd, int unused) {
       return r;
     }
 #if defined(__MVS__)
-    if (0 == (__getfdccsid(newfd) & 0x00010000))
-      __chgfdccsid(newfd, 1047);  // terminal i/o and conversion bit was off,
+    if (0 == __getfdccsid(newfd)) {
+      // untagged and unset
+      struct f_cnvrt req = {SETCVTON, 0, 1047};
+      fcntl(fd, F_CONTROL_CVT, &req);
+    }
 #endif
     fd = newfd;
   }
