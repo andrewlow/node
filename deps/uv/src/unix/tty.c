@@ -164,7 +164,9 @@ int uv_tty_init(uv_loop_t* loop, uv_tty_t* tty, int fd, int unused) {
       uv__close(newfd);
       return r;
     }
+#if defined(__MVS__)
     __chgfdccsid(newfd,1047); // terminal i/o
+#endif
     fd = newfd;
   }
 
