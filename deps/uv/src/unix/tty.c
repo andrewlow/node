@@ -33,6 +33,9 @@
 #if defined(__MVS__) && !defined(IMAXBEL)
 #define IMAXBEL 0
 #endif
+#if defined(__MVS__)
+#include "zos.h"
+#endif
 
 static int orig_termios_fd = -1;
 static struct termios orig_termios;
@@ -161,7 +164,7 @@ int uv_tty_init(uv_loop_t* loop, uv_tty_t* tty, int fd, int unused) {
       uv__close(newfd);
       return r;
     }
-
+    __chgfdccsid(newfd,1047); // terminal i/o
     fd = newfd;
   }
 
