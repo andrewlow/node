@@ -20,6 +20,7 @@ extern void* _convert_a2e(void* dst, const void* src, size_t size);
 extern char** __get_environ_np(void);
 extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
+extern int __getfdccsid(int fd);
 extern size_t __e2a_l(char* bufptr, size_t szLen);
 extern size_t __a2e_l(char* bufptr, size_t szLen);
 extern size_t __e2a_s(char* string);
@@ -27,7 +28,6 @@ extern size_t __a2e_s(char* string);
 extern int dprintf(int fd, const char*, ...);
 extern int vdprintf(int fd, const char*, va_list ap);
 extern void __xfer_env(void);
-extern int __chgfdccsid(int fd, unsigned short ccsid);
 extern void __dump(int fd, const void* addr, size_t len, size_t bw);
 extern void __dump_title(
     int fd, const void* addr, size_t len, size_t bw, const char*, ...);
@@ -65,6 +65,10 @@ extern void __fd_close(int fd);
 extern unsigned long __mach_absolute_time(void);
 extern void* anon_mmap(void* _, size_t len);
 extern int anon_munmap(void* addr, size_t len);
+struct __tlsanchor;
+extern struct __tlsanchor* __tlsvaranchor_create(size_t sz);
+extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor);
+extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor);
 
 #ifdef __cplusplus
 }
@@ -99,6 +103,16 @@ class __auto_ascii {
  public:
   __auto_ascii();
   ~__auto_ascii();
+};
+
+template <typename T>
+class __tlssim {
+  struct __tlsanchor* anchor;
+
+ public:
+  __tlssim() { anchor = __tlsvaranchor_create(sizeof(T)); }
+  ~__tlssim() { __tlsvaranchor_destroy(anchor); }
+  T* access(void) { return static_cast<T*>(__tlsPtrFromAnchor(anchor)); }
 };
 
 #endif

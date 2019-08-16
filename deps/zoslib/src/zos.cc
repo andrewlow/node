@@ -276,6 +276,19 @@ extern "C" int __chgfdccsid(int fd, unsigned short ccsid) {
   }
   return __fchattr(fd, &attr, sizeof(attr));
 }
+
+extern "C" int __getfdccsid(int fd) {
+  struct stat st;
+  int rc;
+  rc = fstat(fd, &st);
+  if (rc != 0) return -1;
+  unsigned short ccsid = st.st_tag.ft_ccsid;
+  if (st.st_tag.ft_txtflag) {
+    return 65536 + ccsid;
+  }
+  return ccsid;
+}
+
 static void ledump(const char* title) {
   __auto_ascii _a;
   __cdump_a((char*)title);
@@ -1000,6 +1013,9 @@ static void cleanupmsgq(int others) {
   }
 }
 class __init {
+  int mode;
+  int cvstate;
+
  public:
   __init() {
     // initialization
@@ -1014,6 +1030,11 @@ class __init {
       } else {
         __argc = x[0];
       }
+    }
+    mode = __ae_thread_swapmode(__AE_ASCII_MODE);
+    cvstate = __ae_autoconvert_state(_CVTSTATE_QUERY);
+    if (_CVTSTATE_OFF == cvstate) {
+      __ae_autoconvert_state(_CVTSTATE_ON);
     }
     char* cu = __getenv_a("__IPC_CLEANUP");
     if (cu && !memcmp(cu, "1", 2)) {
@@ -1032,6 +1053,10 @@ class __init {
     }
   }
   ~__init() {
+    if (_CVTSTATE_OFF == cvstate) {
+      __ae_autoconvert_state(cvstate);
+    }
+    __ae_thread_swapmode(mode);
     cleanupmsgq(0);
   }
 };
@@ -1864,3 +1889,80 @@ extern "C" int anon_munmap(void* addr, size_t len) {
   }
 }
 //------------------------------------------accounting for memory allocation end
+//--tls simulation begin
+extern "C" {
+static void _cleanup(void* p) {
+  pthread_key_t key = *((pthread_key_t*)p);
+  free(p);
+  pthread_setspecific(key, 0);
+}
+
+static void* __tlsPtrAlloc(size_t sz, pthread_key_t* k, pthread_once_t* o) {
+  unsigned int initv = 0;
+  unsigned int expv;
+  unsigned int newv = 1;
+  expv = 0;
+  newv = 1;
+  __asm(" cs  %0,%2,%1 \n" : "+r"(expv), "+m"(*o) : "r"(newv) :);
+  initv = expv;
+  if (initv == 2) {
+    // proceed
+  } else if (initv == 0) {
+    // create
+    pthread_key_create(k, _cleanup);
+    expv = 1;
+    newv = 2;
+    __asm(" cs  %0,%2,%1 \n" : "+r"(expv), "+m"(*o) : "r"(newv) :);
+    initv = expv;
+  } else {
+    // wait and poll for completion
+    while (initv != 2) {
+      expv = 0;
+      newv = 1;
+      __asm(" la 15,0\n"
+            " svc 137\n"
+            " cs  %0,%2,%1 \n"
+            : "+r"(expv), "+m"(*o)
+            : "r"(newv)
+            : "r15");
+      initv = expv;
+    }
+  }
+  void* p = pthread_getspecific(*k);
+  if (!p) {
+    // first call in thread allocate
+    p = calloc(1, sz + sizeof(pthread_key_t));
+    memcpy(p, k, sizeof(pthread_key_t));
+    pthread_setspecific(*k, p);
+  }
+  return (char*)p + sizeof(pthread_key_t);
+}
+static void* __tlsPtr(pthread_key_t* key) {
+  return pthread_getspecific(*key);
+}
+static void __tlsDelete(pthread_key_t* key) {
+  pthread_key_delete(*key);
+}
+
+struct __tlsanchor {
+  pthread_once_t once;
+  pthread_key_t key;
+  size_t sz;
+};
+extern struct __tlsanchor* __tlsvaranchor_create(size_t sz) {
+  struct __tlsanchor* a =
+      (struct __tlsanchor*)calloc(1, sizeof(struct __tlsanchor));
+  a->once = PTHREAD_ONCE_INIT;
+  a->sz = sz;
+  return a;
+}
+extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor) {
+  pthread_key_delete(anchor->key);
+  free(anchor);
+}
+
+extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor) {
+  return __tlsPtrAlloc(anchor->sz, &(anchor->key), &(anchor->once));
+}
+}
+//--tls simulation end
