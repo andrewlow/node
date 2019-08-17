@@ -327,7 +327,17 @@
       ],
 
       'sources': [
-        'src/node_main.cc'
+        'src/node_main.cc',
+        'deps/zoslib/src/celquopt.S',
+      ],
+
+      'conditions': [
+        ['OS!="zos"', {
+          'sources!': [
+            # zos only exclude on other platforms
+            'deps/zoslib/src/celquopt.S',
+          ]
+        }],
       ],
 
       'dependencies': [
