@@ -1897,7 +1897,10 @@ static void _cleanup(void* p) {
   pthread_setspecific(key, 0);
 }
 
-static void* __tlsPtrAlloc(size_t sz, pthread_key_t* k, pthread_once_t* o) {
+static void* __tlsPtrAlloc(size_t sz,
+                           pthread_key_t* k,
+                           pthread_once_t* o,
+                           const void* initvalue) {
   unsigned int initv = 0;
   unsigned int expv;
   unsigned int newv = 1;
@@ -1931,9 +1934,10 @@ static void* __tlsPtrAlloc(size_t sz, pthread_key_t* k, pthread_once_t* o) {
   void* p = pthread_getspecific(*k);
   if (!p) {
     // first call in thread allocate
-    p = calloc(1, sz + sizeof(pthread_key_t));
+    p = malloc(sz + sizeof(pthread_key_t));
     memcpy(p, k, sizeof(pthread_key_t));
     pthread_setspecific(*k, p);
+    memcpy((char*)p + sizeof(pthread_key_t), initvalue, sz);
   }
   return (char*)p + sizeof(pthread_key_t);
 }
@@ -1961,8 +1965,9 @@ extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor) {
   free(anchor);
 }
 
-extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor) {
-  return __tlsPtrAlloc(anchor->sz, &(anchor->key), &(anchor->once));
+extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor,
+                                const void* initvalue) {
+  return __tlsPtrAlloc(anchor->sz, &(anchor->key), &(anchor->once), initvalue);
 }
 }
 //--tls simulation end
