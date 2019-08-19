@@ -68,7 +68,7 @@ extern int anon_munmap(void* addr, size_t len);
 struct __tlsanchor;
 extern struct __tlsanchor* __tlsvaranchor_create(size_t sz);
 extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor);
-extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor);
+extern void *__tlsPtrFromAnchor(struct __tlsanchor *anchor, const void *);
 
 #ifdef __cplusplus
 }
@@ -105,14 +105,16 @@ class __auto_ascii {
   ~__auto_ascii();
 };
 
-template <typename T>
-class __tlssim {
-  struct __tlsanchor* anchor;
+template <typename T> class __tlssim {
+  struct __tlsanchor *anchor;
+  T v;
 
- public:
-  __tlssim() { anchor = __tlsvaranchor_create(sizeof(T)); }
+public:
+  __tlssim(const T &initvalue) : v(initvalue) {
+    anchor = __tlsvaranchor_create(sizeof(T));
+  }
   ~__tlssim() { __tlsvaranchor_destroy(anchor); }
-  T* access(void) { return static_cast<T*>(__tlsPtrFromAnchor(anchor)); }
+  T *access(void) { return static_cast<T *>(__tlsPtrFromAnchor(anchor, &v)); }
 };
 
 #endif
