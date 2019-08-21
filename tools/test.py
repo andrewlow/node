@@ -716,6 +716,8 @@ def CheckedUnlink(name):
 def Execute(args, context, timeout=None, env=None, disable_core_files=False, stdin=None):
   (fd_out, outname) = tempfile.mkstemp()
   (fd_err, errname) = tempfile.mkstemp()
+  if utils.IsZos():
+    os.system('chtag -tc 819 {} {}'.format(outname, errname))
 
   if env is None:
     env = {}
