@@ -1076,9 +1076,9 @@ class __init {
     int original;
     int new_value;
 
-    original = *forkcurr;
-    new_value = original + 1;
     do {
+      original = *forkcurr;
+      new_value = original + 1;
       __asm(" cs %0,%2,%1 \n "
             : "+r"(original), "+m"(*forkcurr)
             : "r"(new_value)
@@ -1285,6 +1285,7 @@ extern "C" int kill(int pid, int sig) {
   if (rv != 0) errno = rc;
   return rv;
 }
+// overriding LE's fork when linked statically
 extern "C" int fork(void) {
   int cnt = __a.inc_forkcount();
   int max = __a.get_forkmax();
