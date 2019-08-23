@@ -20,6 +20,7 @@
 #include <string.h>
 #include <sys/__getipc.h>
 #include <sys/msg.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <mutex>
@@ -34,6 +35,7 @@ static int __debug_mode = 0;
 int __argc = 1;
 char** __argv;
 extern void __settimelimit(int secs);
+static int shmid_value(void);
 
 static inline void* __convert_one_to_one(const void* table,
                                          void* dst,
@@ -1015,9 +1017,12 @@ static void cleanupmsgq(int others) {
 class __init {
   int mode;
   int cvstate;
+  int forkmax;
+  int* forkcurr;
+  int shmid;
 
  public:
-  __init() {
+  __init() : forkmax(0), shmid(0) {
     // initialization
     unsigned long* x =
         (unsigned long*)((char***** __ptr32*)1208)[0][11][1][113][149];
@@ -1051,12 +1056,46 @@ class __init {
         __settimelimit(sec);
       }
     }
+    char* fm = __getenv_a("__NODEFORKMAX");
+    if (fm) {
+      int v = __atoi_a(fm);
+      if (v > 0) {
+        forkmax = v;
+        char path[1024];
+        if (0 == getcwd(path, sizeof(path))) strcpy(path, "./");
+        key_t key = ftok(path, 9021);
+        shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+        forkcurr = (int*)shmat(shmid, (void*)0, 0);
+        *forkcurr = 0;
+      }
+    }
   }
+  int get_forkmax(void) { return forkmax; }
+  int inc_forkcount(void) {
+    if (0 == forkmax || 0 == shmid) return 0;
+    int original;
+    int new_value;
+
+    original = *forkcurr;
+    new_value = original + 1;
+    do {
+      __asm(" cs %0,%2,%1 \n "
+            : "+r"(original), "+m"(*forkcurr)
+            : "r"(new_value)
+            :);
+    } while (original != (new_value - 1));
+    return new_value;
+  }
+  int shmid_value(void) { return shmid; }
   ~__init() {
     if (_CVTSTATE_OFF == cvstate) {
       __ae_autoconvert_state(cvstate);
     }
     __ae_thread_swapmode(mode);
+    if (shmid != 0) {
+      shmdt(forkcurr);
+      shmctl(shmid, IPC_RMID, 0);
+    }
     cleanupmsgq(0);
   }
 };
@@ -1209,7 +1248,7 @@ extern "C" int __find_file_in_path(char* out,
 static char* __ptr32* __ptr32 __base(void) {
   static char* __ptr32* __ptr32 res = 0;
   if (res == 0) {
-    res = ((char* __ptr32* __ptr32* __ptr32* __ptr32*)16)[0][136][6];
+    res = ((char* __ptr32* __ptr32* __ptr32* __ptr32*)0)[4][136][6];
   }
   return res;
 }
@@ -1228,6 +1267,11 @@ static void __bpx4kil(int pid,
                   reason_code};  // os style parm list
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
 }
+static void __bpx4frk(int* pid, int* return_code, int* reason_code) {
+  void* reg15 = __base()[240 / 4];                 // BPX4FRK offset is 240
+  void* argv[] = {pid, return_code, reason_code};  // os style parm list
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+}
 
 extern "C" void abort(void) {
   __display_backtrace(STDERR_FILENO);
@@ -1240,6 +1284,25 @@ extern "C" int kill(int pid, int sig) {
   __bpx4kil(pid, sig, 0, &rv, &rc, &rn);
   if (rv != 0) errno = rc;
   return rv;
+}
+extern "C" int fork(void) {
+  int cnt = __a.inc_forkcount();
+  int max = __a.get_forkmax();
+  if (cnt > max) {
+    dprintf(2,
+            "fork(): current count %d is greater than "
+            "__NODEFORKMAX value %d, fork failed\n",
+            cnt,
+            max);
+    errno = EPROCLIM;
+    return -1;
+  }
+  int rc, rn, pid;
+  __bpx4frk(&pid, &rc, &rn);
+  if (-1 == pid) {
+    errno = rc;
+  }
+  return pid;
 }
 
 struct IntHash {
