@@ -992,7 +992,7 @@ class __csConverter {
   }
 };
 
-static void cleanupmsgq(int others) {
+static void cleanupipc(int others) {
   IPCQPROC buf;
   int rc;
   int uid = getuid();
@@ -1012,6 +1012,21 @@ static void cleanupmsgq(int others) {
       }
     }
     rc = __getipc(rc, &buf, sizeof(buf), IPCQMSG);
+  }
+  if (others) {
+    stop = -1;
+    rc = __getipc(0, &buf, sizeof(buf), IPCQSHM);
+    while (rc != -1 && stop != buf.shm.ipcqmid) {
+      if (stop == -1) stop = buf.shm.ipcqmid;
+      if (buf.shm.ipcqpcp.uid == uid) {
+        if (buf.shm.ipcqcpid == pid) {
+          shmctl(buf.shm.ipcqmid, IPC_RMID, 0);
+        } else if (kill(buf.shm.ipcqcpid, 0) == -1) {
+          shmctl(buf.shm.ipcqmid, IPC_RMID, 0);
+        }
+      }
+      rc = __getipc(rc, &buf, sizeof(buf), IPCQSHM);
+    }
   }
 }
 class __init {
@@ -1043,7 +1058,7 @@ class __init {
     }
     char* cu = __getenv_a("__IPC_CLEANUP");
     if (cu && !memcmp(cu, "1", 2)) {
-      cleanupmsgq(1);
+      cleanupipc(1);
     }
     char* dbg = __getenv_a("__NODERUNDEBUG");
     if (dbg && !memcmp(dbg, "1", 2)) {
@@ -1096,7 +1111,7 @@ class __init {
       shmdt(forkcurr);
       shmctl(shmid, IPC_RMID, 0);
     }
-    cleanupmsgq(0);
+    cleanupipc(0);
   }
 };
 static __init __a;
