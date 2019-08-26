@@ -40,7 +40,7 @@
 extern char **environ;
 #endif
 
-#if defined(__linux__) || defined(__GLIBC__)
+#if defined(__linux__) || defined(__GLIBC__) || defined(__MVS__)
 # include <grp.h>
 #endif
 
@@ -386,10 +386,6 @@ static void uv__process_child_init(const uv_process_options_t* options,
     _exit(127);
   }
 
-  if (options->env != NULL) {
-    environ = options->env;
-  }
-
   /* Reset signal disposition.  Use a hard-coded limit because NSIG
    * is not fixed on Linux: it's either 32, 34 or 64, depending on
    * whether RT signals are enabled.  We are not allowed to touch
@@ -420,7 +416,11 @@ static void uv__process_child_init(const uv_process_options_t* options,
     _exit(127);
   }
 
-  execvp(options->file, options->args);
+  if (options->env != NULL)
+    execvpe(options->file, options->args, options->env);
+  else 
+    execvpe(options->file, options->args, environ);
+
   uv__write_int(error_fd, UV__ERR(errno));
   _exit(127);
 }
@@ -476,7 +476,7 @@ int uv_spawn(uv_loop_t* loop,
 
   for (i = 0; i < options->stdio_count; i++) {
 #if defined(__MVS__)
-    if (i == 2) /* stderr */
+    if (i == 1 || i == 2) /* stdout or stderr */
       err = uv__process_init_stdio(options->stdio + i, pipes[i], 1);
     else
       err = uv__process_init_stdio(options->stdio + i, pipes[i], 0);
@@ -529,6 +529,13 @@ int uv_spawn(uv_loop_t* loop,
     uv__process_child_init(options, stdio_count, pipes, signal_pipe[1]);
     abort();
   }
+ #ifdef __MVS__
+    else {
+      __chgfdccsid(pipes[0][1], 819);  
+      __chgfdccsid(pipes[1][0], 819);
+      __chgfdccsid(pipes[2][0], 819);  
+    }
+  #endif
 
   /* Release lock in parent process */
   uv_rwlock_wrunlock(&loop->cloexec_lock);
