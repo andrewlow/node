@@ -1967,6 +1967,91 @@ extern "C" int anon_munmap(void* addr, size_t len) {
     return 0;
   }
 }
+
+extern "C" int execvpe(const char *name, char *const argv[], char *const envp[]) {
+  int lp, ln;
+  char *p;
+
+  int eacces = 0, etxtbsy = 0;
+  char *bp, *cur, *path, *buf = 0;
+
+  // Absolute or Relative Path Name
+  if (strchr(name, '/')) {
+    return execve(name, argv, envp);
+  }
+
+  // Get the path we're searching
+  if (!(path = getenv("PATH"))) {
+    if ((cur = path = (char*)alloca(2)) != NULL) {
+      path[0] = ':';
+      path[1] = '\0';
+    }
+  } else {
+    char *n = (char*)alloca(strlen(path) + 1);
+    strcpy(n, path);
+    cur = path = n;
+  }
+
+  if (path == NULL ||
+      (bp = buf = (char*)alloca(strlen(path) + strlen(name) + 2)) == NULL)
+    goto done;
+
+  while (cur != NULL) {
+    p = cur;
+    if ((cur = strchr(cur, ':')) != NULL)
+      *cur++ = '\0';
+
+    if (!*p) {
+      p = ".";
+      lp = 1;
+    } else
+      lp = strlen(p);
+    ln = strlen(name);
+
+    memcpy(buf, p, lp);
+    buf[lp] = '/';
+    memcpy(buf + lp + 1, name, ln);
+    buf[lp + ln + 1] = '\0';
+
+  retry:
+    (void)execve(bp, argv, envp);
+    switch (errno) {
+    case EACCES:
+      eacces = 1;
+      break;
+    case ENOTDIR:
+    case ENOENT:
+      break;
+    case ENOEXEC: {
+      register size_t cnt;
+      register char **ap;
+
+      for (cnt = 0, ap = (char **)argv; *ap; ++ap, ++cnt)
+        ;
+      if ((ap = (char**)alloca((cnt + 2) * sizeof(char *))) != NULL) {
+        memcpy(ap + 2, argv + 1, cnt * sizeof(char *));
+
+        ap[0] = "sh";
+        ap[1] = bp;
+        (void)execve("/bin/sh", ap, envp);
+      }
+      goto done;
+    }
+    case ETXTBSY:
+      if (etxtbsy < 3)
+        (void)sleep(++etxtbsy);
+      goto retry;
+    default:
+      goto done;
+    }
+  }
+  if (eacces)
+    errno = EACCES;
+  else if (!errno)
+    errno = ENOENT;
+done:
+  return (-1);
+}
 //------------------------------------------accounting for memory allocation end
 //--tls simulation begin
 extern "C" {
