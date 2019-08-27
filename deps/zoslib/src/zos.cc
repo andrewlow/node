@@ -1301,7 +1301,7 @@ extern "C" int kill(int pid, int sig) {
   return rv;
 }
 // overriding LE's fork when linked statically
-extern "C" int fork(void) {
+extern "C" int __fork(void) {
   int cnt = __a.inc_forkcount();
   int max = __a.get_forkmax();
   if (cnt > max) {
