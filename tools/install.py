@@ -131,6 +131,10 @@ def files(action):
     if is_windows:
       output_file += '.dll'
     else:
+      if sys.platform.startswith('zos'):
+        action([output_prefix + output_file], 'bin/' + output_file)
+        action([output_prefix + 'obj.target/lib' + output_file + '.so'], 'lib/')
+
       output_file = 'lib' + output_file + '.' + variables.get('shlib_suffix')
       # GYP will output to lib.target except on OS X, this is hardcoded
       # in its source - see the _InstallableTargetInstallPath function.
@@ -150,6 +154,14 @@ def files(action):
 
   action(['deps/v8/tools/gdbinit'], 'share/doc/node/')
   action(['deps/v8/tools/lldb_commands.py'], 'share/doc/node/')
+
+  # conversion_tool files
+  if sys.platform.startswith('zos'):
+    if 'false' == variables.get('node_shared'):
+      action([
+        output_prefix + 'obj.target/lib' + output_file + '.x',
+        output_prefix + 'obj.target/lib' + output_file + '.so',
+      ], 'lib/')
 
   if 'freebsd' in sys.platform or 'openbsd' in sys.platform:
     action(['doc/node.1'], 'man/man1/')
