@@ -515,7 +515,7 @@ int uv_spawn(uv_loop_t* loop,
 
   /* Acquire write lock to prevent opening new fds in worker threads */
   uv_rwlock_wrlock(&loop->cloexec_lock);
-  pid = fork();
+  pid = __fork();
 
   if (pid == -1) {
     err = UV__ERR(errno);
@@ -530,11 +530,17 @@ int uv_spawn(uv_loop_t* loop,
     abort();
   }
  #ifdef __MVS__
-    else {
-      __chgfdccsid(pipes[0][1], 819);  
-      __chgfdccsid(pipes[1][0], 819);
-      __chgfdccsid(pipes[2][0], 819);  
+  else {
+    if (!isatty(pipes[1][0])) {
+       __chgfdccsid(pipes[1][0], 819);
     }
+    if (!isatty(pipes[2][0])) {
+       __chgfdccsid(pipes[2][0], 819);
+    }
+    if (!isatty(pipes[0][1])) {
+       __chgfdccsid(pipes[0][1], 819);
+    }
+  }
   #endif
 
   /* Release lock in parent process */
