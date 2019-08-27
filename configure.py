@@ -1121,15 +1121,14 @@ def configure_node(o):
   node_module_version = getmoduleversion.get_version()
 
   if sys.platform == 'darwin':
-    shlib_suffix = '%s.dylib'
+    shlib_suffix = node_module_version + '.dylib'
   elif sys.platform.startswith('aix'):
-    shlib_suffix = '%s.a'
+    shlib_suffix = node_module_version + '.a'
   elif sys.platform.startswith('zos'):
-    shlib_suffix = '%s.x'
+    shlib_suffix = 'x'
   else:
-    shlib_suffix = 'so.%s'
+    shlib_suffix = 'so.' + node_module_version
 
-  shlib_suffix %= node_module_version
   o['variables']['node_module_version'] = int(node_module_version)
   o['variables']['shlib_suffix'] = shlib_suffix
 
