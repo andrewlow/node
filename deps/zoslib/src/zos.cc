@@ -1313,12 +1313,16 @@ extern "C" int __fork(void) {
     errno = EPROCLIM;
     return -1;
   }
+#if 0
   int rc, rn, pid;
   __bpx4frk(&pid, &rc, &rn);
   if (-1 == pid) {
     errno = rc;
   }
   return pid;
+#else
+  return fork();
+#endif
 }
 
 struct IntHash {
