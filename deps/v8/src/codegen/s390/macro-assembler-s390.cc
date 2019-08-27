@@ -1,6 +1,9 @@
 // Copyright 2014 the V8 project authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#if V8_TARGET_ARCH_S390X
+#pragma options("-qNOOPT")
+#endif
 
 #include <assert.h>  // For assert
 #include <limits.h>  // For LONG_MIN, LONG_MAX.
