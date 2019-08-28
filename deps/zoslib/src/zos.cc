@@ -1972,9 +1972,11 @@ extern "C" int anon_munmap(void* addr, size_t len) {
   }
 }
 
-extern "C" int execvpe(const char *name, char *const argv[], char *const envp[]) {
+extern "C" int execvpe(const char* name,
+                       char* const argv[],
+                       char* const envp[]) {
   int lp, ln;
-  char *p;
+  const char* p;
 
   int eacces = 0, etxtbsy = 0;
   char *bp, *cur, *path, *buf = 0;
@@ -1991,7 +1993,7 @@ extern "C" int execvpe(const char *name, char *const argv[], char *const envp[])
       path[1] = '\0';
     }
   } else {
-    char *n = (char*)alloca(strlen(path) + 1);
+    char* n = (char*)alloca(strlen(path) + 1);
     strcpy(n, path);
     cur = path = n;
   }
@@ -2002,8 +2004,7 @@ extern "C" int execvpe(const char *name, char *const argv[], char *const envp[])
 
   while (cur != NULL) {
     p = cur;
-    if ((cur = strchr(cur, ':')) != NULL)
-      *cur++ = '\0';
+    if ((cur = strchr(cur, ':')) != NULL) *cur++ = '\0';
 
     if (!*p) {
       p = ".";
@@ -2020,33 +2021,32 @@ extern "C" int execvpe(const char *name, char *const argv[], char *const envp[])
   retry:
     (void)execve(bp, argv, envp);
     switch (errno) {
-    case EACCES:
-      eacces = 1;
-      break;
-    case ENOTDIR:
-    case ENOENT:
-      break;
-    case ENOEXEC: {
-      register size_t cnt;
-      register char **ap;
+      case EACCES:
+        eacces = 1;
+        break;
+      case ENOTDIR:
+      case ENOENT:
+        break;
+      case ENOEXEC: {
+        size_t cnt;
+        char** ap;
 
-      for (cnt = 0, ap = (char **)argv; *ap; ++ap, ++cnt)
-        ;
-      if ((ap = (char**)alloca((cnt + 2) * sizeof(char *))) != NULL) {
-        memcpy(ap + 2, argv + 1, cnt * sizeof(char *));
+        for (cnt = 0, ap = (char**)argv; *ap; ++ap, ++cnt)
+          ;
+        if ((ap = (char**)alloca((cnt + 2) * sizeof(char*))) != NULL) {
+          memcpy(ap + 2, argv + 1, cnt * sizeof(char*));
 
-        ap[0] = "sh";
-        ap[1] = bp;
-        (void)execve("/bin/sh", ap, envp);
+          ap[0] = (char*)"sh";
+          ap[1] = bp;
+          (void)execve("/bin/sh", ap, envp);
+        }
+        goto done;
       }
-      goto done;
-    }
-    case ETXTBSY:
-      if (etxtbsy < 3)
-        (void)sleep(++etxtbsy);
-      goto retry;
-    default:
-      goto done;
+      case ETXTBSY:
+        if (etxtbsy < 3) (void)sleep(++etxtbsy);
+        goto retry;
+      default:
+        goto done;
     }
   }
   if (eacces)
