@@ -71,7 +71,7 @@ class ThreadManager {
   void Iterate(RootVisitor* v);
   void IterateArchivedThreads(ThreadVisitor* v);
   bool IsLockedByCurrentThread() const {
-    return ThreadId::FromInteger(mutex_owner_.load(std::memory_order_relaxed)) == ThreadId::Current();
+    return mutex_owner_.load(std::memory_order_relaxed) == ThreadId::Current();
   }
 
   ThreadId CurrentId();
@@ -91,7 +91,7 @@ class ThreadManager {
   base::Mutex mutex_;
   // {ThreadId} must be trivially copyable to be stored in {std::atomic}.
   ASSERT_TRIVIALLY_COPYABLE(i::ThreadId);
-  std::atomic<int> mutex_owner_;
+  std::atomic<ThreadId> mutex_owner_;
   ThreadId lazily_archived_thread_;
   ThreadState* lazily_archived_thread_state_;
 
