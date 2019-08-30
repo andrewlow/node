@@ -331,7 +331,7 @@ Isolate::FindOrAllocatePerThreadDataForThisThread() {
 void Isolate::DiscardPerThreadDataForThisThread() {
   ThreadId thread_id = ThreadId::TryGetCurrent();
   if (thread_id.IsValid()) {
-    DCHECK_NE(ThreadId::FromInteger(thread_manager_->mutex_owner_.load(std::memory_order_relaxed)),
+    DCHECK_NE(thread_manager_->mutex_owner_.load(std::memory_order_relaxed),
               thread_id);
     base::MutexGuard lock_guard(&thread_data_table_mutex_);
     PerIsolateThreadData* per_thread = thread_data_table_.Lookup(thread_id);
