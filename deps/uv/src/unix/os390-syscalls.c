@@ -28,11 +28,17 @@
 #include <sys/msg.h>
 #include <unistd.h>
 
-#define CW_INTRPT 1
-#define CW_CONDVAR 32
+#if defined(__has_include) &&  __has_include("zos.h")
+  #include "zos.h"
+#else
+  #define CW_INTRPT 1
+  #define CW_CONDVAR 32
+  #pragma linkage(BPX4CTW, OS)
+  #pragma linkage(BPX1CTW, OS)
+#endif
 
-#pragma linkage(BPX4CTW, OS)
-#pragma linkage(BPX1CTW, OS)
+
+
 
 static int number_of_epolls;
 static QUEUE global_epoll_queue;
@@ -379,6 +385,19 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
   unsigned nanorem;
   int rv;
   int err;
+
+#if defined(__ZOS_EXT__)
+  rv = __cond_timed_wait((unsigned int)req->tv_sec,
+                         (unsigned int)req->tv_nsec,
+                         (unsigned int)(CW_CONDVAR | CW_INTRPT),
+                         &secrem,
+                         &nanorem);
+  if (rv == -1)
+    if (err != EAGAIN && err != EINTR)
+      errno = err;
+#else
+
+  int rc;
   int rsn;
 
   nano = (int)req->tv_nsec;
@@ -391,7 +410,7 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
   BPX4CTW(&seconds, &nano, &events, &secrem, &nanorem, &rv, &err, &rsn);
 #else
   BPX1CTW(&seconds, &nano, &events, &secrem, &nanorem, &rv, &err, &rsn);
-#endif
+#endif // _LP64
 
   /* Don't clobber errno unless BPX1CTW/BPX4CTW errored.
    * Don't leak EAGAIN, that just means the timeout expired.
@@ -399,6 +418,7 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
   if (rv == -1)
     if (err != EAGAIN)
       errno = err;
+#endif // __ZOS_EXT__
 
   if (rem != NULL && (rv == 0 || err == EINTR || err == EAGAIN)) {
     rem->tv_nsec = nanorem;

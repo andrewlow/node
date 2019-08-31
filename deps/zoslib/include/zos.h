@@ -1,5 +1,7 @@
 #ifndef __ZOS_H_
 #define __ZOS_H_
+#undef __ZOS_EXT
+#define __ZOS_EXT__ 1
 //-------------------------------------------------------------------------------------
 //
 // external interface:
@@ -32,7 +34,7 @@ extern void __dump(int fd, const void* addr, size_t len, size_t bw);
 extern void __dump_title(
     int fd, const void* addr, size_t len, size_t bw, const char*, ...);
 extern void __display_backtrace(int fd);
-extern int execvpe(const char *name, char *const argv[], char *const envp[]);
+extern int execvpe(const char* name, char* const argv[], char* const envp[]);
 extern int backtrace(void** buffer, int size);
 extern char** backtrace_symbols(void* const* buffer, int size);
 extern void backtrace_symbols_fd(void* const* buffer, int size, int fd);
@@ -66,10 +68,19 @@ extern void __fd_close(int fd);
 extern unsigned long __mach_absolute_time(void);
 extern void* anon_mmap(void* _, size_t len);
 extern int anon_munmap(void* addr, size_t len);
+extern int __cond_timed_wait(unsigned int secs,
+                             unsigned int nsecs,
+                             unsigned int event_list,
+                             unsigned int* secs_rem,
+                             unsigned int* nsecs_rem);
+
+enum COND_TIME_WAIT_CONSTANTS { CW_INTRPT = 1, CW_CONDVAR = 32 };
+
+extern int __fork(void);
 struct __tlsanchor;
 extern struct __tlsanchor* __tlsvaranchor_create(size_t sz);
 extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor);
-extern void *__tlsPtrFromAnchor(struct __tlsanchor *anchor, const void *);
+extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor, const void*);
 
 #ifdef __cplusplus
 }
@@ -106,16 +117,17 @@ class __auto_ascii {
   ~__auto_ascii();
 };
 
-template <typename T> class __tlssim {
-  struct __tlsanchor *anchor;
+template <typename T>
+class __tlssim {
+  struct __tlsanchor* anchor;
   T v;
 
-public:
-  __tlssim(const T &initvalue) : v(initvalue) {
+ public:
+  __tlssim(const T& initvalue) : v(initvalue) {
     anchor = __tlsvaranchor_create(sizeof(T));
   }
   ~__tlssim() { __tlsvaranchor_destroy(anchor); }
-  T *access(void) { return static_cast<T *>(__tlsPtrFromAnchor(anchor, &v)); }
+  T* access(void) { return static_cast<T*>(__tlsPtrFromAnchor(anchor, &v)); }
 };
 
 #endif
