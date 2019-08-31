@@ -29,10 +29,16 @@
 #include <sys/msg.h>
 #include <unistd.h>
 
-#define CW_CONDVAR 32
+#if defined(__has_include) &&  __has_include("zos.h")
+  #include "zos.h"
+#else
+  #define CW_CONDVAR 32
+  #pragma linkage(BPX4CTW, OS)
+  #pragma linkage(BPX1CTW, OS)
+#endif
 
-#pragma linkage(BPX4CTW, OS)
-#pragma linkage(BPX1CTW, OS)
+
+
 
 static int number_of_epolls;
 static QUEUE global_epoll_queue;
@@ -378,6 +384,16 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
   unsigned secrem;
   unsigned nanorem;
   int rv;
+
+#if defined(__ZOS_EXT__)
+  rv = __cond_timed_wait((unsigned int)req->tv_sec,
+                         (unsigned int)req->tv_nsec,
+                         (unsigned int)(CW_CONDVAR | CW_INTRPT),
+                         &secrem,
+                         &nanorem);
+  assert(rv == -1 && (errno == EAGAIN || errno == EINTR));
+#else
+
   int rc;
   int rsn;
 
@@ -392,8 +408,9 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
 #endif
 
   assert(rv == -1 && errno == EAGAIN);
+#endif
 
-  if(rem != NULL) {
+  if (rem != NULL) {
     rem->tv_nsec = nanorem;
     rem->tv_sec = secrem;
   }

@@ -1260,6 +1260,15 @@ extern "C" int __find_file_in_path(char* out,
   }
   return 0;
 }
+// clang-format off
+//
+// Call setup information:
+// https://www.ibm.com/support/knowledgecenter/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxb100/bpx2cr_Example.htm
+//
+// List of offsets for USS apis:
+// https://www.ibm.com/support/knowledgecenter/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxb100/bpx2cr_List_of_offsets.htm
+//
+// clang-format on 
 
 static char* __ptr32* __ptr32 __base(void) {
   static char* __ptr32* __ptr32 res = 0;
@@ -1287,6 +1296,35 @@ static void __bpx4frk(int* pid, int* return_code, int* reason_code) {
   void* reg15 = __base()[240 / 4];                 // BPX4FRK offset is 240
   void* argv[] = {pid, return_code, reason_code};  // os style parm list
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+}
+static void __bpx4ctw(unsigned int* secs,
+                      unsigned int* nsecs,
+                      unsigned int* event_list,
+                      unsigned int* secs_rem,
+                      unsigned int* nsecs_rem,
+                      int* return_value,
+                      int* return_code,
+                      int* reason_code) {
+  void* reg15 = __base()[492 / 4];  // BPX4CTW offset is 492
+  void* argv[] = {secs,
+                  nsecs,
+                  event_list,
+                  secs_rem,
+                  nsecs_rem,
+                  return_value,
+                  return_code,
+                  reason_code};  // os style parm list
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+}
+extern "C" int __cond_timed_wait(unsigned int secs,
+                      unsigned int nsecs,
+                      unsigned int event_list,
+                      unsigned int* secs_rem,
+                      unsigned int* nsecs_rem) {
+  int rv, rc, rn;
+  __bpx4ctw(&secs, &nsecs, &event_list, secs_rem, nsecs_rem, &rv, &rc, &rn);
+  if (rv != 0) errno = rc;
+  return rv;
 }
 
 extern "C" void abort(void) {
@@ -1592,28 +1630,28 @@ struct iarv64parm {
   unsigned xflags9_rsvd1 : 2;                               //  168(6)
   unsigned char xrsv0005[7];                                //  169
 };
-static long long __iarv64(void* parm, void** ptr, long long* reason_code_ptr) {
+static long long __iarv64(void *parm, void **ptr, long long *reason_code_ptr) {
   long long rc;
   long long reason;
-  __asm volatile(" lgr 1,%3 \n"
-                 " llgtr 14,14 \n"
+  void *out = 0;
+  __asm volatile(" llgtr 14,14 \n"
                  " l 14,16(0,0) \n"
                  " l 14,772(14,0) \n"
                  " l 14,208(14,0) \n"
                  " la 15,14 \n"
                  " or 14,15 \n"
                  " pc 0(14) \n"
-                 " stg 1,%0 \n"
-                 " stg 15,%1 \n"
-                 " stg 0,%2 \n"
-                 : "=m"(*ptr), "=m"(rc), "=m"(reason)
-                 : "r"(parm)
-                 : "r0", "r1", "r14", "r15");
+                 " lgr %0,1 \n"
+                 " lgr %1,15 \n"
+                 " lgr %2,0 \n"
+                 : "=r"(out), "=r"(rc), "=r"(reason),"+NR:r1"(parm):: "r0", "r14", "r15");
   if (rc != 0 && reason_code_ptr != 0) {
     *reason_code_ptr = reason;
   }
+  if (out) *ptr = out;
   return rc;
 }
+
 
 static void* __iarv64_alloc(int segs, const char* token) {
   void* ptr = 0;
