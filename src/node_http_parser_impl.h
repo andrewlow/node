@@ -23,6 +23,10 @@
 // and node_http_parser_llhttp.cc.
 
 #pragma once
+#if defined(__MVS__)
+#undef NODE_EXPERIMENTAL_HTTP
+#define NODE_EXPERIMENTAL_HTTP 1
+#endif
 
 #include "node.h"
 #include "node_buffer.h"
