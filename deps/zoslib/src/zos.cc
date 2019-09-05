@@ -2254,3 +2254,60 @@ void __atomic_store_real(int size, void* ptr, void* val, int memorder) {
   }
 }
 // --- end __atomic_store
+
+
+struct espiearg {
+  void *__ptr32 exitproc;
+  void *__ptr32 exitargs;
+  int flags;
+  void *__ptr32 reserved;
+};
+
+extern "C" int __testread(const void *location) {
+  struct espiearg *r1 = (struct espiearg *)__malloc31(sizeof(struct espiearg));
+  long token = 0;
+  volatile int state = 0;
+  volatile int word;
+  r1->flags = 0x08000000;
+  r1->reserved = 0;
+  __asm volatile("&suffix SETA &suffix+1\n"
+                 " lg 1,%1\n"
+                 " larl 0,exit&suffix \n"
+                 " st 0,0(1)\n"
+                 " larl 0,back&suffix \n"
+                 " st 0,4(1)\n"
+                 " la 15,28\n"
+                 " la 0,4\n"
+                 " svc 109\n"
+                 " stg 1,%0\n"
+                 " brc 15,back&suffix \n"
+                 "exit&suffix  l 2,4(1)\n"
+                 " la 3,1\n"
+                 " sll 3,31\n"
+                 " or 2,3\n"
+                 " st 2,76(1)\n"
+                 " br 14\n"
+                 "back&suffix  ds 0d\n"
+                 : "=m"(token)
+                 : "m"(r1)
+                 : "r0", "r1", "r15"); 
+                                      
+  if (state == 1) {
+    state = 2;
+  } else {
+    state = 1;
+    word = *(int *)location;
+  }
+  __asm volatile(" lg 1,%0\n"
+                 " la 0,8\n"
+                 " la 15,28\n"
+                 " svc 109\n"
+                 : 
+                 : "m"(token)
+                 : "r0", "r1", "r15");
+  free(r1); 
+  if (state != 1)
+    return -1;
+  return 0;
+} 
+
