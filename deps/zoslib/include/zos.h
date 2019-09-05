@@ -81,6 +81,7 @@ struct __tlsanchor;
 extern struct __tlsanchor* __tlsvaranchor_create(size_t sz);
 extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor);
 extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor, const void*);
+extern int __testread(const void* location);
 
 #ifdef __cplusplus
 }
