@@ -110,7 +110,7 @@ const isFreeBSD = process.platform === 'freebsd';
 const isOpenBSD = process.platform === 'openbsd';
 const isLinux = process.platform === 'linux';
 const isOSX = process.platform === 'darwin';
-const isZOS = process.platform === 'os390';
+const isZOS = process.platform === 'zos';
 
 const rootDir = isWindows ? 'c:\\' : '/';
 
