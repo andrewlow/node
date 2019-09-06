@@ -153,6 +153,12 @@ class StandardTestRunner(base_runner.BaseTestRunner):
     parser.add_option('--report', default=False, action='store_true',
                       help='Print a summary of the tests to be run')
 
+    # z/OS
+    parser.add_option('--no-multiprocessing', '--nomultiprocessing',
+                      help='Use threading instead of multiprocessing',
+                      default=False, dest='no_multiprocessing',
+                      action='store_true')
+
   def _process_options(self, options):
     if options.sancov_dir:
       self.sancov_dir = options.sancov_dir
@@ -230,6 +236,12 @@ class StandardTestRunner(base_runner.BaseTestRunner):
       base_runner.TEST_MAP['default'].remove('intl')
       # TODO(machenbach): uncomment after infra side lands.
       # base_runner.TEST_MAP['d8_default'].remove('intl')
+
+    if options.no_multiprocessing:
+      from testrunner.local import command
+      from testrunner.local import pool
+      command.setup_testing()
+      pool.setup_testing()
 
   def _parse_variants(self, aliases_str):
     # Use developer defaults if no variant was specified.
