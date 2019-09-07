@@ -13,6 +13,9 @@
         # Enable the shared object to be linked by runtime linker
         ['OS=="aix"', {
           'ldflags': [ '-Wl,-G' ]
+        }],
+        ['OS=="zos"', {
+          'libraries': [ 'binding.x' ]
         }]],
     },
     {
