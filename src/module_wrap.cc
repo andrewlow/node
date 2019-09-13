@@ -546,7 +546,7 @@ inline DescriptorType CheckDescriptorAtFile(uv_file fd) {
   uv_fs_t fs_req;
   int rc = uv_fs_fstat(nullptr, &fs_req, fd, nullptr);
   if (rc == 0) {
-    uint64_t is_directory = fs_req.statbuf.st_mode & S_IFDIR;
+    int is_directory = S_ISDIR(fs_req.statbuf.st_mode);
     uv_fs_req_cleanup(&fs_req);
     return is_directory ? DIRECTORY : FILE;
   }
