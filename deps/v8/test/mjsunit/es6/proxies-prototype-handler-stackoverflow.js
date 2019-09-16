@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Flags: --stack-size=100
+// On z/OS, this test needs a stack size of at least 204 kBytes.
+// Flags: --stack-size=220
 
 // Test that traps that involve walking the target object's prototype chain
 // don't overflow the stack when the original proxy is on that chain.
