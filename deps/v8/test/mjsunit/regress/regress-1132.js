@@ -28,7 +28,8 @@
 // Test the case when exception is thrown from the parser when lazy
 // compiling a function.
 
-// Flags: --stack-size=100
+// On z/OS, this test needs a stack size of at least 204 kBytes.
+// Flags: --stack-size=220
 // NOTE: stack size constant above has been empirically chosen.
 // If the test starts to fail in Genesis, consider increasing this constant.
 

@@ -27,7 +27,8 @@
 
 // On MacOS X 10.7.5, this test needs a stack size of at least 788 kBytes.
 // On PPC64, this test needs a stack size of at least 698 kBytes.
-// Flags: --stack-size=1000
+// On z/OS, this test needs a stack size of at least 2968 kBytes.
+// Flags: --stack-size=3000
 //
 // The above stack limits were written assuming no lazy parsing, so turn
 // off lazy parsing for this test.
