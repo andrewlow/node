@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Flags: --expose-gc --stack-size=120
+// On z/OS, this test needs a stack size of at least 204 kBytes.
+// Flags: --expose-gc --stack-size=220
 
 var __v_11 = {};
 function __f_2(depth) {
