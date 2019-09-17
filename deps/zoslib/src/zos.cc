@@ -23,6 +23,7 @@
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <mutex>
 #include <unordered_map>
@@ -430,7 +431,10 @@ extern "C" int __console_printf(const char* fmt, ...) {
   va_end(ap1);
   va_end(ap);
   if (len < 0) goto quit;
-  __console(buf, len);
+  while (len > 0 && buf[len - 1] == 0x15) {
+    --len;
+  }
+  if (len > 0) __console(buf, len);
 quit:
   __ae_thread_swapmode(mode);
   return len;
@@ -1260,7 +1264,6 @@ extern "C" int __find_file_in_path(char* out,
   }
   return 0;
 }
-// clang-format off
 //
 // Call setup information:
 // https://www.ibm.com/support/knowledgecenter/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxb100/bpx2cr_Example.htm
@@ -1268,7 +1271,6 @@ extern "C" int __find_file_in_path(char* out,
 // List of offsets for USS apis:
 // https://www.ibm.com/support/knowledgecenter/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxb100/bpx2cr_List_of_offsets.htm
 //
-// clang-format on 
 
 static char* __ptr32* __ptr32 __base(void) {
   static char* __ptr32* __ptr32 res = 0;
@@ -1317,10 +1319,10 @@ static void __bpx4ctw(unsigned int* secs,
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
 }
 extern "C" int __cond_timed_wait(unsigned int secs,
-                      unsigned int nsecs,
-                      unsigned int event_list,
-                      unsigned int* secs_rem,
-                      unsigned int* nsecs_rem) {
+                                 unsigned int nsecs,
+                                 unsigned int event_list,
+                                 unsigned int* secs_rem,
+                                 unsigned int* nsecs_rem) {
   int rv, rc, rn;
   __bpx4ctw(&secs, &nsecs, &event_list, secs_rem, nsecs_rem, &rv, &rc, &rn);
   if (rv != 0) errno = rc;
@@ -1330,6 +1332,7 @@ extern "C" int __cond_timed_wait(unsigned int secs,
 extern "C" void abort(void) {
   __display_backtrace(STDERR_FILENO);
   kill(getpid(), SIGABRT);
+  exit(-1);
 }
 
 // overriding LE's kill when linked statically
@@ -1630,28 +1633,28 @@ struct iarv64parm {
   unsigned xflags9_rsvd1 : 2;                               //  168(6)
   unsigned char xrsv0005[7];                                //  169
 };
-static long long __iarv64(void *parm, void **ptr, long long *reason_code_ptr) {
+static long long __iarv64(void* parm, void** ptr, long long* reason_code_ptr) {
   long long rc;
   long long reason;
-  void *out = 0;
-  __asm volatile(" llgtr 14,14 \n"
-                 " l 14,16(0,0) \n"
-                 " l 14,772(14,0) \n"
-                 " l 14,208(14,0) \n"
-                 " la 15,14 \n"
-                 " or 14,15 \n"
-                 " pc 0(14) \n"
-                 " lgr %0,1 \n"
-                 " lgr %1,15 \n"
-                 " lgr %2,0 \n"
-                 : "=r"(out), "=r"(rc), "=r"(reason),"+NR:r1"(parm):: "r0", "r14", "r15");
+  void* out = 0;
+  __asm volatile(
+      " llgtr 14,14 \n"
+      " l 14,16(0,0) \n"
+      " l 14,772(14,0) \n"
+      " l 14,208(14,0) \n"
+      " la 15,14 \n"
+      " or 14,15 \n"
+      " pc 0(14) \n"
+      " lgr %0,1 \n"
+      " lgr %1,15 \n"
+      " lgr %2,0 \n"
+      : "=r"(out), "=r"(rc), "=r"(reason), "+NR:r1"(parm)::"r0", "r14", "r15");
   if (rc != 0 && reason_code_ptr != 0) {
     *reason_code_ptr = reason;
   }
   if (out) *ptr = out;
   return rc;
 }
-
 
 static void* __iarv64_alloc(int segs, const char* token) {
   void* ptr = 0;
@@ -2255,16 +2258,15 @@ void __atomic_store_real(int size, void* ptr, void* val, int memorder) {
 }
 // --- end __atomic_store
 
-
 struct espiearg {
-  void *__ptr32 exitproc;
-  void *__ptr32 exitargs;
+  void* __ptr32 exitproc;
+  void* __ptr32 exitargs;
   int flags;
-  void *__ptr32 reserved;
+  void* __ptr32 reserved;
 };
 
-extern "C" int __testread(const void *location) {
-  struct espiearg *r1 = (struct espiearg *)__malloc31(sizeof(struct espiearg));
+extern "C" int __testread(const void* location) {
+  struct espiearg* r1 = (struct espiearg*)__malloc31(sizeof(struct espiearg));
   long token = 0;
   volatile int state = 0;
   volatile int word;
@@ -2290,24 +2292,142 @@ extern "C" int __testread(const void *location) {
                  "back&suffix  ds 0d\n"
                  : "=m"(token)
                  : "m"(r1)
-                 : "r0", "r1", "r15"); 
-                                      
+                 : "r0", "r1", "r15");
+
   if (state == 1) {
     state = 2;
   } else {
     state = 1;
-    word = *(int *)location;
+    word = *(int*)location;
   }
   __asm volatile(" lg 1,%0\n"
                  " la 0,8\n"
                  " la 15,28\n"
                  " svc 109\n"
-                 : 
+                 :
                  : "m"(token)
                  : "r0", "r1", "r15");
-  free(r1); 
-  if (state != 1)
-    return -1;
+  free(r1);
+  if (state != 1) return -1;
   return 0;
-} 
+}
 
+#if TRACE_ON  // for debugging use
+
+// for debugging use
+static void __tb(void) {
+  void* buffer[100];
+  int nptrs = backtrace(buffer, 100);
+  char** str = backtrace_symbols(buffer, nptrs);
+  if (str) {
+    int pid = getpid();
+    for (int i = 0; i < nptrs; ++i)
+      __console_printf("pid %d ->%s\n", pid, str[i]);
+    free(str);
+  }
+}
+
+// for debugging use
+extern "C" void __fdinfo(int fd) {
+  struct stat st;
+  int rc;
+
+  char buf[1024];
+  struct tm tm;
+
+  rc = fstat(fd, &st);
+  if (-1 == rc) {
+    __console_printf("fd %d invalid, errno=%d", fd, errno);
+    return;
+  }
+  if (S_ISBLK(st.st_mode)) {
+    __console_printf("fd %d IS_BLK", fd);
+  } else if (S_ISDIR(st.st_mode)) {
+    __console_printf("fd %d IS_DIR", fd);
+  } else if (S_ISCHR(st.st_mode)) {
+    __console_printf("fd %d IS_CHR", fd);
+  } else if (S_ISFIFO(st.st_mode)) {
+    __console_printf("fd %d IS_FIFO", fd);
+  } else if (S_ISREG(st.st_mode)) {
+    __console_printf("fd %d IS_REG", fd);
+  } else if (S_ISLNK(st.st_mode)) {
+    __console_printf("fd %d IS_LNK", fd);
+  } else if (S_ISSOCK(st.st_mode)) {
+    __console_printf("fd %d IS_SOCK", fd);
+  } else if (S_ISVMEXTL(st.st_mode)) {
+    __console_printf("fd %d IS_VMEXTL", fd);
+  }
+  __console_printf("fd %d ino %d", fd, st.st_ino);
+  __console_printf("fd %d dev %d", fd, st.st_dev);
+  __console_printf("fd %d rdev %d", fd, st.st_rdev);
+  __console_printf("fd %d nlink %d", fd, st.st_nlink);
+  __console_printf("fd %d uid %d", fd, st.st_uid);
+  __console_printf("fd %d gid %d", fd, st.st_gid);
+  __console_printf(
+      "fd %d atime %s", fd, asctime_r(localtime_r(&st.st_atime, &tm), buf));
+  __console_printf(
+      "fd %d mtime %s", fd, asctime_r(localtime_r(&st.st_mtime, &tm), buf));
+  __console_printf(
+      "fd %d ctime %s", fd, asctime_r(localtime_r(&st.st_ctime, &tm), buf));
+  __console_printf("fd %d createtime %s",
+                   fd,
+                   asctime_r(localtime_r(&st.st_createtime, &tm), buf));
+  __console_printf(
+      "fd %d reftime %s", fd, asctime_r(localtime_r(&st.st_reftime, &tm), buf));
+  __console_printf("fd %d auditoraudit %d", fd, st.st_auditoraudit);
+  __console_printf("fd %d useraudit %d", fd, st.st_useraudit);
+  __console_printf("fd %d blksize %d", fd, st.st_blksize);
+  __console_printf("fd %d auditid %-.*s", fd, 16, st.st_auditid);
+  __console_printf("fd %d ccsid %d", fd, st.st_tag.ft_ccsid);
+  __console_printf("fd %d txt %d", fd, st.st_tag.ft_txtflag);
+  __console_printf("fd %d blkcnt  %ld", fd, st.st_blocks);
+  __console_printf("fd %d genvalue %d", fd, st.st_genvalue);
+  __console_printf("fd %d fid %-.*s", fd, 8, st.st_fid);
+  __console_printf("fd %d filefmt %d", fd, st.st_filefmt);
+  __console_printf("fd %d fspflag2 %d", fd, st.st_fspflag2);
+  __console_printf("fd %d seclabel %-.*s", fd, 8, st.st_seclabel);
+}
+// for debugging use
+extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
+  void* reg15 = __base()[220 / 4];  // BPX4WRT offset is 220
+  int rv, rc, rn;
+  void* alet = 0;
+  unsigned int size = sz;
+  const void* argv[] = {&fd, &buffer, &alet, &size, &rv, &rc, &rn};
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+  if (-1 == rv) {
+    errno = rc;
+  }
+  return rv;
+}
+// for debugging use
+extern "C" int close(int fd) {
+  if (21 == fd) {
+    __tb();
+  }
+  void* reg15 = __base()[72 / 4];  // BPX4CLO offset is 72
+  int rv = -1, rc = -1, rn = -1;
+  const void* argv[] = {&fd, &rv, &rc, &rn};
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+  if (-1 == rv) {
+    errno = rc;
+  }
+  return rv;
+}
+// for debugging use
+extern int __open(const char* file, int oflag, int mode) asm("@@A00144");
+int __open(const char* file, int oflag, int mode) {
+  void* reg15 = __base()[156 / 4];  // BPX4OPN offset is 156
+  int rv, rc, rn, len;
+  char name[1024];
+  strncpy(name, file, 1024);
+  __a2e_s(name);
+  len = strlen(name);
+  const void* argv[] = {&len, name, &oflag, &mode, &rv, &rc, &rn};
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+  if (-1 == rv) {
+    errno = rc;
+  }
+  return rv;
+}
+#endif  // for debugging use
