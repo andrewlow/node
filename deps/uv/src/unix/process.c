@@ -476,7 +476,7 @@ int uv_spawn(uv_loop_t* loop,
 
   for (i = 0; i < options->stdio_count; i++) {
 #if defined(__MVS__)
-    if (i == 1 || i == 2) /* stdout or stderr */
+    if (i < 3) /* all stdio */
       err = uv__process_init_stdio(options->stdio + i, pipes[i], 1);
     else
       err = uv__process_init_stdio(options->stdio + i, pipes[i], 0);
@@ -486,6 +486,14 @@ int uv_spawn(uv_loop_t* loop,
     if (err)
       goto error;
   }
+
+#if defined(__MVS__)
+    // pipes are uni-directional, install it backwards so the
+    // right ends are dup'ed and closed appropiately
+    int _t = pipes[0][0];
+    pipes[0][0] = pipes[0][1];
+    pipes[0][1] = _t;
+#endif
 
   /* This pipe is used by the parent to wait until
    * the child has called `execve()`. We need this
