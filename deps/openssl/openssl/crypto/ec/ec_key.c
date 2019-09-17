@@ -1,3 +1,6 @@
+#if V8_TARGET_ARCH_S390X
+#pragma options("-qNOOPT")
+#endif
 /*
  * Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
