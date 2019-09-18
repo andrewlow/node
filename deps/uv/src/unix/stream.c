@@ -696,6 +696,10 @@ static void uv__drain(uv_stream_t* stream) {
     uv__req_unregister(stream->loop, req);
 
     err = 0;
+#if defined(__MVS__)
+    struct stat st;
+    if (-1 != fstat(uv__stream_fd(stream),&st) && (S_ISSOCK(st.st_mode)) ) 
+#endif
     if (shutdown(uv__stream_fd(stream), SHUT_WR))
       err = UV__ERR(errno);
 
