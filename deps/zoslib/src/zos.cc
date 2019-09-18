@@ -281,6 +281,16 @@ extern "C" int __chgfdccsid(int fd, unsigned short ccsid) {
   return __fchattr(fd, &attr, sizeof(attr));
 }
 
+extern "C" int __setfdccsid(int fd, int t_ccsid) {
+  attrib_t attr;
+  memset(&attr, 0, sizeof(attr));
+  int txt = (0 != (t_ccsid & 65536));
+  int ccsid = (t_ccsid & 0x0ffff);
+  attr.att_filetagchg = txt;
+  attr.att_filetag.ft_ccsid = ccsid;
+  return __fchattr(fd, &attr, sizeof(attr));
+}
+
 extern "C" int __getfdccsid(int fd) {
   struct stat st;
   int rc;
@@ -2312,10 +2322,7 @@ extern "C" int __testread(const void* location) {
   return 0;
 }
 
-#if TRACE_ON  // for debugging use
-
-// for debugging use
-static void __tb(void) {
+extern "C" void __tb(void) {
   void* buffer[100];
   int nptrs = backtrace(buffer, 100);
   char** str = backtrace_symbols(buffer, nptrs);
@@ -2327,7 +2334,6 @@ static void __tb(void) {
   }
 }
 
-// for debugging use
 extern "C" void __fdinfo(int fd) {
   struct stat st;
   int rc;
@@ -2387,6 +2393,8 @@ extern "C" void __fdinfo(int fd) {
   __console_printf("fd %d fspflag2 %d", fd, st.st_fspflag2);
   __console_printf("fd %d seclabel %-.*s", fd, 8, st.st_seclabel);
 }
+
+#if TRACE_ON  // for debugging use
 // for debugging use
 extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   void* reg15 = __base()[220 / 4];  // BPX4WRT offset is 220
@@ -2398,13 +2406,17 @@ extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   if (-1 == rv) {
     errno = rc;
   }
+  __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
+                   __FILE__,
+                   __LINE__,
+                   fd,
+                   sz,
+                   rv,
+                   rc);
   return rv;
 }
 // for debugging use
 extern "C" int close(int fd) {
-  if (21 == fd) {
-    __tb();
-  }
   void* reg15 = __base()[72 / 4];  // BPX4CLO offset is 72
   int rv = -1, rc = -1, rn = -1;
   const void* argv[] = {&fd, &rv, &rc, &rn};
@@ -2412,6 +2424,8 @@ extern "C" int close(int fd) {
   if (-1 == rv) {
     errno = rc;
   }
+  __console_printf(
+      "%s:%d fd %d return %d errno %d\n", __FILE__, __LINE__, fd, rv, rc);
   return rv;
 }
 // for debugging use
@@ -2428,6 +2442,14 @@ int __open(const char* file, int oflag, int mode) {
   if (-1 == rv) {
     errno = rc;
   }
+  __console_printf("%s:%d fd %d errno %d open %s oflag %08x mode %08x\n",
+                   __FILE__,
+                   __LINE__,
+                   rv,
+                   rc,
+                   file,
+                   oflag,
+                   mode);
   return rv;
 }
 #endif  // for debugging use

@@ -23,6 +23,7 @@ extern char** __get_environ_np(void);
 extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
 extern int __getfdccsid(int fd);
+extern int __setfdccsid(int fd, int t_ccsid); 
 extern size_t __e2a_l(char* bufptr, size_t szLen);
 extern size_t __a2e_l(char* bufptr, size_t szLen);
 extern size_t __e2a_s(char* string);
@@ -82,6 +83,7 @@ extern struct __tlsanchor* __tlsvaranchor_create(size_t sz);
 extern void __tlsvaranchor_destroy(struct __tlsanchor* anchor);
 extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor, const void*);
 extern int __testread(const void* location);
+extern void __tb(void);
 
 #ifdef __cplusplus
 }
