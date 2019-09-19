@@ -284,11 +284,9 @@ extern "C" int __chgfdccsid(int fd, unsigned short ccsid) {
 extern "C" int __setfdccsid(int fd, int t_ccsid) {
   attrib_t attr;
   memset(&attr, 0, sizeof(attr));
-  int txt = (0 != (t_ccsid & 65536));
-  int ccsid = (t_ccsid & 0x0ffff);
-  attr.att_filetag.ft_txtflag = txt;
-  attr.att_filetag.ft_ccsid = ccsid;
   attr.att_filetagchg = 1;
+  attr.att_filetag.ft_txtflag = (t_ccsid >> 16);
+  attr.att_filetag.ft_ccsid = (t_ccsid & 0x0ffff);
   return __fchattr(fd, &attr, sizeof(attr));
 }
 
@@ -633,6 +631,13 @@ __auto_ascii::__auto_ascii(void) {
 }
 __auto_ascii::~__auto_ascii(void) {
   if (ascii_mode == 0) __ae_thread_swapmode(__AE_EBCDIC_MODE);
+}
+__conv_off::__conv_off(void) {
+  convert_state = __ae_autoconvert_state(_CVTSTATE_QUERY);
+  __ae_autoconvert_state(_CVTSTATE_OFF);
+}
+__conv_off::~__conv_off(void) {
+  __ae_autoconvert_state(convert_state);
 }
 
 static void init_tf_parms_t(__tf_parms_t* parm,
@@ -2364,6 +2369,7 @@ extern "C" void __fdinfo(int fd) {
   } else if (S_ISVMEXTL(st.st_mode)) {
     __console_printf("fd %d IS_VMEXTL", fd);
   }
+  __console_printf("fd %d perm %04x\n", fd, 0xffff & st.st_mode);
   __console_printf("fd %d ino %d", fd, st.st_ino);
   __console_printf("fd %d dev %d", fd, st.st_dev);
   __console_printf("fd %d rdev %d", fd, st.st_rdev);
