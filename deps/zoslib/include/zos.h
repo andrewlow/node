@@ -23,7 +23,7 @@ extern char** __get_environ_np(void);
 extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
 extern int __getfdccsid(int fd);
-extern int __setfdccsid(int fd, int t_ccsid); 
+extern int __setfdccsid(int fd, int t_ccsid);
 extern size_t __e2a_l(char* bufptr, size_t szLen);
 extern size_t __a2e_l(char* bufptr, size_t szLen);
 extern size_t __e2a_s(char* string);
@@ -118,6 +118,14 @@ class __auto_ascii {
  public:
   __auto_ascii();
   ~__auto_ascii();
+};
+
+class __conv_off {
+  int convert_state;
+
+ public:
+  __conv_off();
+  ~__conv_off();
 };
 
 template <typename T>
