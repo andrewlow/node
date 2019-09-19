@@ -286,8 +286,9 @@ extern "C" int __setfdccsid(int fd, int t_ccsid) {
   memset(&attr, 0, sizeof(attr));
   int txt = (0 != (t_ccsid & 65536));
   int ccsid = (t_ccsid & 0x0ffff);
-  attr.att_filetagchg = txt;
+  attr.att_filetag.ft_txtflag = txt;
   attr.att_filetag.ft_ccsid = ccsid;
+  attr.att_filetagchg = 1;
   return __fchattr(fd, &attr, sizeof(attr));
 }
 
