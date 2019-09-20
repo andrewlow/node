@@ -2340,6 +2340,14 @@ extern "C" void __tb(void) {
   }
 }
 
+extern "C" int clock_gettime(clockid_t clk_id, struct timespec *tp) {
+  unsigned long long value;
+  __stckf(&value);
+  tp->tv_sec = (value / 4096000000UL) - 2208988800UL;
+  tp->tv_nsec = (value % 4096000000UL) * 1000 / 4096;
+  return 0;
+}
+
 extern "C" void __fdinfo(int fd) {
   struct stat st;
   int rc;
