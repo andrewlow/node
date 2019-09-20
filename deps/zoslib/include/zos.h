@@ -17,8 +17,11 @@ typedef unsigned long size_t;
 #define __size_t 1
 #endif
 
+typedef enum { CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_HIGHRES, CLOCK_THREAD_CPUTIME_ID } clockid_t;
+
 extern void* _convert_e2a(void* dst, const void* src, size_t size);
 extern void* _convert_a2e(void* dst, const void* src, size_t size);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
 extern char** __get_environ_np(void);
 extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
@@ -39,6 +42,7 @@ extern int execvpe(const char* name, char* const argv[], char* const envp[]);
 extern int backtrace(void** buffer, int size);
 extern char** backtrace_symbols(void* const* buffer, int size);
 extern void backtrace_symbols_fd(void* const* buffer, int size, int fd);
+extern void __fdinfo(int fd);
 extern void __abend(int comp_code,
                     unsigned reason_code,
                     int flat_byte,
