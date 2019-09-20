@@ -181,7 +181,7 @@ function testError() {
       'Thrown:',
       /^Error: ENOENT: no such file or directory, scandir '.*nonexistent\?'/,
       /Object\.readdirSync/,
-      /^  errno: -(2|4058),$/,
+      /^  errno: -(2|4058|129),$/,
       "  syscall: 'scandir',",
       "  code: 'ENOENT',",
       "  path: '/nonexistent?'",
