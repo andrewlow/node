@@ -23,7 +23,7 @@
 // and node_http_parser_llhttp.cc.
 
 #pragma once
-#if defined(__MVS__)
+#if defined(__MVS__) && defined(DEBUG)
 #undef NODE_EXPERIMENTAL_HTTP
 #define NODE_EXPERIMENTAL_HTTP 1
 #endif
