@@ -97,8 +97,13 @@ UnicodeString AffixUtils::escape(const UnicodeString &input) {
             case u'-':
             case u'+':
             case u'%':
+#ifdef __MVS__
+            case u'\u2030':
+            case u'\u00A4':
+#else
             case u'‰':
             case u'¤':
+#endif
                 if (state == STATE_BASE) {
                     output.append(u'\'');
                     output.append(cp);
@@ -293,9 +298,17 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                         return makeTag(offset + count, TYPE_PLUS_SIGN, STATE_BASE, 0);
                     case u'%':
                         return makeTag(offset + count, TYPE_PERCENT, STATE_BASE, 0);
+#ifdef __MVS__
+                    case u'\u2030':
+#else
                     case u'‰':
+#endif
                         return makeTag(offset + count, TYPE_PERMILLE, STATE_BASE, 0);
+#ifdef __MVS__
+                    case u'\u00A4':
+#else
                     case u'¤':
+#endif
                         state = STATE_FIRST_CURR;
                         offset += count;
                         // continue to the next code point
@@ -328,7 +341,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     break;
                 }
             case STATE_FIRST_CURR:
+#ifdef __MVS__
+                if (cp == u'\u00A4') {
+#else
                 if (cp == u'¤') {
+#endif
                     state = STATE_SECOND_CURR;
                     offset += count;
                     // continue to the next code point
@@ -337,7 +354,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     return makeTag(offset, TYPE_CURRENCY_SINGLE, STATE_BASE, 0);
                 }
             case STATE_SECOND_CURR:
+#ifdef __MVS__
+                if (cp == u'\u00A4') {
+#else
                 if (cp == u'¤') {
+#endif
                     state = STATE_THIRD_CURR;
                     offset += count;
                     // continue to the next code point
@@ -346,7 +367,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     return makeTag(offset, TYPE_CURRENCY_DOUBLE, STATE_BASE, 0);
                 }
             case STATE_THIRD_CURR:
+#ifdef __MVS__
+                if (cp == u'\u00A4') {
+#else
                 if (cp == u'¤') {
+#endif
                     state = STATE_FOURTH_CURR;
                     offset += count;
                     // continue to the next code point
@@ -355,7 +380,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     return makeTag(offset, TYPE_CURRENCY_TRIPLE, STATE_BASE, 0);
                 }
             case STATE_FOURTH_CURR:
+#ifdef __MVS__
+                if (cp == u'\u00A4') { 
+#else
                 if (cp == u'¤') {
+#endif
                     state = STATE_FIFTH_CURR;
                     offset += count;
                     // continue to the next code point
@@ -364,7 +393,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     return makeTag(offset, TYPE_CURRENCY_QUAD, STATE_BASE, 0);
                 }
             case STATE_FIFTH_CURR:
-                if (cp == u'¤') {
+#ifdef __MVS__
+                if (cp == u'\u00A4') {
+#else
+                if (cp == u'¤'){ 
+#endif
                     state = STATE_OVERFLOW_CURR;
                     offset += count;
                     // continue to the next code point
@@ -373,7 +406,11 @@ AffixTag AffixUtils::nextToken(AffixTag tag, const UnicodeString &patternString,
                     return makeTag(offset, TYPE_CURRENCY_QUINT, STATE_BASE, 0);
                 }
             case STATE_OVERFLOW_CURR:
+#ifdef __MVS__
+                if (cp == u'\u00A4') {
+#else
                 if (cp == u'¤') {
+#endif
                     offset += count;
                     // continue to the next code point and loop back to this state
                     break;

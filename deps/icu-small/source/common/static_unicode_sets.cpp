@@ -101,6 +101,22 @@ class ParseDataSink : public ResourceSink {
                             saveSet(MINUS_SIGN, str, status);
                         } else if (str.indexOf(u'$') != -1) {
                             saveSet(DOLLAR_SIGN, str, status);
+#ifdef __MVS__
+                        } else if (str.indexOf(u'\u00A3') != -1) {
+                            saveSet(POUND_SIGN, str, status);
+                        } else if (str.indexOf(u'\u20B9') != -1) {
+                            saveSet(RUPEE_SIGN, str, status);
+                        } else if (str.indexOf(u'\u00A5') != -1) {
+                            saveSet(YEN_SIGN, str, status);
+                        } else if (str.indexOf(u'\u20A9') != -1) {
+                            saveSet(WON_SIGN, str, status);
+                        } else if (str.indexOf(u'%') != -1) {
+                            saveSet(PERCENT_SIGN, str, status);
+                        } else if (str.indexOf(u'\u2030') != -1) {
+                            saveSet(PERMILLE_SIGN, str, status);
+                        } else if (str.indexOf(u'\u2019') != -1) {
+                            saveSet(APOSTROPHE_SIGN, str, status);
+#else
                         } else if (str.indexOf(u'£') != -1) {
                             saveSet(POUND_SIGN, str, status);
                         } else if (str.indexOf(u'₹') != -1) {
@@ -115,6 +131,7 @@ class ParseDataSink : public ResourceSink {
                             saveSet(PERMILLE_SIGN, str, status);
                         } else if (str.indexOf(u'’') != -1) {
                             saveSet(APOSTROPHE_SIGN, str, status);
+#endif
                         } else {
                             // Unknown class of parse lenients
                             // TODO(ICU-20428): Make ICU automatically accept new classes?
