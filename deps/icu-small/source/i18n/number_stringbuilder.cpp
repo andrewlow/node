@@ -403,7 +403,11 @@ UnicodeString NumberStringBuilder::toDebugString() const {
                     c = u'%';
                     break;
                 case UNUM_PERMILL_FIELD:
+#ifdef __MVS__
+                    c = u'\u2030';
+#else
                     c = u'‰';
+#endif
                     break;
                 case UNUM_CURRENCY_FIELD:
                     c = u'$';

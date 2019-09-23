@@ -309,17 +309,6 @@
         '<!(realpath src/large_pages/ld.implicit.script.lld)',
       ]
     }],
-    [ 'OS=="zos"', {
-      'conditions': [
-        [ 'v8_enable_i18n_support==1', {
-          'libraries': [
-            '<(OBJ_DIR)/tools/icu/libicui18n.a',
-            '<(OBJ_DIR)/tools/icu/libicuucx.a',
-            '<(OBJ_DIR)/tools/icu/libicudata.a',
-          ],
-        }],
-      ],
-    }],
     [ 'node_use_openssl=="true"', {
       'defines': [ 'HAVE_OPENSSL=1' ],
       'conditions': [

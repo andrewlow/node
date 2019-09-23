@@ -742,7 +742,11 @@ void AlphabeticIndex::addIndexExemplars(const Locale &locale, UErrorCode &status
         // the base is 0 mod 8.
         UnicodeSet ethiopic(UnicodeString(u"[ሀለሐመሠረሰሸቀቈቐቘበቨተቸኀኈነኘአከኰኸዀወዐዘዠየደዸጀገጐጘጠጨጰጸፀፈፐፘ]"), status);
         ethiopic.retainAll(exemplars);
+#ifdef __MVS__
+        exemplars.remove(u'\u1200', 0x137F).addAll(ethiopic);
+#else
         exemplars.remove(u'ሀ', 0x137F).addAll(ethiopic);
+#endif
     }
 
     // Upper-case any that aren't already so.

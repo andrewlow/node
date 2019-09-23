@@ -71,14 +71,18 @@ String StringViewToUtf8(v8_inspector::StringView view) {
 
 String fromDouble(double d) {
   std::ostringstream stream;
+#ifndef __MVS__
   stream.imbue(std::locale("C"));  // Ignore locale
+#endif
   stream << d;
   return stream.str();
 }
 
 double toDouble(const char* buffer, size_t length, bool* ok) {
   std::istringstream stream(std::string(buffer, length));
+#ifndef __MVS__
   stream.imbue(std::locale("C"));  // Ignore locale
+#endif
   double d;
   stream >> d;
   *ok = !stream.fail();
