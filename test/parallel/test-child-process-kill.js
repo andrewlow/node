@@ -26,7 +26,16 @@ const spawn = require('child_process').spawn;
 const cat = spawn(common.isWindows ? 'cmd' : 'cat');
 
 cat.stdout.on('end', common.mustCall());
-cat.stderr.on('data', common.mustNotCall());
+if (process.platform === 'zos') {
+  cat.stderr.on('data',(data) => {
+    if (!data.toString().match(/^\s*CEE5205S The signal SIGTERM was received.\s*/)) {
+      console.error('error: found unexpected output in stderr: "',data.toString(),'"');
+      process.exit(1);
+    }
+  });
+} else {
+    cat.stderr.on('data', common.mustNotCall());
+}
 cat.stderr.on('end', common.mustCall());
 
 cat.on('exit', common.mustCall((code, signal) => {
