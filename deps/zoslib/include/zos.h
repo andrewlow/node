@@ -18,7 +18,7 @@ typedef unsigned long size_t;
 #endif
 
 typedef enum { CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_HIGHRES, CLOCK_THREAD_CPUTIME_ID } clockid_t;
-
+struct timespec;
 extern void* _convert_e2a(void* dst, const void* src, size_t size);
 extern void* _convert_a2e(void* dst, const void* src, size_t size);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
