@@ -3,6 +3,7 @@
 #define _ENHANCED_ASCII_EXT 0xFFFFFFFF
 #define _XOPEN_SOURCE 600
 #define _OPEN_SYS_FILE_EXT 1
+#define _OPEN_MSGQ_EXT 1
 #define __ZOS_CC
 #include <_Ccsid.h>
 #include <_Nascii.h>
@@ -373,7 +374,7 @@ extern "C" size_t __a2e_s(char* string) {
 static void __console(const void* p_in, int len_i) {
   const unsigned char* p = (const unsigned char*)p_in;
   int len = len_i;
-  while (p[len] == 0x15 && len > 0) {
+  while (len > 0 && p[len - 1] == 0x15) {
     --len;
   }
   typedef struct wtob {
@@ -439,11 +440,8 @@ extern "C" int __console_printf(const char* fmt, ...) {
   va_end(ap2);
   va_end(ap1);
   va_end(ap);
-  if (len < 0) goto quit;
-  while (len > 0 && buf[len - 1] == 0x15) {
-    --len;
-  }
-  if (len > 0) __console(buf, len);
+  if (len <= 0) goto quit;
+  __console(buf, len);
 quit:
   __ae_thread_swapmode(mode);
   return len;
@@ -1665,8 +1663,9 @@ static long long __iarv64(void* parm, void** ptr, long long* reason_code_ptr) {
       " lgr %1,15 \n"
       " lgr %2,0 \n"
       : "=r"(out), "=r"(rc), "=r"(reason), "+NR:r1"(parm)::"r0", "r14", "r15");
+  rc = (rc & 0x0ffff);
   if (rc != 0 && reason_code_ptr != 0) {
-    *reason_code_ptr = reason;
+    *reason_code_ptr = (0x0ffff & reason);
   }
   if (out) *ptr = out;
   return rc;
@@ -1694,16 +1693,19 @@ static void* __iarv64_alloc(int segs, const char* token) {
   rc = __iarv64(&parm, &ptr, &reason);
   if (mem_account())
     dprintf(2,
-            "__iarv64_alloc: pid %d tid %d ptr=%p size=%lu rc=%lld\n",
+            "__iarv64_alloc: pid %d tid %d ptr=%p size=%lu(0x%lx) rc=%lx, "
+            "reason=%lx\n",
             getpid(),
             (int)(pthread_self().__ & 0x7fffffff),
             parm.xorigin,
             (unsigned long)(segs * 1024 * 1024),
-            rc);
+            (unsigned long)(segs * 1024 * 1024),
+            rc,
+            reason);
   if (rc == 0) {
-    ptr = parm.xorigin;
+    return parm.xorigin;
   }
-  return ptr;
+  return 0;
 }
 
 #define __USE_IARV64 1
@@ -2340,7 +2342,7 @@ extern "C" void __tb(void) {
   }
 }
 
-extern "C" int clock_gettime(clockid_t clk_id, struct timespec *tp) {
+extern "C" int clock_gettime(clockid_t clk_id, struct timespec* tp) {
   unsigned long long value;
   __stckf(&value);
   tp->tv_sec = (value / 4096000000UL) - 2208988800UL;
@@ -2408,8 +2410,66 @@ extern "C" void __fdinfo(int fd) {
   __console_printf("fd %d fspflag2 %d", fd, st.st_fspflag2);
   __console_printf("fd %d seclabel %-.*s", fd, 8, st.st_seclabel);
 }
-
 #if TRACE_ON  // for debugging use
+extern "C" void __perror(const char* str) {
+  char buf[1024];
+  int err = errno;
+  int rc = strerror_r(err, buf, 1024);
+  if (rc == EINVAL) {
+    __console_printf("%s: %d is not a valid errno", str, err);
+  } else {
+    __console_printf("%s: %s", str, buf);
+  }
+  errno = err;
+}
+extern "C" int poll(void* array, unsigned int count, int timeout) {
+  void* reg15 = __base()[932 / 4];  // BPX4POL offset is 932
+  int rv, rc, rn;
+  int inf = (timeout == -1);
+
+  typedef struct pollitem {
+    int msg_fd;
+    short events;
+    short revents;
+  } pollitem_t;
+
+  pollitem_t* item;
+  int fd_cnt = count & 0x0ffff;
+  int msg_cnt = (count >> 16) & 0x0ffff;
+
+  int cnt = 3;
+  if (inf) timeout = 60 * 1000;
+  const void* argv[] = {&array, &count, &timeout, &rv, &rc, &rn};
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+  if (-1 == rv) {
+    int err = errno;
+  }
+  if (rv != 0 && rv != -1) {
+    int fd_res_cnt = rv & 0x0ffff;
+  }
+  while (rv == 0 && inf && cnt > 0) {
+    __console_printf(
+        "%s:%d end tid %d fd_count %u msgq_count %u timeout %d rv-fd "
+        "%d rv-mq %d rc %d ",
+        __FILE__,
+        __LINE__,
+        (int)(pthread_self().__ & 0x7fffffffUL),
+        count >> 16,
+        count & 0xffff,
+        timeout,
+        rv >> 16,
+        rv & 0xffff,
+        rc);
+    reg15 = __base()[932 / 4];  // BPX4POL offset is 932
+    __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+    --cnt;
+  }
+  if (-1 == rv) {
+    errno = rc;
+  }
+  return rv;
+}
+
 // for debugging use
 extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   void* reg15 = __base()[220 / 4];  // BPX4WRT offset is 220
