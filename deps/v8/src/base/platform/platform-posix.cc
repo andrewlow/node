@@ -424,11 +424,6 @@ void OS::Abort() {
     V8_IMMEDIATE_CRASH();
   }
 
-#ifdef __MVS__
-  // Send SIGABRT to main thread to do cleanup.
-  raise(SIGABRT);
-#endif
-
   // Redirect to std abort to signal abnormal program termination.
   abort();
 }
