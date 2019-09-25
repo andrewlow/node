@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <exception>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -1054,6 +1055,7 @@ class __init {
   int forkmax;
   int* forkcurr;
   int shmid;
+  std::terminate_handler _th;
 
  public:
   __init() : forkmax(0), shmid(0) {
@@ -1103,6 +1105,8 @@ class __init {
         *forkcurr = 0;
       }
     }
+    _th = std::get_terminate();
+    std::set_terminate(abort);
   }
   int get_forkmax(void) { return forkmax; }
   int inc_forkcount(void) {
@@ -1132,6 +1136,7 @@ class __init {
     }
     cleanupipc(0);
   }
+  void __abort() { _th(); }
 };
 static __init __a;
 static __csConverter utf16_to_8(1208, 1200);
@@ -1345,8 +1350,7 @@ extern "C" int __cond_timed_wait(unsigned int secs,
 
 extern "C" void abort(void) {
   __display_backtrace(STDERR_FILENO);
-  kill(getpid(), SIGABRT);
-  exit(-1);
+  __a.__abort();
 }
 
 // overriding LE's kill when linked statically
@@ -2410,7 +2414,6 @@ extern "C" void __fdinfo(int fd) {
   __console_printf("fd %d fspflag2 %d", fd, st.st_fspflag2);
   __console_printf("fd %d seclabel %-.*s", fd, 8, st.st_seclabel);
 }
-#if TRACE_ON  // for debugging use
 extern "C" void __perror(const char* str) {
   char buf[1024];
   int err = errno;
@@ -2422,6 +2425,9 @@ extern "C" void __perror(const char* str) {
   }
   errno = err;
 }
+
+#if TRACE_ON  // for debugging use
+
 extern "C" int poll(void* array, unsigned int count, int timeout) {
   void* reg15 = __base()[932 / 4];  // BPX4POL offset is 932
   int rv, rc, rn;
@@ -2455,11 +2461,37 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
         __LINE__,
         (int)(pthread_self().__ & 0x7fffffffUL),
         count >> 16,
-        count & 0xffff,
+        count & 0x0ffff,
         timeout,
         rv >> 16,
         rv & 0xffff,
         rc);
+    pollitem_t* fds = (pollitem_t*)array;
+    int i;
+    i = 0;
+    for (; i < (count & 0x0ffff); ++i) {
+      __console_printf("%s:%d end tid %d "
+                       "fd array entry: %d fd %d events 0x%04x revents 0x%04x",
+                       __FILE__,
+                       __LINE__,
+                       (int)(pthread_self().__ & 0x7fffffffUL),
+                       i,
+                       fds[i].msg_fd,
+                       fds[i].events,
+                       fds[i].revents);
+    }
+    for (; i < ((count & 0x0ffff) + (count >> 16)); ++i) {
+      __console_printf(
+          "%s:%d end tid %d "
+          "msgq array entry: %d msgq %d events 0x%04x revents 0x%04x",
+          __FILE__,
+          __LINE__,
+          (int)(pthread_self().__ & 0x7fffffffUL),
+          i,
+          fds[i].msg_fd,
+          fds[i].events,
+          fds[i].revents);
+    }
     reg15 = __base()[932 / 4];  // BPX4POL offset is 932
     __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
     --cnt;
