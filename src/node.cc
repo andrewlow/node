@@ -260,6 +260,15 @@ void SignalHandlerThread(void* data) {
 }
 #endif
 
+static void platform_exit(int code) {
+#ifndef __MVS__
+  exit(code);
+#endif
+
+  OS390ThreadManager::Destroy(0);
+  exit(code);
+}
+
 void SignalExit(int signo) {
   ResetStdio();
 #ifdef __FreeBSD__
@@ -269,7 +278,11 @@ void SignalExit(int signo) {
   sa.sa_handler = SIG_DFL;
   CHECK_EQ(sigaction(signo, &sa, nullptr), 0);
 #endif
+#ifdef __MVS__
+  signalHandlerExit = signo;
+#else
   raise(signo);
+#endif
 }
 
 MaybeLocal<Value> ExecuteBootstrapper(Environment* env,
@@ -971,7 +984,7 @@ void Init(int* argc,
 
   for (const std::string& error : errors)
     fprintf(stderr, "%s: %s\n", argv_.at(0).c_str(), error.c_str());
-  if (exit_code != 0) exit(exit_code);
+  if (exit_code != 0) platform_exit(exit_code);
 
   if (per_process::cli_options->print_version) {
     printf("%s\n", NODE_VERSION);
