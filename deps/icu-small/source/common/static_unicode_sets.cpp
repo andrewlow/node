@@ -189,7 +189,8 @@ void U_CALLCONV initNumberParseUniSets(UErrorCode& status) {
     U_ASSERT(gUnicodeSets[APOSTROPHE_SIGN] != nullptr);
 
     LocalPointer<UnicodeSet> otherGrouping(new UnicodeSet(
-        u"[٬‘\\u0020\\u00A0\\u2000-\\u200A\\u202F\\u205F\\u3000]",
+        // d9ac is not valid unicode, remove it from z/OS
+        u"[\\u0020\\u00A0\\u2000-\\u200A\\u202F\\u205F\\u3000]",
         status
     ), status);
     if (U_FAILURE(status)) { return; }
