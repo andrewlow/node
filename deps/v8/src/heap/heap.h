@@ -246,7 +246,11 @@ class Heap {
   static constexpr size_t kOldGenerationLowMemory =
       128 * MB * kPointerMultiplier;
   static constexpr size_t kNewLargeObjectSpaceToSemiSpaceRatio = 1;
+#ifdef __MVS__
+  static constexpr size_t kMinSemiSpaceSize = 1024 * KB * kPointerMultiplier;
+#else
   static constexpr size_t kMinSemiSpaceSize = 512 * KB * kPointerMultiplier;
+#endif
   static constexpr size_t kMaxSemiSpaceSize = 8192 * KB * kPointerMultiplier;
 
   STATIC_ASSERT(kMinSemiSpaceSize % (1 << kPageSizeBits) == 0);
