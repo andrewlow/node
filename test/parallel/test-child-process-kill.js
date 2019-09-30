@@ -23,7 +23,20 @@
 const common = require('../common');
 const assert = require('assert');
 const spawn = require('child_process').spawn;
-const cat = spawn(common.isWindows ? 'cmd' : 'cat');
+var cat;
+if (process.platform === 'zos') {
+  const teststr = "cat is running";
+  cat = spawn('cat', ['-u']);
+  cat.stdin.write(teststr);
+  cat.stdout.on('data', (data) => {
+    if (data.toString() !== teststr) {
+      console.error("error: cat emitted '" + data.toString() + "', expected '" + teststr + "'");
+      process.exit(1);
+    }
+  });
+} else {
+  cat = spawn(common.isWindows ? 'cmd' : 'cat');
+}
 
 cat.stdout.on('end', common.mustCall());
 if (process.platform === 'zos') {
@@ -34,15 +47,15 @@ if (process.platform === 'zos') {
     }
   });
 } else {
-    cat.stderr.on('data', common.mustNotCall());
+  cat.stderr.on('data', common.mustNotCall());
 }
 cat.stderr.on('end', common.mustCall());
-
+  
 cat.on('exit', common.mustCall((code, signal) => {
   assert.strictEqual(code, null);
   assert.strictEqual(signal, 'SIGTERM');
 }));
-
+  
 assert.strictEqual(cat.killed, false);
 cat.kill();
 assert.strictEqual(cat.killed, true);
