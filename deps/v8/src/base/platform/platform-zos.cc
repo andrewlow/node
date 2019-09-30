@@ -58,18 +58,36 @@
 namespace v8 {
 namespace base {
 
+static const int kMegaByte = 1024*1024;
+
+typedef unsigned long value_type;
+typedef unsigned long key_type;
+std::unordered_map<key_type, value_type> address_map;
+typedef std::unordered_map<key_type, value_type>::const_iterator
+    cursor_t;
+
 bool OS::Free(void* address, const size_t size) {
-  // TODO(1240712): munmap has a return value which is ignored here.
-  int result = anon_munmap(address, size);
+  int result = 0;
+  cursor_t c = address_map.find((key_type)address);
+  if (c != address_map.end()) {
+    result = anon_munmap((void*)c->second, size);
+  }
+  
   USE(result);
   DCHECK(result == 0);
   return result == 0;;
 }
 
 bool OS::Release(void* address, size_t size) {
+  int result = 0;
   DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
   DCHECK_EQ(0, size % CommitPageSize());
-  return anon_munmap(address, size) == 0;
+
+  cursor_t c = address_map.find((key_type)address);
+  if (c != address_map.end()) {
+    result = anon_munmap((void*)c->second, size);
+  }
+  return result == 0;
 }
 
 class ZOSTimezoneCache : public PosixTimezoneCache {
@@ -108,36 +126,33 @@ TimezoneCache * OS::CreateTimezoneCache() { return new ZOSTimezoneCache(); }
 
 void* OS::Allocate(void* address, size_t size, size_t alignment,
                    MemoryPermission access) {
-  size_t page_size = AllocatePageSize();
-  DCHECK_EQ(0, size % page_size);
-  DCHECK_EQ(0, alignment % page_size);
-  address = AlignedAddress(address, alignment);
-  // Add the maximum misalignment so we are guaranteed an aligned base address.
-  size_t request_size = size + (alignment - page_size);
-  request_size = RoundUp(request_size, OS::AllocatePageSize());
-  void* result = anon_mmap(address, request_size);
-  if (result == nullptr) return nullptr;
 
-  // Unmap memory allocated before the aligned base address.
-  uint8_t* base = static_cast<uint8_t*>(result);
+  if (size % kMegaByte == 0) {
+    void* reservation = anon_mmap(address, size);
+    address_map[(unsigned long)reservation] = (unsigned long)reservation;
+    return reservation;
+  }
+
+  size_t page_size = AllocatePageSize();
+  size_t request_size = size + (alignment - page_size);
+
+  request_size = RoundUp(request_size, page_size);
+  void* reservation = anon_mmap(address,
+                           request_size);
+
+  // If no below the bar storage left, allocate above the bar:
+  if (reservation == MAP_FAILED) {
+    request_size = RoundUp(size + alignment,
+                             static_cast<intptr_t>(kMegaByte));
+    reservation = anon_mmap(address, request_size);
+  }
+
+  uint8_t* base = static_cast<uint8_t*>(reservation);
   uint8_t* aligned_base = reinterpret_cast<uint8_t*>(
       RoundUp(reinterpret_cast<uintptr_t>(base), alignment));
-  if (aligned_base != base) {
-    DCHECK_LT(base, aligned_base);
-    size_t prefix_size = static_cast<size_t>(aligned_base - base);
-    CHECK(Free(base, prefix_size));
-    request_size -= prefix_size;
-  }
-  // Unmap memory allocated after the potentially unaligned end.
-  if (size != request_size) {
-    DCHECK_LT(size, request_size);
-    size_t suffix_size = request_size - size;
-    CHECK(Free(aligned_base + size, suffix_size));
-    request_size -= suffix_size;
-  }
-
-  DCHECK_EQ(size, request_size);
-  return static_cast<void*>(aligned_base);
+  
+  address_map[(unsigned long)aligned_base] = (unsigned long)reservation;
+  return aligned_base;
 }
 
 std::vector<OS::SharedLibraryAddress> OS::GetSharedLibraryAddresses() {

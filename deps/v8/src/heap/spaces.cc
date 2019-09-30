@@ -32,6 +32,7 @@
 #include "src/sanitizer/msan.h"
 #include "src/snapshot/snapshot.h"
 #include "src/utils/ostreams.h"
+#include "src/base/sys-info.h"
 
 namespace v8 {
 namespace internal {
@@ -162,7 +163,7 @@ void MemoryAllocator::InitializeCodePageAllocator(
   code_page_allocator_ = page_allocator;
 
   if (requested == 0) {
-    if (!kRequiresCodeRange) return;
+    if (!RequiresCodeRange()) return;
     // When a target requires the code range feature, we put all code objects
     // in a kMaximalCodeRangeSize range of virtual address space, so that
     // they can call each other with near calls.
@@ -179,7 +180,7 @@ void MemoryAllocator::InitializeCodePageAllocator(
     // alignments is not supported (requires re-implementation).
     DCHECK_LE(kMinExpectedOSPageSize, page_allocator->AllocatePageSize());
   }
-  DCHECK(!kRequiresCodeRange || requested <= kMaximalCodeRangeSize);
+  DCHECK(!RequiresCodeRange()|| requested <= kMaximalCodeRangeSize);
 
   Address hint =
       RoundDown(code_range_address_hint.Pointer()->GetAddressHint(requested),
@@ -1071,8 +1072,14 @@ size_t Page::ShrinkToHighWaterMark() {
   // Ensure that no objects will be allocated on this page.
   DCHECK_EQ(0u, AvailableInFreeList());
 
+#ifdef V8_OS_ZOS
+  // z/OS does not allow partial frees.
+  return 0;
+#endif
+
   size_t unused = RoundDown(static_cast<size_t>(area_end() - filler.address()),
                             MemoryAllocator::GetCommitPageSize());
+
   if (unused > 0) {
     DCHECK_EQ(0u, unused % MemoryAllocator::GetCommitPageSize());
     if (FLAG_trace_gc_verbose) {
@@ -3765,6 +3772,8 @@ void LargeObjectSpace::FreeUnmarkedObjects() {
     if (marking_state->IsBlack(object)) {
       Address free_start;
       surviving_object_size += size;
+// z/OS does not allow partial frees, skip shrinkage.
+#ifndef V8_OS_ZOS
       if ((free_start = current->GetAddressToShrink(object.address(), size)) !=
           0) {
         DCHECK(!current->IsFlagSet(Page::IS_EXECUTABLE));
@@ -3777,6 +3786,7 @@ void LargeObjectSpace::FreeUnmarkedObjects() {
         size_ -= bytes_to_free;
         AccountUncommitted(bytes_to_free);
       }
+#endif
     } else {
       RemovePage(current, size);
       heap()->memory_allocator()->Free<MemoryAllocator::kPreFreeAndQueue>(
