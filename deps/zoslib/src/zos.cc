@@ -1163,7 +1163,7 @@ typedef struct timer_parm {
 
 unsigned long __clock(void) {
   unsigned long long value, sec, nsec;
-  __stck(&value);
+  __stckf(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
 static void* _timer(void* parm) {
@@ -1501,7 +1501,7 @@ extern "C" int __file_needs_conversion_init(const char* name, int fd) {
 }
 extern "C" unsigned long __mach_absolute_time(void) {
   unsigned long long value, sec, nsec;
-  __stck(&value);
+  __stckf(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
 
@@ -2349,7 +2349,7 @@ extern "C" void __tb(void) {
 
 extern "C" int clock_gettime(clockid_t clk_id, struct timespec* tp) {
   unsigned long long value;
-  __stck(&value);
+  __stckf(&value);
   tp->tv_sec = (value / 4096000000UL) - 2208988800UL;
   tp->tv_nsec = (value % 4096000000UL) * 1000 / 4096;
   return 0;
@@ -2358,11 +2358,11 @@ static unsigned char _value(int bit) {
   unsigned long long t0, t1, start;
   int i;
   asm(" la 15,0 \n svc 137\n" ::: "r15");
-  asm(" stck %0 " : "=m"(start)::);
+  asm(" stckf %0 " : "=m"(start)::);
   start = start >> bit;
   for (i = 0; i < 200; ++i) {
     asm(" la 15,0 \n svc 137\n" ::: "r15");
-    asm(" stck %0 " : "=m"(t0)::);
+    asm(" stckf %0 " : "=m"(t0)::);
     t0 = t0 >> bit;
     if ((t0 - start) > 0x3ffff) {
       break;
@@ -2389,8 +2389,8 @@ static void _slow(int size, void* output) {
 
   while (bits == 0 || bits > 11) {
     for (i = 0; i < 10; ++i) {
-      asm(" stck %0 " : "=m"(t0)::);
-      asm(" stck %0 " : "=m"(t1)::);
+      asm(" stckf %0 " : "=m"(t0)::);
+      asm(" stckf %0 " : "=m"(t1)::);
       r = t0 ^ t1;
       if (r < m) m = r;
     }
