@@ -34,7 +34,8 @@
         ['OS=="zos"', {
           'cflags': [
             '-qcsect=openssl'
-          ]
+          ],
+          'dependencies': [ '../../deps/zoslib/zoslib.gyp:zoslib' ]
         }],
       ],
       'direct_dependent_settings': {
