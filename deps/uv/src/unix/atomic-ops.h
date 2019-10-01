@@ -17,6 +17,7 @@
 #define UV_ATOMIC_OPS_H_
 
 #include "internal.h"  /* UV_UNUSED */
+#include <pthread.h>
 
 #if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #include <atomic.h>
@@ -53,6 +54,8 @@ UV_UNUSED(static int cmpxchgi(int* ptr, int oldval, int newval)) {
 UV_UNUSED(static void cpu_relax(void)) {
 #if defined(__i386__) || defined(__x86_64__)
   __asm__ __volatile__ ("rep; nop");  /* a.k.a. PAUSE */
+#else
+  pthread_yield();
 #endif
 }
 

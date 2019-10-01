@@ -261,11 +261,9 @@ void SignalHandlerThread(void* data) {
 #endif
 
 static void platform_exit(int code) {
-#ifndef __MVS__
-  exit(code);
-#endif
-
+#ifdef __MVS__
   OS390ThreadManager::Destroy(0);
+#endif
   exit(code);
 }
 
@@ -1087,6 +1085,12 @@ void TearDownOncePerProcess() {
   // Since uv_run cannot be called, uv_async handles held by the platform
   // will never be fully cleaned up.
   per_process::v8_platform.Dispose();
+
+#ifdef __MVS__
+  if (pthread_cancel(signalHandlerThread) == -1)
+    abort();
+#endif
+  
 }
 
 int Start(int argc, char** argv) {
