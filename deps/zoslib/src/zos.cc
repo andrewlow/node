@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iconv.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -1162,7 +1163,7 @@ typedef struct timer_parm {
 
 unsigned long __clock(void) {
   unsigned long long value, sec, nsec;
-  __stckf(&value);
+  __stck(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
 static void* _timer(void* parm) {
@@ -1500,7 +1501,7 @@ extern "C" int __file_needs_conversion_init(const char* name, int fd) {
 }
 extern "C" unsigned long __mach_absolute_time(void) {
   unsigned long long value, sec, nsec;
-  __stckf(&value);
+  __stck(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
 }
 
@@ -2348,12 +2349,109 @@ extern "C" void __tb(void) {
 
 extern "C" int clock_gettime(clockid_t clk_id, struct timespec* tp) {
   unsigned long long value;
-  __stckf(&value);
+  __stck(&value);
   tp->tv_sec = (value / 4096000000UL) - 2208988800UL;
   tp->tv_nsec = (value % 4096000000UL) * 1000 / 4096;
   return 0;
 }
+static unsigned char _value(int bit) {
+  unsigned long long t0, t1, start;
+  int i;
+  asm(" la 15,0 \n svc 137\n" ::: "r15");
+  asm(" stck %0 " : "=m"(start)::);
+  start = start >> bit;
+  for (i = 0; i < 200; ++i) {
+    asm(" la 15,0 \n svc 137\n" ::: "r15");
+    asm(" stck %0 " : "=m"(t0)::);
+    t0 = t0 >> bit;
+    if ((t0 - start) > 0x3ffff) {
+      break;
+    }
+    t1 ^= t0;
+  }
+  return (unsigned char)t1;
+}
 
+static void _slow(int size, void* output) {
+  char* out = (char*)output;
+  int i;
+#ifdef _LP64
+  static int bits = 0;
+#else
+  int bits = 0;
+#endif
+  unsigned long long t0, t1, r, m = 0xffff;
+  unsigned int zbitcnt[] = {0xffffffff, 0,  1,  26, 2,  23, 27, 0, 3,  16,
+                            24,         30, 28, 11, 0,  13, 4,  7, 17, 0,
+                            25,         22, 31, 15, 29, 19, 12, 6, 0,  21,
+                            14,         9,  5,  20, 8,  19, 18};
+  unsigned int t = 0xaa;
+
+  while (bits == 0 || bits > 11) {
+    for (i = 0; i < 10; ++i) {
+      asm(" stck %0 " : "=m"(t0)::);
+      asm(" stck %0 " : "=m"(t1)::);
+      r = t0 ^ t1;
+      if (r < m) m = r;
+    }
+    bits = zbitcnt[(-m & m) % 37];
+  }
+  for (i = 0; i < size; ++i) {
+    t ^= _value(bits);
+    out[i] = t;
+  }
+}
+extern "C" int getentropy(void* output, size_t size) {
+  char* out = (char*)output;
+#ifdef _LP64
+  static int feature = -1;
+#else
+  int feature = -1;
+#endif
+  typedef struct parm {
+    unsigned long long a;
+    unsigned long long b;
+  } parm_t;
+
+  if (feature == -1) {
+    if (0x40 & *(char*)(207)) {
+      volatile parm_t value = {0, 0};
+      asm(" dc x'b93c008a' \n"
+          " jo *-4\n"
+          :
+          : "NR:r0"(0), "NR:r1"(&value)
+          :);
+      if (0x2000 & value.b) {
+        feature = 1;
+        // parm bit 114 is on
+      } else {
+        feature = 0;
+      }
+    } else {
+      feature = 0;
+    }
+  }
+  if (feature == 0) {
+    _slow(size, out);
+    return 0;
+  }
+#ifdef __XPLINK__
+  asm(" dc x'b93c0082' \n"
+      " jo *-4\n"
+      : "+NR:r2"(out), "+NR:r3"(size)
+      : "NR:r0"(114), "NR:r9"(0)
+      : "r0");
+#else
+  asm(" dc x'b93c008a' \n"
+      " jo *-4\n"
+      : "+NR:r10"(out), "+NR:r11"(size)
+      : "NR:r0"(114), "NR:r9"(0)
+      : "r0");
+#endif
+  return 0;
+}
+
+#if TRACE_ON  // for debugging use
 extern "C" void __fdinfo(int fd) {
   struct stat st;
   int rc;
@@ -2426,12 +2524,45 @@ extern "C" void __perror(const char* str) {
   errno = err;
 }
 
-#if TRACE_ON  // for debugging use
-
+static int __eventinfo(char* buffer, size_t size, short poll_event) {
+  size_t bytes = 0;
+  if (size > 0 && ((poll_event & POLLRDNORM) == POLLRDNORM)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLRDNORM");
+  }
+  if (size > 0 && ((poll_event & POLLRDBAND) == POLLRDBAND)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLRDBAND");
+  }
+  if (size > 0 && ((poll_event & POLLWRNORM) == POLLWRNORM)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLWRNORM");
+  }
+  if (size > 0 && ((poll_event & POLLWRBAND) == POLLWRBAND)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLWRBAND");
+  }
+  if (size > 0 && ((poll_event & POLLIN) == POLLIN)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLIN");
+  }
+  if (size > 0 && ((poll_event & POLLPRI) == POLLPRI)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLPRI");
+  }
+  if (size > 0 && ((poll_event & POLLOUT) == POLLOUT)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLOUT");
+  }
+  if (size > 0 && ((poll_event & POLLERR) == POLLERR)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLERR");
+  }
+  if (size > 0 && ((poll_event & POLLHUP) == POLLHUP)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLHUP");
+  }
+  if (size > 0 && ((poll_event & POLLNVAL) == POLLNVAL)) {
+    bytes += snprintf(buffer + bytes, size - bytes, "%s ", "POLLNVAL");
+  }
+  return bytes;
+}
 extern "C" int poll(void* array, unsigned int count, int timeout) {
   void* reg15 = __base()[932 / 4];  // BPX4POL offset is 932
   int rv, rc, rn;
   int inf = (timeout == -1);
+  int tid = (int)(pthread_self().__ & 0x7fffffffUL);
 
   typedef struct pollitem {
     int msg_fd;
@@ -2443,7 +2574,7 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
   int fd_cnt = count & 0x0ffff;
   int msg_cnt = (count >> 16) & 0x0ffff;
 
-  int cnt = 3;
+  int cnt = 9999;
   if (inf) timeout = 60 * 1000;
   const void* argv[] = {&array, &count, &timeout, &rv, &rc, &rn};
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
@@ -2454,43 +2585,72 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
     int fd_res_cnt = rv & 0x0ffff;
   }
   while (rv == 0 && inf && cnt > 0) {
-    __console_printf(
-        "%s:%d end tid %d fd_count %u msgq_count %u timeout %d rv-fd "
-        "%d rv-mq %d rc %d ",
-        __FILE__,
-        __LINE__,
-        (int)(pthread_self().__ & 0x7fffffffUL),
-        count >> 16,
-        count & 0x0ffff,
-        timeout,
-        rv >> 16,
-        rv & 0xffff,
-        rc);
+    char event_msg[128];
+    char revent_msg[128];
+    __console_printf("%s:%d end tid %d count %08x timeout %d rv %08x rc %d "
+                     "timeout count-down %d",
+                     __FILE__,
+                     __LINE__,
+                     (int)(pthread_self().__ & 0x7fffffffUL),
+                     count,
+                     timeout,
+                     rv,
+                     rc,
+                     cnt);
     pollitem_t* fds = (pollitem_t*)array;
     int i;
     i = 0;
-    for (; i < (count & 0x0ffff); ++i) {
-      __console_printf("%s:%d end tid %d "
-                       "fd array entry: %d fd %d events 0x%04x revents 0x%04x",
-                       __FILE__,
-                       __LINE__,
-                       (int)(pthread_self().__ & 0x7fffffffUL),
-                       i,
-                       fds[i].msg_fd,
-                       fds[i].events,
-                       fds[i].revents);
+    for (; i < fd_cnt; ++i) {
+      if (fds[i].msg_fd != -1) {
+        size_t s1 = __eventinfo(event_msg, 128, fds[i].events);
+        size_t s2 = __eventinfo(revent_msg, 128, fds[i].revents);
+        __console_printf("%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
+                         __FILE__,
+                         __LINE__,
+                         tid,
+                         i,
+                         "fd",
+                         fds[i].msg_fd,
+                         fds[i].events,
+                         fds[i].revents);
+        __console_printf("%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
+                         __FILE__,
+                         __LINE__,
+                         tid,
+                         i,
+                         "fd",
+                         fds[i].msg_fd,
+                         s1,
+                         event_msg,
+                         s2,
+                         revent_msg);
+      }
     }
-    for (; i < ((count & 0x0ffff) + (count >> 16)); ++i) {
-      __console_printf(
-          "%s:%d end tid %d "
-          "msgq array entry: %d msgq %d events 0x%04x revents 0x%04x",
-          __FILE__,
-          __LINE__,
-          (int)(pthread_self().__ & 0x7fffffffUL),
-          i,
-          fds[i].msg_fd,
-          fds[i].events,
-          fds[i].revents);
+    for (; i < (fd_cnt + msg_cnt); ++i) {
+      if (fds[i].msg_fd != -1) {
+        size_t s1 = __eventinfo(event_msg, 128, fds[i].events);
+        size_t s2 = __eventinfo(revent_msg, 128, fds[i].revents);
+        __console_printf("%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
+                         __FILE__,
+                         __LINE__,
+                         tid,
+                         i,
+                         "msgq",
+                         fds[i].msg_fd,
+                         fds[i].events,
+                         fds[i].revents);
+        __console_printf("%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
+                         __FILE__,
+                         __LINE__,
+                         tid,
+                         i,
+                         "msgq",
+                         fds[i].msg_fd,
+                         s1,
+                         event_msg,
+                         s2,
+                         revent_msg);
+      }
     }
     reg15 = __base()[932 / 4];  // BPX4POL offset is 932
     __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
@@ -2513,13 +2673,18 @@ extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   if (-1 == rv) {
     errno = rc;
   }
-  __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
-                   __FILE__,
-                   __LINE__,
-                   fd,
-                   sz,
-                   rv,
-                   rc);
+  if (rv > 0) {
+    __console_printf(
+        "%s:%d fd %d sz %d return %d\n", __FILE__, __LINE__, fd, sz, rv);
+  } else {
+    __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
+                     __FILE__,
+                     __LINE__,
+                     fd,
+                     sz,
+                     rv,
+                     rc);
+  }
   return rv;
 }
 // for debugging use
