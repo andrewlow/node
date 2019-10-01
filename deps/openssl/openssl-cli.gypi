@@ -10,6 +10,8 @@
   'conditions': [
     ['OS=="solaris"', {
       'libraries': ['<@(openssl_cli_libraries_solaris)']
+    }, 'OS=="zos"', {
+      'dependencies': [ '../../deps/zoslib/zoslib.gyp:zoslib' ],
     }, 'OS=="win"', {
       'link_settings': {
         'libraries': ['<@(openssl_cli_libraries_win)'],
