@@ -418,7 +418,7 @@ static void uv__process_child_init(const uv_process_options_t* options,
 
   if (options->env != NULL)
     execvpe(options->file, options->args, options->env);
-  else 
+  else
     execvpe(options->file, options->args, environ);
 
   uv__write_int(error_fd, UV__ERR(errno));
@@ -490,9 +490,12 @@ int uv_spawn(uv_loop_t* loop,
 #if defined(__MVS__)
     // pipes are uni-directional, install it backwards so the
     // right ends are dup'ed and closed appropiately
-    int _t = pipes[0][0];
-    pipes[0][0] = pipes[0][1];
-    pipes[0][1] = _t;
+    int _m = UV_INHERIT_FD | UV_INHERIT_STREAM;
+    if ((options->stdio[0].flags & _m) == 0) {
+      int _t = pipes[0][0];
+      pipes[0][0] = pipes[0][1];
+      pipes[0][1] = _t;
+    }
 #endif
 
   /* This pipe is used by the parent to wait until
