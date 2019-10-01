@@ -42,6 +42,10 @@
 # include <unistd.h>
 # include <sys/time.h>
 
+#ifdef __MVS__
+#include "zos.h"
+#endif
+
 static uint64_t get_time_stamp(void);
 static uint64_t get_timer_bits(void);
 
@@ -322,6 +326,8 @@ static ssize_t syscall_random(void *buf, size_t buflen)
 
     if (getentropy != NULL)
         return getentropy(buf, buflen) == 0 ? (ssize_t)buflen : -1;
+#elif __MVS__
+    return getentropy(buf, buflen) == 0 ? (ssize_t)buflen : -1;
 #  else
     union {
         void *p;
