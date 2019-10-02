@@ -2436,10 +2436,10 @@ extern "C" int getentropy(void* output, size_t size) {
     return 0;
   }
 #ifdef __XPLINK__
-  asm(" dc x'b93c0082' \n"
+  asm(" dc x'b93c00a2' \n"
       " jo *-4\n"
       : "+NR:r2"(out), "+NR:r3"(size)
-      : "NR:r0"(114), "NR:r9"(0)
+      : "NR:r0"(114), "NR:r11"(0)
       : "r0");
 #else
   asm(" dc x'b93c008a' \n"
