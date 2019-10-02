@@ -38,12 +38,8 @@ UV_UNUSED(static int cmpxchgi(int* ptr, int oldval, int newval)) {
                         : "memory");
   return out;
 #elif defined(__MVS__)
-  unsigned int op4;
-  if (__plo_CSST(ptr, (unsigned int*) &oldval, newval,
-                (unsigned int*) ptr, *ptr, &op4))
-    return oldval;
-  else
-    return op4;
+   __asm(" cs %0,%2,%1 \n " : "+r"(oldval), "+m"(*ptr) : "r"(newval) :);
+   return oldval;
 #elif defined(__SUNPRO_C) || defined(__SUNPRO_CC)
   return atomic_cas_uint((uint_t *)ptr, (uint_t)oldval, (uint_t)newval);
 #else
