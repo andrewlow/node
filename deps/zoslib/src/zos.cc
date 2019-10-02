@@ -1057,9 +1057,10 @@ class __init {
   int* forkcurr;
   int shmid;
   std::terminate_handler _th;
+  int __forked;
 
  public:
-  __init() : forkmax(0), shmid(0) {
+  __init() : forkmax(0), shmid(0), __forked(0) {
     // initialization
     unsigned long* x =
         (unsigned long*)((char***** __ptr32*)1208)[0][11][1][113][149];
@@ -1109,6 +1110,11 @@ class __init {
     _th = std::get_terminate();
     std::set_terminate(abort);
   }
+  int forked(int newvalue) {
+    int old = __forked;
+    __forked = newvalue;
+    return old;
+  }
   int get_forkmax(void) { return forkmax; }
   int inc_forkcount(void) {
     if (0 == forkmax || 0 == shmid) return 0;
@@ -1125,6 +1131,22 @@ class __init {
     } while (original != (new_value - 1));
     return new_value;
   }
+  int dec_forkcount(void) {
+    if (0 == forkmax || 0 == shmid) return 0;
+    int original;
+    int new_value;
+
+    do {
+      original = *forkcurr;
+      if (original == 0) return 0;
+      new_value = original - 1;
+      __asm(" cs %0,%2,%1 \n "
+            : "+r"(original), "+m"(*forkcurr)
+            : "r"(new_value)
+            :);
+    } while (original != (new_value - 1));
+    return new_value;
+  }
   int shmid_value(void) { return shmid; }
   ~__init() {
     if (_CVTSTATE_OFF == cvstate) {
@@ -1132,6 +1154,7 @@ class __init {
     }
     __ae_thread_swapmode(mode);
     if (shmid != 0) {
+      if (__forked) dec_forkcount();
       shmdt(forkcurr);
       shmctl(shmid, IPC_RMID, 0);
     }
@@ -1352,6 +1375,7 @@ extern "C" int __cond_timed_wait(unsigned int secs,
 extern "C" void abort(void) {
   __display_backtrace(STDERR_FILENO);
   __a.__abort();
+  exit(-1);  // never reach here, suppress clang warning
 }
 
 // overriding LE's kill when linked statically
@@ -1382,7 +1406,11 @@ extern "C" int __fork(void) {
   }
   return pid;
 #else
-  return fork();
+  int pid = fork();
+  if (pid == 0) {
+    __a.forked(1);
+  }
+  return pid;
 #endif
 }
 
