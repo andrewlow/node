@@ -27,7 +27,7 @@
 
 #include <stdlib.h>
 
-#define MAX_THREADPOOL_SIZE 1024
+#define MAX_THREADPOOL_SIZE 128
 
 static uv_once_t once = UV_ONCE_INIT;
 static uv_cond_t cond;
