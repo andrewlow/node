@@ -527,7 +527,6 @@
           '_LARGE_TIME_API',
           '_ALL_SOURCE',
           '__IBMCPP_TR1__',
-          'NODE_PLATFORM="os390"',
           'PATH_MAX=1023',
         ],
         'cflags': [
