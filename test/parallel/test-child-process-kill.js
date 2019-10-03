@@ -24,7 +24,7 @@ const common = require('../common');
 const assert = require('assert');
 const spawn = require('child_process').spawn;
 var cat;
-if (process.platform === 'zos') {
+if (process.platform === 'os390') {
   const teststr = "cat is running";
   cat = spawn('cat', ['-u']);
   cat.stdin.write(teststr);
@@ -39,7 +39,7 @@ if (process.platform === 'zos') {
 }
 
 cat.stdout.on('end', common.mustCall());
-if (process.platform === 'zos') {
+if (process.platform === 'os390') {
   cat.stderr.on('data',(data) => {
     if (!data.toString().match(/^\s*CEE5205S The signal SIGTERM was received.\s*/)) {
       console.error('error: found unexpected output in stderr: "',data.toString(),'"');

@@ -113,7 +113,7 @@ const isFreeBSD = process.platform === 'freebsd';
 const isOpenBSD = process.platform === 'openbsd';
 const isLinux = process.platform === 'linux';
 const isOSX = process.platform === 'darwin';
-const isZOS = process.platform === 'zos';
+const isZOS = process.platform === 'os390';
 
 const enoughTestMem = os.totalmem() > 0x70000000; /* 1.75 Gb */
 const cpus = os.cpus();
