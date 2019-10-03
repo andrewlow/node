@@ -250,6 +250,16 @@
         'NODE_PLATFORM="sunos"',
       ],
     }],
+    [ 'OS=="zos"', {
+      'defines': [
+        'NODE_PLATFORM="os390"',
+      ],
+      'defines!': [
+        # we need to use node's preferred "os390"
+        # rather than gyp's preferred "zos"
+        'NODE_PLATFORM="zos"',
+      ],
+    }],
     [ '(OS=="freebsd" or OS=="linux") and node_shared=="false"'
         ' and force_load=="true"', {
       'ldflags': [
