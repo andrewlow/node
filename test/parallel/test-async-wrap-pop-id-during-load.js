@@ -15,7 +15,7 @@ const assert = require('assert');
 const { spawnSync } = require('child_process');
 
 var ret;
-if (process.platform === 'zos')
+if (process.platform === 'os390')
     ret = spawnSync(
       process.execPath,
       ['--stack_size=350', __filename, 'async'],
