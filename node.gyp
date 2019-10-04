@@ -331,15 +331,6 @@
         'deps/zoslib/src/celquopt.S',
       ],
 
-      'conditions': [
-        ['OS!="zos"', {
-          'sources!': [
-            # zos only exclude on other platforms
-            'deps/zoslib/src/celquopt.S',
-          ]
-        }],
-      ],
-
       'dependencies': [
         'deps/histogram/histogram.gyp:histogram',
         'deps/uvwasi/uvwasi.gyp:uvwasi',
@@ -360,6 +351,12 @@
       'msvs_disabled_warnings!': [4244],
 
       'conditions': [
+        ['OS!="zos"', {
+          'sources!': [
+            # zos only, exclude on other platforms
+            'deps/zoslib/src/celquopt.S',
+          ],
+        }],
         [ 'node_intermediate_lib_type=="static_library" and '
             'node_shared=="true" and OS=="aix"', {
           # For AIX, shared lib is linked by static lib and .exp. In the

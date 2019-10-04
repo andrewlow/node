@@ -239,7 +239,7 @@ void ParsedPatternInfo::consumeAffix(Endpoints& endpoints, UErrorCode& status) {
 #ifdef __MVS__
             case u'\u00A4':
 #else
-            case u'¤:'
+            case u'¤':
 #endif
                 currentSubpattern->hasCurrencySign = true;
                 break;
