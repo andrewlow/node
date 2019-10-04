@@ -685,7 +685,6 @@
         'generate_bytecode_builtins_list',
         'run_torque',
         'v8_maybe_icu',
-        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
       'includes': ['inspector.gypi'],
       'direct_dependent_settings': {
@@ -760,6 +759,9 @@
         ['v8_target_arch=="s390x"', {
           'sources': [  ### gcmole(arch:s390) ###
             '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"v8_base_without_compiler.*?v8_current_cpu == \\"s390.*?sources \+= ")',
+          ],
+          'dependencies': [
+            '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
           ],
         }],
         ['OS=="win"', {
@@ -910,7 +912,6 @@
 
       'dependencies': [
         'v8_headers',
-        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
 
       'conditions': [
@@ -947,6 +948,9 @@
           },
         }],
         ['OS=="zos"', {
+          'dependencies': [
+            '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
+          ],
           'include_dirs+': [
             '<(V8_ROOT)/../zoslib/include',
           ],
@@ -1321,7 +1325,6 @@
         'v8_libbase',
         # "build/win:default_exe_manifest",
         'v8_maybe_icu',
-        '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
       ],
       'include_dirs+': [
         '<(V8_ROOT)/../zoslib/include',
@@ -1330,6 +1333,9 @@
         '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"mksnapshot.*?sources = ")',
       ],
       'conditions': [
+        ['OS=="zos"', {
+          'dependencies': ['<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target'],
+        }],
         ['want_separate_host_toolset', {
           'toolsets': ['host'],
         }],
