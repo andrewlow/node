@@ -19,7 +19,9 @@
 #include "src/snapshot/snapshot.h"
 #include "src/snapshot/startup-serializer.h"
 
+#ifdef __MVS__
 #include "zos.h"
+#endif
 
 namespace {
 
