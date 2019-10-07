@@ -1158,7 +1158,7 @@ static ssize_t uv__fs_copyfile(uv_fs_t* req) {
 
 #if defined(__MVS__)
   // copy the source tag to dest
-  __setfdccsid(dstfd, src_statsbuf.st_tag.ft_ccsid);
+  __setfdccsid(dstfd, (src_statsbuf.st_tag.ft_txtflag << 16) | src_statsbuf.st_tag.ft_ccsid);
 #endif
 
   bytes_to_send = src_statsbuf.st_size;
