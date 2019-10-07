@@ -1125,6 +1125,14 @@ InitializationResult InitializeOncePerProcess(int argc, char** argv) {
     UNREACHABLE();
   }
 
+#ifdef __MVS__
+  signalHandlerExit = 0;
+  sigset_t set;
+  sigfillset(&set);
+  uv_thread_create(&signalHandlerThread, SignalHandlerThread, NULL);
+  CHECK_EQ(0, pthread_sigmask(SIG_BLOCK, &set, NULL));
+#endif
+
 #if HAVE_OPENSSL
   {
     std::string extra_ca_certs;
@@ -1176,14 +1184,6 @@ int Start(int argc, char** argv) {
   if (result.early_return) {
     return result.exit_code;
   }
-
-#ifdef __MVS__
-  signalHandlerExit = 0;
-  sigset_t set;
-  sigfillset(&set);
-  uv_thread_create(&signalHandlerThread, SignalHandlerThread, NULL);
-  CHECK_EQ(0, pthread_sigmask(SIG_BLOCK, &set, NULL));
-#endif
 
   {
     Isolate::CreateParams params;
