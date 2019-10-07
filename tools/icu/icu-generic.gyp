@@ -58,6 +58,9 @@
           [ 'OS == "mac" or OS == "ios"', {
             'xcode_settings': {'GCC_ENABLE_CPP_RTTI': 'YES' },
           }],
+          [ 'OS == "zos"', {
+            'cflags': [ '-qCSECT=ICU' ],
+          }],
           [ 'OS == "win"', {
             'msvs_settings': {
               'VCCLCompilerTool': {'RuntimeTypeInfo': 'true'},
