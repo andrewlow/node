@@ -49,6 +49,10 @@
 #include <tchar.h>
 #endif  // _WIN32
 
+#ifdef __MVS__
+#include "zos.h"
+#endif
+
 namespace node {
 
 #ifdef __POSIX__
@@ -387,6 +391,24 @@ std::vector<std::string> NativeSymbolDebuggingContext::GetLoadedLibraries() {
     for (Link_map* l = p; l != nullptr; l = l->l_next) {
       list.push_back(l->l_name);
     }
+  }
+
+#elif __MVS__
+  void *dlcb = 0;
+  const int max_path = 1024;
+  char buffer[max_path];
+  char filename[max_path];
+  char *libpath = getenv("LIBPATH");
+  while (dlcb = __dlcb_next(dlcb), dlcb) {
+    int len = __dlcb_entry_name(buffer, sizeof(buffer), dlcb);
+    void *addr = __dlcb_entry_addr(dlcb);
+    if (0 == addr)
+      continue;
+    if (buffer[0] != '/' && libpath && __find_file_in_path(filename, sizeof(filename), libpath, buffer) > 0) {
+      snprintf(buffer + len, sizeof(buffer) - len, " => %s (0x%p)", filename, addr);
+    } else
+      snprintf(buffer + len, sizeof(buffer) - len, " (0x%p)", addr);
+    list.push_back(buffer);
   }
 
 #elif _WIN32

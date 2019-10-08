@@ -19,6 +19,12 @@
 #include <cwctype>
 #include <fstream>
 
+#ifdef __MVS__
+#define OPEN_MODE std::ios::out
+#else
+#define OPEN_MODE std::ios::out | std::ios::binary
+#endif
+
 constexpr int NODE_REPORT_VERSION = 1;
 constexpr int NANOS_PER_SEC = 1000 * 1000 * 1000;
 constexpr double SEC_PER_MICROS = 1e-6;
@@ -104,9 +110,9 @@ std::string TriggerNodeReport(Isolate* isolate,
       std::string pathname = options->report_directory;
       pathname += node::kPathSeparator;
       pathname += filename;
-      outfile.open(pathname, std::ios::out | std::ios::binary);
+      outfile.open(pathname, OPEN_MODE);
     } else {
-      outfile.open(filename, std::ios::out | std::ios::binary);
+      outfile.open(filename, OPEN_MODE);
     }
     // Check for errors on the file open
     if (!outfile.is_open()) {
@@ -276,7 +282,7 @@ static void PrintVersionInformation(JSONWriter* writer) {
   writer->json_keyvalue("nodejsVersion", buf.str());
   buf.str("");
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__MVS__)
   // Report compiler and runtime glibc versions where possible.
   const char* (*libc_version)();
   *(reinterpret_cast<void**>(&libc_version)) =
@@ -285,9 +291,24 @@ static void PrintVersionInformation(JSONWriter* writer) {
     writer->json_keyvalue("glibcVersionRuntime", (*libc_version)());
 #endif /* _WIN32 */
 
-#ifdef __GLIBC__
+#if defined(__GLIBC__) 
   buf << __GLIBC__ << "." << __GLIBC_MINOR__;
   writer->json_keyvalue("glibcVersionCompiler", buf.str());
+  buf.str("");
+#endif
+
+#ifdef __MVS__
+    char *r;
+    __asm(" llgt %0,1208 \n"
+          " lg   %0,88(%0) \n"
+          " lg   %0,8(%0) \n"
+          " lg   %0,984(%0) \n"
+          : "=r"(r)::);
+    if (r != NULL) {
+      const char *prod = (int)r[80]==4 ? " (MVS LE)" : "";
+      buf << "\nProduct " << (int)r[80] << prod << " Version " << (int)r[81] << " Release " << (int)r[82] << " Modification " << (int)r[83];
+    }
+  writer->json_keyvalue("leVersion", buf.str());
   buf.str("");
 #endif
 
@@ -574,16 +595,16 @@ static void PrintSystemInformation(JSONWriter* writer) {
     {"core_file_size_blocks", RLIMIT_CORE},
     {"data_seg_size_kbytes", RLIMIT_DATA},
     {"file_size_blocks", RLIMIT_FSIZE},
-#if !(defined(_AIX) || defined(__sun))
+#if !(defined(_AIX) || defined(__sun) || defined(__MVS__))
     {"max_locked_memory_bytes", RLIMIT_MEMLOCK},
 #endif
-#ifndef __sun
+#if !(defined(__sun) || defined(__MVS__))
     {"max_memory_size_kbytes", RLIMIT_RSS},
 #endif
     {"open_files", RLIMIT_NOFILE},
     {"stack_size_bytes", RLIMIT_STACK},
     {"cpu_time_seconds", RLIMIT_CPU},
-#ifndef __sun
+#if !(defined(__sun) || defined(__MVS__))
     {"max_user_processes", RLIMIT_NPROC},
 #endif
 #ifndef __OpenBSD__
