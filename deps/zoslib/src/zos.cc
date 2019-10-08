@@ -2388,11 +2388,11 @@ static unsigned char _value(int bit) {
   asm(" la 15,0 \n svc 137\n" ::: "r15");
   asm(" stckf %0 " : "=m"(start)::);
   start = start >> bit;
-  for (i = 0; i < 200; ++i) {
+  for (i = 0; i < 400; ++i) {
     asm(" la 15,0 \n svc 137\n" ::: "r15");
     asm(" stckf %0 " : "=m"(t0)::);
     t0 = t0 >> bit;
-    if ((t0 - start) > 0x3ffff) {
+    if ((t0 - start) > 0xfffff) {
       break;
     }
     t1 ^= t0;
