@@ -501,8 +501,10 @@
 
       'include_dirs': [
         'src',
+        'deps/zoslib/include',
         '<(SHARED_INTERMEDIATE_DIR)' # for node_natives.h
       ],
+
       'dependencies': [ 'deps/histogram/histogram.gyp:histogram' ],
 
       'sources': [
