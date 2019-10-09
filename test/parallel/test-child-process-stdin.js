@@ -25,7 +25,7 @@ const assert = require('assert');
 
 const spawn = require('child_process').spawn;
 
-const cat = spawn('cat');
+const cat = spawn('cat',['-u']);
 cat.stdin.write('hello');
 cat.stdin.write(' ');
 cat.stdin.write('world');

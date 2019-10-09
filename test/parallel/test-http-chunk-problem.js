@@ -72,7 +72,7 @@ server = http.createServer(function(req, res) {
   res.writeHead(200);
 
   // Create the subprocess
-  const cat = cp.spawn('cat', [filename]);
+  const cat = cp.spawn('cat', ['-u',filename]);
 
   // Stream the data through to the response as binary chunks
   cat.stdout.on('data', (data) => {

@@ -77,14 +77,14 @@ let options = {
 };
 
 common.expectsError(
-  () => spawnSync('cat', [], options),
+  () => spawnSync('cat', ['-u'], options),
   { code: 'ERR_INVALID_ARG_TYPE', type: TypeError });
 
 options = {
   input: 'hello world'
 };
 
-ret = spawnSync('cat', [], options);
+ret = spawnSync('cat', ['-u'], options);
 
 checkSpawnSyncRet(ret);
 assert.strictEqual(ret.stdout.toString('utf8'), options.input);
@@ -94,7 +94,7 @@ options = {
   input: Buffer.from('hello world')
 };
 
-ret = spawnSync('cat', [], options);
+ret = spawnSync('cat', ['-u'], options);
 
 checkSpawnSyncRet(ret);
 assert.deepStrictEqual(ret.stdout, options.input);
@@ -108,7 +108,7 @@ for (const arrayBufferView of common.getArrayBufferViews(msgBuf)) {
     input: arrayBufferView
   };
 
-  ret = spawnSync('cat', [], options);
+  ret = spawnSync('cat', ['-u'], options);
 
   checkSpawnSyncRet(ret);
 
