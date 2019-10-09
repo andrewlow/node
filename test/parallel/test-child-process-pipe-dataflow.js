@@ -29,7 +29,7 @@ const MB = KB * KB;
     buf[i * KB] = 10;
   fs.writeFileSync(file, buf.toString());
 
-  cat = spawn('cat', [file]);
+  cat = spawn('cat', ['-u', file]);
   grep = spawn('grep', ['x'], { stdio: [cat.stdout, 'pipe', 'pipe'] });
   wc = spawn('wc', ['-c'], { stdio: [grep.stdout, 'pipe', 'pipe'] });
 
