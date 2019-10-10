@@ -202,7 +202,10 @@
 #endif
 
 // Number of bits to represent the page size for paged spaces.
-#if defined(V8_TARGET_ARCH_PPC) || defined(V8_TARGET_ARCH_PPC64)
+#if defined(V8_OS_ZOS)
+// z/OS uses 1MB pages
+const int kPageSizeBits = 20;
+#elif defined(V8_TARGET_ARCH_PPC) || defined(V8_TARGET_ARCH_PPC64)
 // PPC has large (64KB) physical pages.
 const int kPageSizeBits = 19;
 #else
