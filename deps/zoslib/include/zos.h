@@ -89,6 +89,7 @@ extern void* __tlsPtrFromAnchor(struct __tlsanchor* anchor, const void*);
 extern int __testread(const void* location);
 extern void __tb(void);
 extern int getentropy(void* buffer, size_t length);
+extern void __build_version(void);
 
 #ifdef __cplusplus
 }

@@ -37,6 +37,10 @@ static int __debug_mode = 0;
 #error not build with correct codeset
 #endif
 
+#if defined(BUILD_VERSION)
+const char * __version = BUILD_VERSION ;
+#endif
+
 int __argc = 1;
 char** __argv;
 extern void __settimelimit(int secs);
@@ -2477,6 +2481,13 @@ extern "C" int getentropy(void* output, size_t size) {
       : "r0");
 #endif
   return 0;
+}
+
+extern "C" void __build_version(void) {
+    char* V = __getenv_a("V");
+    if (V && !memcmp(V, "1", 2)) {
+      printf("%s\n", __version);
+    }
 }
 
 #if TRACE_ON  // for debugging use
