@@ -433,6 +433,13 @@ static ssize_t uv__fs_read(uv_fs_t* req) {
   }
 
 done:
+#if defined(__MVS__)
+  if (__file_needs_conversion(req->file)) {
+    for (int idx = 0; idx < req->nbufs; idx++) {
+      __e2a_l(req->bufs[idx].base, req->bufs[idx].len);
+    }
+  }
+#endif
   /* Early cleanup of bufs allocation, since we're done with it. */
   if (req->bufs != req->bufsml)
     uv__free(req->bufs);
