@@ -38,7 +38,7 @@ static int __debug_mode = 0;
 #endif
 
 #if defined(BUILD_VERSION)
-const char * __version = BUILD_VERSION ;
+const char* __version = BUILD_VERSION;
 #endif
 
 int __argc = 1;
@@ -1234,6 +1234,9 @@ extern "C" int __indebug(void) {
   return __debug_mode;
 }
 extern "C" char** __getargv(void) {
+  return __argv;
+}
+extern "C" char** __getargv_a(void) {
   return __argv;
 }
 extern "C" int __getargc(void) {
@@ -2484,10 +2487,10 @@ extern "C" int getentropy(void* output, size_t size) {
 }
 
 extern "C" void __build_version(void) {
-    char* V = __getenv_a("V");
-    if (V && !memcmp(V, "1", 2)) {
-      printf("%s\n", __version);
-    }
+  char* V = __getenv_a("V");
+  if (V && !memcmp(V, "1", 2)) {
+    printf("%s\n", __version);
+  }
 }
 
 #if TRACE_ON  // for debugging use
