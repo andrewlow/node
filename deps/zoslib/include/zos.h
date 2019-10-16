@@ -17,11 +17,16 @@ typedef unsigned long size_t;
 #define __size_t 1
 #endif
 
-typedef enum { CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_HIGHRES, CLOCK_THREAD_CPUTIME_ID } clockid_t;
+typedef enum {
+  CLOCK_REALTIME,
+  CLOCK_MONOTONIC,
+  CLOCK_HIGHRES,
+  CLOCK_THREAD_CPUTIME_ID
+} clockid_t;
 struct timespec;
 extern void* _convert_e2a(void* dst, const void* src, size_t size);
 extern void* _convert_a2e(void* dst, const void* src, size_t size);
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_gettime(clockid_t clk_id, struct timespec* tp);
 extern char** __get_environ_np(void);
 extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
@@ -90,6 +95,7 @@ extern int __testread(const void* location);
 extern void __tb(void);
 extern int getentropy(void* buffer, size_t length);
 extern void __build_version(void);
+extern size_t strnlen(const char* str, size_t maxlen);
 
 #ifdef __cplusplus
 }

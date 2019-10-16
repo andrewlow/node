@@ -2492,6 +2492,15 @@ extern "C" void __build_version(void) {
     printf("%s\n", __version);
   }
 }
+extern "C" size_t strnlen(const char* str, size_t maxlen) {
+  char* op1 = (char*)str + maxlen;
+  asm(" SRST %0,%1\n"
+      " jo *-4"
+      : "+r"(op1)
+      : "r"(str), "NR:r0"(0)
+      :);
+  return op1 - str;
+}
 
 #if TRACE_ON  // for debugging use
 extern "C" void __fdinfo(int fd) {
@@ -2707,6 +2716,31 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
 // for debugging use
 extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   void* reg15 = __base()[220 / 4];  // BPX4WRT offset is 220
+  int rv, rc, rn;
+  void* alet = 0;
+  unsigned int size = sz;
+  const void* argv[] = {&fd, &buffer, &alet, &size, &rv, &rc, &rn};
+  __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
+  if (-1 == rv) {
+    errno = rc;
+  }
+  if (rv > 0) {
+    __console_printf(
+        "%s:%d fd %d sz %d return %d\n", __FILE__, __LINE__, fd, sz, rv);
+  } else {
+    __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
+                     __FILE__,
+                     __LINE__,
+                     fd,
+                     sz,
+                     rv,
+                     rc);
+  }
+  return rv;
+}
+// for debugging use
+extern "C" ssize_t read(int fd, void* buffer, size_t sz) {
+  void* reg15 = __base()[176 / 4];  // BPX4RED offset is 176
   int rv, rc, rn;
   void* alet = 0;
   unsigned int size = sz;
