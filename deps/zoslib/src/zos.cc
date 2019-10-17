@@ -1485,7 +1485,6 @@ extern "C" void __fd_close(int fd) {
 }
 extern "C" int __file_needs_conversion(int fd) {
   if (no_tag_read_behaviour == __NO_TAG_READ_STRICT) return 0;
-  if (no_tag_read_behaviour == __NO_TAG_READ_V6) return 1;
   unsigned long attr = fdcache.get_attribute(fd);
   if (attr == 0x0000000000020000UL) {
     return 1;
