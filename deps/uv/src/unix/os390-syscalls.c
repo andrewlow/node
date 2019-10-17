@@ -569,11 +569,3 @@ ssize_t os390_readlink(const char* path, char* buf, size_t len) {
   return rlen;
 }
 
-
-size_t strnlen(const char* str, size_t maxlen) {
-  char* p = memchr(str, 0, maxlen);
-  if (p == NULL)
-    return maxlen;
-  else
-    return p - str;
-}
