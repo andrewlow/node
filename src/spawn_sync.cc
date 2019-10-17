@@ -162,8 +162,11 @@ int SyncProcessStdioPipe::Start() {
                        WriteCallback);
       if (r < 0)
         return r;
+#if defined(__MVS__)
+	  // close the pipe after writing input data 
+      close(uv_stream()->io_watcher.fd);
+#endif
     }
-
     int r = uv_shutdown(&shutdown_req_, uv_stream(), ShutdownCallback);
     if (r < 0)
       return r;
