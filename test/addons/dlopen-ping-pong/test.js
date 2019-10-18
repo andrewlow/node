@@ -10,6 +10,7 @@ const os = require('os');
 
 const bindingPath = require.resolve(`./build/${common.buildType}/binding`);
 console.log('process.dlopen:', bindingPath);
+process.env.BINDINGPATH=bindingPath
 process.dlopen(module, bindingPath,
                os.constants.dlopen.RTLD_NOW | os.constants.dlopen.RTLD_GLOBAL);
 console.log('module.exports.load:', `${path.dirname(bindingPath)}/ping.so`);
