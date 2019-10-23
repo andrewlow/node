@@ -11,6 +11,7 @@ import platform
 import subprocess
 import sys
 import time
+import string
 
 from . import base
 from ..local import junit_output
@@ -30,6 +31,9 @@ def print_failure_header(test):
     'label': test,
     'negative': negative_marker,
   })
+
+def sanitize_unprintable(dirty_string):
+  return "".join(char for char in dirty_string if char in string.printable)
 
 
 class ResultsTracker(base.TestProcObserver):
@@ -300,10 +304,10 @@ class JUnitTestProgressIndicator(ProgressIndicator):
     if result.has_unexpected_output:
       stdout = output.stdout.strip()
       if len(stdout):
-        fail_text += "stdout:\n%s\n" % stdout
+        fail_text += "stdout:\n%s\n" % sanitize_unprintable(stdout)
       stderr = output.stderr.strip()
       if len(stderr):
-        fail_text += "stderr:\n%s\n" % stderr
+        fail_text += "stderr:\n%s\n" % sanitize_unprintable(stderr)
       fail_text += "Command: %s" % result.cmd.to_string()
       if output.HasCrashed():
         fail_text += "exit code: %d\n--- CRASHED ---" % output.exit_code
