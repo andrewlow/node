@@ -294,7 +294,8 @@ class TapProgressIndicator(SimpleProgressIndicator):
     logger.info('  stack: |-')
 
     for l in self.traceback.splitlines():
-      logger.info('    ' + l)
+      # Leading whitespaces can cause Jenkins TAP parser error.
+      logger.info('    ' + l.lstrip())
 
   def Starting(self):
     logger.info('TAP version 13')
