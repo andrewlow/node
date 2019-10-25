@@ -142,6 +142,18 @@ int WriteLineEndIfNeeded(PlatformEmbeddedFileWriterBase* w,
 // static
 void EmbeddedFileWriter::WriteBinaryContentsAsInlineAssembly(
     PlatformEmbeddedFileWriterBase* w, const uint8_t* data, uint32_t size) {
+#ifdef V8_OS_ZOS
+    int chunks = (size + 31)/32;
+    uint32_t i,j;
+    uint32_t offset = 0;
+    for (i = 0; i < chunks; ++i) {
+      fprintf(w->fp(), " dc x'");
+      for (j = 0; offset < size && j < 32; ++j) {
+         fprintf(w->fp(), "%02x", data[offset++]);
+      } 
+      fprintf(w->fp(), "'\n");
+    }
+#else
   int current_line_length = 0;
   uint32_t i = 0;
 
@@ -167,6 +179,7 @@ void EmbeddedFileWriter::WriteBinaryContentsAsInlineAssembly(
   }
 
   if (current_line_length != 0) w->Newline();
+#endif
 }
 
 int EmbeddedFileWriter::LookupOrAddExternallyCompiledFilename(
