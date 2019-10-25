@@ -2194,7 +2194,7 @@ static void* __tlsPtrAlloc(size_t sz,
             " cs  %0,%2,%1 \n"
             : "+r"(expv), "+m"(*o)
             : "r"(newv)
-            : "r15");
+            : "r15","r6");
       initv = expv;
     }
   }
@@ -2391,11 +2391,11 @@ extern "C" int clock_gettime(clockid_t clk_id, struct timespec* tp) {
 static unsigned char _value(int bit) {
   unsigned long long t0, t1, start;
   int i;
-  asm(" la 15,0 \n svc 137\n" ::: "r15");
+  asm(" la 15,0 \n svc 137\n" ::: "r15","r6");
   asm(" stckf %0 " : "=m"(start)::);
   start = start >> bit;
   for (i = 0; i < 400; ++i) {
-    asm(" la 15,0 \n svc 137\n" ::: "r15");
+    asm(" la 15,0 \n svc 137\n" ::: "r15","r6");
     asm(" stckf %0 " : "=m"(t0)::);
     t0 = t0 >> bit;
     if ((t0 - start) > 0xfffff) {
@@ -2500,8 +2500,41 @@ extern "C" size_t strnlen(const char* str, size_t maxlen) {
       :);
   return op1 - str;
 }
-
 #if TRACE_ON  // for debugging use
+class Fdtype {
+  char buffer[64];
+
+ public:
+  Fdtype(int fd) {
+    struct stat st;
+    int rc = fstat(fd, &st);
+    if (-1 == rc) {
+      snprintf(buffer, 64, "fstat %d failed errno is %d", fd, errno);
+      return;
+    }
+    if (S_ISBLK(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISBLK");
+    } else if (S_ISDIR(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISDIR");
+    } else if (S_ISCHR(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISCHR");
+    } else if (S_ISFIFO(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISFIFO");
+    } else if (S_ISREG(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISREG");
+    } else if (S_ISLNK(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISLNK");
+    } else if (S_ISSOCK(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISSOCK");
+    } else if (S_ISVMEXTL(st.st_mode)) {
+      snprintf(buffer, 64, "fd %d is %s", fd, "S_ISVMEXTL");
+    } else {
+      snprintf(buffer, 64, "fd %d st_mode is x%08x", fd, st.st_mode);
+    }
+  }
+  const char* toString(void) { return buffer; }
+};
+
 extern "C" void __fdinfo(int fd) {
   struct stat st;
   int rc;
@@ -2637,9 +2670,10 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
   while (rv == 0 && inf && cnt > 0) {
     char event_msg[128];
     char revent_msg[128];
-    __console_printf("%s:%d end tid %d count %08x timeout %d rv %08x rc %d "
+    __console_printf("%s:%s:%d end tid %d count %08x timeout %d rv %08x rc %d "
                      "timeout count-down %d",
                      __FILE__,
+                     __FUNCTION__,
                      __LINE__,
                      (int)(pthread_self().__ & 0x7fffffffUL),
                      count,
@@ -2654,8 +2688,9 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
       if (fds[i].msg_fd != -1) {
         size_t s1 = __eventinfo(event_msg, 128, fds[i].events);
         size_t s2 = __eventinfo(revent_msg, 128, fds[i].revents);
-        __console_printf("%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
+        __console_printf("%s:%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
                          __FILE__,
+                         __FUNCTION__,
                          __LINE__,
                          tid,
                          i,
@@ -2663,25 +2698,28 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
                          fds[i].msg_fd,
                          fds[i].events,
                          fds[i].revents);
-        __console_printf("%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
-                         __FILE__,
-                         __LINE__,
-                         tid,
-                         i,
-                         "fd",
-                         fds[i].msg_fd,
-                         s1,
-                         event_msg,
-                         s2,
-                         revent_msg);
+        __console_printf(
+            "%s:%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
+            __FILE__,
+            __FUNCTION__,
+            __LINE__,
+            tid,
+            i,
+            "fd",
+            fds[i].msg_fd,
+            s1,
+            event_msg,
+            s2,
+            revent_msg);
       }
     }
     for (; i < (fd_cnt + msg_cnt); ++i) {
       if (fds[i].msg_fd != -1) {
         size_t s1 = __eventinfo(event_msg, 128, fds[i].events);
         size_t s2 = __eventinfo(revent_msg, 128, fds[i].revents);
-        __console_printf("%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
+        __console_printf("%s:%s:%d tid:%d ary-i:%d %s %d/0x%04x/0x%04x",
                          __FILE__,
+                         __FUNCTION__,
                          __LINE__,
                          tid,
                          i,
@@ -2689,17 +2727,19 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
                          fds[i].msg_fd,
                          fds[i].events,
                          fds[i].revents);
-        __console_printf("%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
-                         __FILE__,
-                         __LINE__,
-                         tid,
-                         i,
-                         "msgq",
-                         fds[i].msg_fd,
-                         s1,
-                         event_msg,
-                         s2,
-                         revent_msg);
+        __console_printf(
+            "%s:%s:%d tid:%d ary-i:%d %s %d event:%-.*s revent:%-.*s",
+            __FILE__,
+            __FUNCTION__,
+            __LINE__,
+            tid,
+            i,
+            "msgq",
+            fds[i].msg_fd,
+            s1,
+            event_msg,
+            s2,
+            revent_msg);
       }
     }
     reg15 = __base()[932 / 4];  // BPX4POL offset is 932
@@ -2708,6 +2748,7 @@ extern "C" int poll(void* array, unsigned int count, int timeout) {
   }
   if (-1 == rv) {
     errno = rc;
+    __perror("poll");
   }
   return rv;
 }
@@ -2722,18 +2763,27 @@ extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
   if (-1 == rv) {
     errno = rc;
+    __perror("write");
   }
   if (rv > 0) {
-    __console_printf(
-        "%s:%d fd %d sz %d return %d\n", __FILE__, __LINE__, fd, sz, rv);
-  } else {
-    __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
+    __console_printf("%s:%s:%d fd %d sz %d return %d type is %s\n",
                      __FILE__,
+                     __FUNCTION__,
                      __LINE__,
                      fd,
                      sz,
                      rv,
-                     rc);
+                     Fdtype(rv).toString());
+  } else {
+    __console_printf("%s:%s:%d fd %d sz %d return %d errno %d type is %s\n",
+                     __FILE__,
+                     __FUNCTION__,
+                     __LINE__,
+                     fd,
+                     sz,
+                     rv,
+                     rc,
+                     Fdtype(rv).toString());
   }
   return rv;
 }
@@ -2747,18 +2797,27 @@ extern "C" ssize_t read(int fd, void* buffer, size_t sz) {
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
   if (-1 == rv) {
     errno = rc;
+    __perror("read");
   }
   if (rv > 0) {
-    __console_printf(
-        "%s:%d fd %d sz %d return %d\n", __FILE__, __LINE__, fd, sz, rv);
-  } else {
-    __console_printf("%s:%d fd %d sz %d return %d errno %d\n",
+    __console_printf("%s:%s:%d fd %d sz %d return %d type is %s\n",
                      __FILE__,
+                     __FUNCTION__,
                      __LINE__,
                      fd,
                      sz,
                      rv,
-                     rc);
+                     Fdtype(fd).toString());
+  } else {
+    __console_printf("%s:%s:%d fd %d sz %d return %d errno %d type is %s\n",
+                     __FILE__,
+                     __FUNCTION__,
+                     __LINE__,
+                     fd,
+                     sz,
+                     rv,
+                     rc,
+                     Fdtype(fd).toString());
   }
   return rv;
 }
@@ -2766,13 +2825,21 @@ extern "C" ssize_t read(int fd, void* buffer, size_t sz) {
 extern "C" int close(int fd) {
   void* reg15 = __base()[72 / 4];  // BPX4CLO offset is 72
   int rv = -1, rc = -1, rn = -1;
+  const char* fdtype = Fdtype(fd).toString();
   const void* argv[] = {&fd, &rv, &rc, &rn};
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
   if (-1 == rv) {
     errno = rc;
+    __perror("close");
   }
-  __console_printf(
-      "%s:%d fd %d return %d errno %d\n", __FILE__, __LINE__, fd, rv, rc);
+  __console_printf("%s:%s:%d fd %d return %d errno %d type was %s\n",
+                   __FILE__,
+                   __FUNCTION__,
+                   __LINE__,
+                   fd,
+                   rv,
+                   rc,
+                   fdtype);
   return rv;
 }
 // for debugging use
@@ -2788,15 +2855,19 @@ int __open(const char* file, int oflag, int mode) {
   __asm(" basr 14,%0\n" : "+NR:r15"(reg15) : "NR:r1"(&argv) : "r0", "r14");
   if (-1 == rv) {
     errno = rc;
+    __perror("open");
   }
-  __console_printf("%s:%d fd %d errno %d open %s oflag %08x mode %08x\n",
-                   __FILE__,
-                   __LINE__,
-                   rv,
-                   rc,
-                   file,
-                   oflag,
-                   mode);
+  __console_printf(
+      "%s:%s:%d fd %d errno %d open %s oflag %08x mode %08x type is %s\n",
+      __FILE__,
+      __FUNCTION__,
+      __LINE__,
+      rv,
+      rc,
+      file,
+      oflag,
+      mode,
+      Fdtype(rv).toString());
   return rv;
 }
-#endif  // for debugging use
+#endif        // for debugging use
