@@ -30,6 +30,7 @@ enum class EmbeddedTargetOs {
   kFuchsia,
   kMac,
   kWin,
+  kZOS,
   kGeneric,  // Everything not covered above falls in here.
 };
 

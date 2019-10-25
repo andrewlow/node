@@ -8,6 +8,7 @@
 
 #include "src/common/globals.h"
 #include "src/snapshot/embedded/platform-embedded-file-writer-aix.h"
+#include "src/snapshot/embedded/platform-embedded-file-writer-zos.h"
 #include "src/snapshot/embedded/platform-embedded-file-writer-generic.h"
 #include "src/snapshot/embedded/platform-embedded-file-writer-mac.h"
 #include "src/snapshot/embedded/platform-embedded-file-writer-win.h"
@@ -98,6 +99,8 @@ EmbeddedTargetArch ToEmbeddedTargetArch(const char* s) {
 EmbeddedTargetOs DefaultEmbeddedTargetOs() {
 #if defined(V8_OS_AIX)
   return EmbeddedTargetOs::kAIX;
+#elif defined(V8_OS_ZOS)
+  return EmbeddedTargetOs::kZOS;
 #elif defined(V8_OS_MACOSX)
   return EmbeddedTargetOs::kMac;
 #elif defined(V8_OS_WIN)
@@ -115,6 +118,8 @@ EmbeddedTargetOs ToEmbeddedTargetOs(const char* s) {
   std::string string(s);
   if (string == "aix") {
     return EmbeddedTargetOs::kAIX;
+  } else if (string == "zos") {
+    return EmbeddedTargetOs::kZOS;
   } else if (string == "chromeos") {
     return EmbeddedTargetOs::kChromeOS;
   } else if (string == "fuchsia") {
@@ -137,6 +142,9 @@ std::unique_ptr<PlatformEmbeddedFileWriterBase> NewPlatformEmbeddedFileWriter(
 
   if (embedded_target_os == EmbeddedTargetOs::kAIX) {
     return base::make_unique<PlatformEmbeddedFileWriterAIX>(
+        embedded_target_arch, embedded_target_os);
+  } else if (embedded_target_os == EmbeddedTargetOs::kZOS) {
+    return base::make_unique<PlatformEmbeddedFileWriterZOS>(
         embedded_target_arch, embedded_target_os);
   } else if (embedded_target_os == EmbeddedTargetOs::kMac) {
     return base::make_unique<PlatformEmbeddedFileWriterMac>(
