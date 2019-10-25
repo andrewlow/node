@@ -455,7 +455,8 @@
           'inputs': [
             '<(mksnapshot_exec)',
           ],
-          'outputs': ["<(INTERMEDIATE_DIR)/snapshot.cc"],
+          'outputs': ["<(INTERMEDIATE_DIR)/snapshot.cc", "<(INTERMEDIATE_DIR)/snapshot_hlasm.S"],
+
           'process_outputs_as_sources': 1,
           'conditions': [
             ['v8_enable_embedded_builtins', {

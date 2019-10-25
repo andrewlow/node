@@ -3809,6 +3809,8 @@ if (v8_use_snapshot && current_toolchain == v8_snapshot_toolchain) {
       "src/snapshot/embedded/embedded-file-writer.h",
       "src/snapshot/embedded/platform-embedded-file-writer-aix.cc",
       "src/snapshot/embedded/platform-embedded-file-writer-aix.h",
+      "src/snapshot/embedded/platform-embedded-file-writer-zos.cc",
+      "src/snapshot/embedded/platform-embedded-file-writer-zos.h",
       "src/snapshot/embedded/platform-embedded-file-writer-base.cc",
       "src/snapshot/embedded/platform-embedded-file-writer-base.h",
       "src/snapshot/embedded/platform-embedded-file-writer-generic.cc",
