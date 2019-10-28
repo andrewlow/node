@@ -771,6 +771,9 @@
           'dependencies': [
             '<(V8_ROOT)/../../deps/zoslib/zoslib.gyp:zoslib#target',
           ],
+          'include_dirs+': [
+            '<(V8_ROOT)/../zoslib/include',
+          ],
         }],
         ['OS=="win"', {
           'msvs_precompiled_header': '<(V8_ROOT)/../../tools/msvs/pch/v8_pch.h',
