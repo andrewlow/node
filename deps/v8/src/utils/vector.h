@@ -13,6 +13,10 @@
 #include "src/common/globals.h"
 #include "src/utils/allocation.h"
 
+#ifdef __MVS__
+extern "C" size_t strnlen(const char* str, size_t maxlen);
+#endif
+
 namespace v8 {
 namespace internal {
 
