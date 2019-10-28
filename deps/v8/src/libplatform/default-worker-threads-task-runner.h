@@ -16,6 +16,12 @@
 namespace v8 {
 namespace platform {
 
+#if defined(V8_OS_ZOS)
+inline bool operator==(const pthread_t &_a, const pthread_t &_b) {
+  return _a.__ == _b.__;
+}
+#endif
+
 class V8_PLATFORM_EXPORT DefaultWorkerThreadsTaskRunner
     : public NON_EXPORTED_BASE(TaskRunner) {
  public:
@@ -68,7 +74,11 @@ class V8_PLATFORM_EXPORT DefaultWorkerThreadsTaskRunner
   DelayedTaskQueue queue_;
   std::vector<std::unique_ptr<WorkerThread>> thread_pool_;
   TimeFunction time_function_;
+#if defined(V8_OS_ZOS)
+  std::atomic<pthread_t> single_worker_thread_id_;
+#else
   std::atomic_int single_worker_thread_id_{0};
+#endif
   uint32_t thread_pool_size_;
 };
 

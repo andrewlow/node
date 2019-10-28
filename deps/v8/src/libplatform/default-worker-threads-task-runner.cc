@@ -17,6 +17,11 @@ DefaultWorkerThreadsTaskRunner::DefaultWorkerThreadsTaskRunner(
   for (uint32_t i = 0; i < thread_pool_size; ++i) {
     thread_pool_.push_back(base::make_unique<WorkerThread>(this));
   }
+#if defined(V8_OS_ZOS)
+  pthread_t zero;
+  zero.__ = 0;
+  single_worker_thread_id_ = zero;
+#endif
 }
 
 DefaultWorkerThreadsTaskRunner::~DefaultWorkerThreadsTaskRunner() = default;
@@ -38,7 +43,13 @@ void DefaultWorkerThreadsTaskRunner::Terminate() {
   queue_.Terminate();
   // Clearing the thread pool lets all worker threads join.
   thread_pool_.clear();
+#if defined(V8_OS_ZOS)
+  pthread_t zero;
+  zero.__ = 0;
+  single_worker_thread_id_.store(zero, std::memory_order_relaxed);
+#else
   single_worker_thread_id_.store(0, std::memory_order_relaxed);
+#endif
 }
 
 void DefaultWorkerThreadsTaskRunner::PostTask(std::unique_ptr<Task> task) {
