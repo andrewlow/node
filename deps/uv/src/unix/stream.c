@@ -1184,7 +1184,7 @@ static void uv__read(uv_stream_t* stream) {
       } else if (errno == ECONNRESET && stream->type == UV_NAMED_PIPE) {
         uv__stream_eof(stream, &buf);
         return;
-#elif defined(_AIX)
+#elif defined(_AIX) || defined(__MVS__)
       } else if (errno == ECONNRESET && (stream->flags & UV_DISCONNECT)) {
         uv__stream_eof(stream, &buf);
         return;

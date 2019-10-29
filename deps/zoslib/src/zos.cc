@@ -2194,7 +2194,7 @@ static void* __tlsPtrAlloc(size_t sz,
             " cs  %0,%2,%1 \n"
             : "+r"(expv), "+m"(*o)
             : "r"(newv)
-            : "r15","r6");
+            : "r15", "r6");
       initv = expv;
     }
   }
@@ -2391,11 +2391,11 @@ extern "C" int clock_gettime(clockid_t clk_id, struct timespec* tp) {
 static unsigned char _value(int bit) {
   unsigned long long t0, t1, start;
   int i;
-  asm(" la 15,0 \n svc 137\n" ::: "r15","r6");
+  asm(" la 15,0 \n svc 137\n" ::: "r15", "r6");
   asm(" stckf %0 " : "=m"(start)::);
   start = start >> bit;
   for (i = 0; i < 400; ++i) {
-    asm(" la 15,0 \n svc 137\n" ::: "r15","r6");
+    asm(" la 15,0 \n svc 137\n" ::: "r15", "r6");
     asm(" stckf %0 " : "=m"(t0)::);
     t0 = t0 >> bit;
     if ((t0 - start) > 0xfffff) {
@@ -2773,7 +2773,7 @@ extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
                      fd,
                      sz,
                      rv,
-                     Fdtype(rv).toString());
+                     Fdtype(fd).toString());
   } else {
     __console_printf("%s:%s:%d fd %d sz %d return %d errno %d type is %s\n",
                      __FILE__,
@@ -2783,7 +2783,7 @@ extern "C" ssize_t write(int fd, const void* buffer, size_t sz) {
                      sz,
                      rv,
                      rc,
-                     Fdtype(rv).toString());
+                     Fdtype(fd).toString());
   }
   return rv;
 }
@@ -2857,17 +2857,21 @@ int __open(const char* file, int oflag, int mode) {
     errno = rc;
     __perror("open");
   }
-  __console_printf(
-      "%s:%s:%d fd %d errno %d open %s oflag %08x mode %08x type is %s\n",
-      __FILE__,
-      __FUNCTION__,
-      __LINE__,
-      rv,
-      rc,
-      file,
-      oflag,
-      mode,
-      Fdtype(rv).toString());
+  __console_printf("%s:%s:%d fd %d errno %d open %s (part-1)\n",
+                   __FILE__,
+                   __FUNCTION__,
+                   __LINE__,
+                   rv,
+                   rc,
+                   file);
+  __console_printf("%s:%s:%d fd %d oflag %08x mode %08x type is %s (part-2)\n",
+                   __FILE__,
+                   __FUNCTION__,
+                   __LINE__,
+                   rv,
+                   oflag,
+                   mode,
+                   Fdtype(rv).toString());
   return rv;
 }
-#endif        // for debugging use
+#endif  // for debugging use
