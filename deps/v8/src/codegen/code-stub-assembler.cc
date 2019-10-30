@@ -2023,6 +2023,7 @@ TNode<IntPtrT> CodeStubAssembler::LoadArrayLength(
   return LoadAndUntagWeakFixedArrayLength(array);
 }
 
+#ifndef __MVS__
 template <typename Array, typename T>
 TNode<T> CodeStubAssembler::LoadArrayElement(TNode<Array> array,
                                              int array_header_size,
@@ -2059,6 +2060,8 @@ CodeStubAssembler::LoadArrayElement<DescriptorArray>(TNode<DescriptorArray>,
                                                      int, Node*, int,
                                                      ParameterMode,
                                                      LoadSensitivity);
+#endif // __MVS__
+
 
 void CodeStubAssembler::FixedArrayBoundsCheck(TNode<FixedArrayBase> array,
                                               Node* index,
@@ -2090,6 +2093,7 @@ void CodeStubAssembler::FixedArrayBoundsCheck(TNode<FixedArrayBase> array,
   }
 }
 
+#ifndef __MVS__
 TNode<Object> CodeStubAssembler::LoadFixedArrayElement(
     TNode<FixedArray> object, Node* index_node, int additional_offset,
     ParameterMode parameter_mode, LoadSensitivity needs_poisoning,
@@ -2115,6 +2119,7 @@ TNode<Object> CodeStubAssembler::LoadPropertyArrayElement(
                                additional_offset, parameter_mode,
                                needs_poisoning));
 }
+#endif // __MVS__
 
 TNode<IntPtrT> CodeStubAssembler::LoadPropertyArrayLength(
     TNode<PropertyArray> object) {
@@ -2469,6 +2474,7 @@ TNode<MaybeObject> CodeStubAssembler::LoadFeedbackVectorSlot(
       Load(MachineType::AnyTagged(), object, offset));
 }
 
+#ifndef __MVS__
 template <typename Array>
 TNode<Int32T> CodeStubAssembler::LoadAndUntagToWord32ArrayElement(
     TNode<Array> object, int array_header_size, Node* index_node,
@@ -2616,6 +2622,7 @@ TNode<Float64T> CodeStubAssembler::LoadDoubleWithHoleCheck(
   }
   return UncheckedCast<Float64T>(Load(machine_type, base, offset));
 }
+#endif // __MVS__
 
 TNode<Object> CodeStubAssembler::LoadContextElement(
     SloppyTNode<Context> context, int slot_index) {
@@ -6086,6 +6093,7 @@ void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
   ThrowTypeError(context, message, arg0_node, arg1_node);
 }
 
+#ifndef __MVS__
 void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
                                        Node* arg0, Node* arg1, Node* arg2) {
   TNode<Smi> template_index = SmiConstant(static_cast<int>(message));
@@ -6270,7 +6278,6 @@ TNode<BoolT> CodeStubAssembler::IsCell(SloppyTNode<HeapObject> object) {
   return TaggedEqual(LoadMap(object), CellMapConstant());
 }
 
-#ifndef __MVS__
 TNode<BoolT> CodeStubAssembler::IsCode(SloppyTNode<HeapObject> object) {
   return HasInstanceType(object, CODE_TYPE);
 }
@@ -14162,54 +14169,6 @@ void PrototypeCheckAssembler::CheckAndBranch(TNode<HeapObject> prototype,
   }
 }
 #endif // __MVS__
-
-#ifdef __MVS__
-TNode<Uint32T> CodeStubAssembler::LoadDetailsByKeyIndex(
-    TNode<DescriptorArray> container, TNode<IntPtrT> key_index) {
-  const int kKeyToDetails =
-      DescriptorArray::ToDetailsIndex(0) - DescriptorArray::ToKeyIndex(0);
-  return Unsigned(
-      LoadAndUntagToWord32ArrayElement(container, DescriptorArray::kHeaderSize,
-                                       key_index, kKeyToDetails * kTaggedSize));
-}
-
-TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
-    TNode<DescriptorArray> container, TNode<IntPtrT> descriptor_entry) {
-  return Unsigned(LoadAndUntagToWord32ArrayElement(
-      container, DescriptorArray::kHeaderSize,
-      DescriptorEntryToIndex(descriptor_entry),
-      DescriptorArray::ToDetailsIndex(0) * kTaggedSize));
-}
-
-TNode<Uint32T> CodeStubAssembler::LoadDetailsByDescriptorEntry(
-    TNode<DescriptorArray> container, int descriptor_entry) {
-  return Unsigned(LoadAndUntagToWord32ArrayElement(
-      container, DescriptorArray::kHeaderSize, IntPtrConstant(0),
-      DescriptorArray::ToDetailsIndex(descriptor_entry) * kTaggedSize));
-}
-
-template <>
-TNode<Uint32T> CodeStubAssembler::NumberOfEntries<TransitionArray>(
-    TNode<TransitionArray> transitions) {
-  TNode<IntPtrT> length = LoadAndUntagWeakFixedArrayLength(transitions);
-  return Select<Uint32T>(
-      UintPtrLessThan(length, IntPtrConstant(TransitionArray::kFirstIndex)),
-      [=] { return Unsigned(Int32Constant(0)); },
-      [=] {
-        return Unsigned(LoadAndUntagToWord32ArrayElement(
-            transitions, WeakFixedArray::kHeaderSize,
-            IntPtrConstant(TransitionArray::kTransitionLengthIndex)));
-      });
-}
-
-TNode<Uint32T> CodeStubAssembler::DescriptorArrayGetDetails(
-    TNode<DescriptorArray> descriptors, TNode<Uint32T> descriptor_number) {
-  const int details_offset = DescriptorArray::ToDetailsIndex(0) * kTaggedSize;
-  return Unsigned(LoadAndUntagToWord32ArrayElement(
-      descriptors, DescriptorArray::kHeaderSize,
-      EntryIndexToIndex<DescriptorArray>(descriptor_number), details_offset));
-}
-#endif
 
 }  // namespace internal
 }  // namespace v8
