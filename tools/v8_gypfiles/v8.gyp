@@ -359,7 +359,7 @@
         }],
         ['OS=="zos"', {
           'sources': [
-            '<(V8_ROOT)/src/code-stub-assembler_part2.cc', # Temporary, until RTC defect 161453 is fixed
+            '<(V8_ROOT)/src/codegen/code-stub-assembler_part2.cc', # Temporary, until RTC defect 161453 is fixed
           ],
         }],
         ['v8_target_arch=="s390x"', {
