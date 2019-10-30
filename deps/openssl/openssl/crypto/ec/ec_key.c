@@ -1,5 +1,5 @@
 #if V8_TARGET_ARCH_S390X
-#pragma options("-qNOOPT")
+#pragma options("-qNOINLINE")
 #endif
 /*
  * Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.

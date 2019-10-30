@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #if V8_TARGET_ARCH_S390X
-#pragma options("-qNOOPT")
+#pragma options("-qNOINLINE")
 #endif
 
 #include <assert.h>  // For assert
