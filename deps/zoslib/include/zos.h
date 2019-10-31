@@ -97,6 +97,13 @@ extern int getentropy(void* buffer, size_t length);
 extern void __build_version(void);
 extern size_t strnlen(const char* str, size_t maxlen);
 
+typedef struct __cpu_relax_workarea {
+  void *sfaddr;
+  unsigned long t0;
+} __crwa_t;
+
+extern void __cpu_relax(__crwa_t *);
+
 #ifdef __cplusplus
 }
 #endif

@@ -25,7 +25,6 @@
 #include "uv.h"
 #include "internal.h"
 #include "atomic-ops.h"
-
 #include <errno.h>
 #include <stdio.h>  /* snprintf() */
 #include <assert.h>
@@ -79,6 +78,9 @@ int uv_async_send(uv_async_t* handle) {
 /* Only call this from the event loop thread. */
 static int uv__async_spin(uv_async_t* handle) {
   int rc;
+#if defined(__MVS__)
+  __crwa_t state;
+#endif
 
   for (;;) {
     /* rc=0 -- handle is not pending.
@@ -91,7 +93,11 @@ static int uv__async_spin(uv_async_t* handle) {
       return rc;
 
     /* Other thread is busy with this handle, spin until it's done. */
+#if defined(__MVS__)
+    __cpu_relax(&state);
+#else
     cpu_relax();
+#endif
   }
 }
 

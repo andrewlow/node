@@ -2500,6 +2500,30 @@ extern "C" size_t strnlen(const char* str, size_t maxlen) {
       :);
   return op1 - str;
 }
+extern "C" void __cpu_relax(__crwa_t* p) {
+  // heuristics to avoid excessive CPU spin
+  void* r4;
+  sched_yield();
+  asm(" lgr %0,4" : "=r"(r4)::);
+  if (p->sfaddr != r4) {
+    p->sfaddr = r4;
+    asm(" stckf %0 " : "=m"(p->t0)::);
+  } else {
+    unsigned long now;
+    asm(" stckf %0 " : "=m"(now)::);
+    unsigned long ticks = now - p->t0;
+
+    if (ticks < 12288000000UL) {
+      if (ticks < 4096) ticks = 4096;
+      int sec = ticks / 4096000000;
+      int msec = (ticks - (sec * 4096000000)) / 4096;
+      if (sec) sleep(sec);
+      if (msec) usleep(msec);
+    } else {
+      sleep(3);
+    }
+  }
+}
 #if TRACE_ON  // for debugging use
 class Fdtype {
   char buffer[64];
