@@ -13,6 +13,8 @@
  * without express or implied warranty.
  */
 
+#include <strings.h>
+
 #include "ares_setup.h"
 #include "ares_strsplit.h"
 #include "ares.h"

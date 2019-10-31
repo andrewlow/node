@@ -35,7 +35,12 @@ UV_UNUSED(static void uv_spinlock_init(uv_spinlock_t* spinlock)) {
 }
 
 UV_UNUSED(static void uv_spinlock_lock(uv_spinlock_t* spinlock)) {
+#if defined(__MVS__)
+  __crwa_t state;
+  while (!uv_spinlock_trylock(spinlock)) __cpu_relax(&state);
+#else
   while (!uv_spinlock_trylock(spinlock)) cpu_relax();
+#endif
 }
 
 UV_UNUSED(static void uv_spinlock_unlock(uv_spinlock_t* spinlock)) {

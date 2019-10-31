@@ -22,9 +22,15 @@
 #if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #include <atomic.h>
 #endif
+#if defined(__MVS__)
+#include "zos.h"
+#endif
 
 UV_UNUSED(static int cmpxchgi(int* ptr, int oldval, int newval));
+#if defined(__MVS__)
+#else
 UV_UNUSED(static void cpu_relax(void));
+#endif
 
 /* Prefer hand-rolled assembly over the gcc builtins because the latter also
  * issue full memory barriers.
@@ -46,7 +52,7 @@ UV_UNUSED(static int cmpxchgi(int* ptr, int oldval, int newval)) {
   return __sync_val_compare_and_swap(ptr, oldval, newval);
 #endif
 }
-
+#if !defined(__MVS__)
 UV_UNUSED(static void cpu_relax(void)) {
 #if defined(__i386__) || defined(__x86_64__)
   __asm__ __volatile__ ("rep; nop");  /* a.k.a. PAUSE */
@@ -54,5 +60,6 @@ UV_UNUSED(static void cpu_relax(void)) {
   sched_yield();
 #endif
 }
+#endif
 
 #endif  /* UV_ATOMIC_OPS_H_ */
