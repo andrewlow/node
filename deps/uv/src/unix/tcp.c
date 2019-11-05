@@ -27,6 +27,9 @@
 #include <assert.h>
 #include <errno.h>
 
+#if defined(__MVS__)
+#include "zos.h"
+#endif
 
 static int new_socket(uv_tcp_t* handle, int domain, unsigned long flags) {
   struct sockaddr_storage saddr;
@@ -444,7 +447,11 @@ int uv_tcp_simultaneous_accepts(uv_tcp_t* handle, int enable) {
   return 0;
 }
 
-
 void uv__tcp_close(uv_tcp_t* handle) {
+#if defined(__MVS__)
+  if  (((uv_stream_t *) handle)->flags & UV_HANDLE_TCP_NODELAY  ) {
+     __tcp_clear_to_close(((uv_stream_t*)handle)->io_watcher.fd, 15);
+  }
+#endif
   uv__stream_close((uv_stream_t*)handle);
 }
