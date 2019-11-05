@@ -24,13 +24,16 @@
 #include <sys/__getipc.h>
 #include <sys/msg.h>
 #include <sys/shm.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 #include <exception>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+
 #include "zos.h"
 static int __debug_mode = 0;
 #if ' ' != 0x20
@@ -2522,6 +2525,22 @@ extern "C" void __cpu_relax(__crwa_t* p) {
     } else {
       sleep(3);
     }
+  }
+}
+
+extern "C" void __tcp_clear_to_close(int socket, unsigned int secs) {
+  if (getenv("__tcp_clear_to_close_bypass")) return;
+  struct linger lg;
+  lg.l_onoff = 1;
+  lg.l_linger = secs;
+  shutdown(socket, SHUT_WR);
+  int rc =
+      setsockopt(socket, SOL_SOCKET, SO_LINGER, (const char*)&lg, sizeof lg);
+  char buffer[4096];
+  int s;
+  s = read(socket, buffer, 4096);
+  while (s > 1) {
+    s = read(socket, buffer, 4096);
   }
 }
 #if TRACE_ON  // for debugging use
