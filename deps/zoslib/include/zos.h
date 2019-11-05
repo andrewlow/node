@@ -96,6 +96,7 @@ extern void __tb(void);
 extern int getentropy(void* buffer, size_t length);
 extern void __build_version(void);
 extern size_t strnlen(const char* str, size_t maxlen);
+extern void __tcp_clear_to_close(int socket, unsigned int secs);
 
 typedef struct __cpu_relax_workarea {
   void *sfaddr;
