@@ -43,7 +43,7 @@ constexpr size_t kV8MaxWasmTables = 1;
 constexpr size_t kV8MaxWasmMemories = 1;
 #if defined(V8_TARGET_ARCH_64_BIT) && defined(__MVS__)
 // Don't use this limit directly, but use the value of FLAG_wasm_max_guard_region_size:
-constexpr size_t kV8MaxGuardSizeMB = 2 * 1024;  // in MiB (= 2 GiB)
+constexpr size_t kV8MaxGuardSizeMB = 512;  // in MiB (= 0.5 GiB)
 #endif
 
 static_assert(kV8MaxWasmMemoryPages <= kSpecMaxWasmMemoryPages,
