@@ -13,6 +13,10 @@
 #include "src/wasm/wasm-memory.h"
 #include "src/wasm/wasm-module.h"
 
+extern "C" void dprintf(int fd, const char* fmt, ...);
+extern "C" void __display_backtrace(int fd);
+#define dbg {dprintf(2,"%s line %d\n",__FILE__,__LINE__);}
+
 namespace v8 {
 namespace internal {
 namespace wasm {
@@ -52,7 +56,7 @@ void* TryAllocateBackingStore(WasmMemoryTracker* memory_tracker, Heap* heap,
                               void** allocation_base,
                               size_t* allocation_length) {
   using AllocationStatus = WasmMemoryTracker::AllocationStatus;
-#if V8_TARGET_ARCH_64_BIT
+#if defined(V8_TARGET_ARCH_64_BIT) && !defined(__MVS__)
   constexpr bool kRequireFullGuardRegions = true;
 #else
   constexpr bool kRequireFullGuardRegions = false;
@@ -69,11 +73,16 @@ void* TryAllocateBackingStore(WasmMemoryTracker* memory_tracker, Heap* heap,
     //
     // To protect against 32-bit integer overflow issues, we also
     // protect the 2GiB before the valid part of the memory buffer.
+#if defined(V8_TARGET_ARCH_64_BIT) && defined(__MVS__)
+    static uint64_t bytes = FLAG_wasm_max_guard_region_size * 1024UL * 1024UL;
+    *allocation_length = RoundUp(bytes, CommitPageSize());
+#else
     *allocation_length =
         kRequireFullGuardRegions
             ? RoundUp(kWasmMaxHeapOffset + kNegativeGuardSize, CommitPageSize())
             : RoundUp(base::bits::RoundUpToPowerOfTwo(reservation_size),
                       kWasmPageSize);
+#endif
     DCHECK_GE(*allocation_length, size);
     DCHECK_GE(*allocation_length, kWasmPageSize);
 
