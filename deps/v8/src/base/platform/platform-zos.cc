@@ -129,6 +129,7 @@ void* OS::Allocate(void* address, size_t size, size_t alignment,
 
   if (size % kMegaByte == 0) {
     void* reservation = anon_mmap(address, size);
+    if (reservation == MAP_FAILED) return NULL;
     address_map[(unsigned long)reservation] = (unsigned long)reservation;
     return reservation;
   }
@@ -145,6 +146,7 @@ void* OS::Allocate(void* address, size_t size, size_t alignment,
     request_size = RoundUp(size + alignment,
                              static_cast<intptr_t>(kMegaByte));
     reservation = anon_mmap(address, request_size);
+    if (reservation == MAP_FAILED) return NULL;
   }
 
   uint8_t* base = static_cast<uint8_t*>(reservation);
