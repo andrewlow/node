@@ -13,10 +13,6 @@
 #include "src/wasm/wasm-memory.h"
 #include "src/wasm/wasm-module.h"
 
-extern "C" void dprintf(int fd, const char* fmt, ...);
-extern "C" void __display_backtrace(int fd);
-#define dbg {dprintf(2,"%s line %d\n",__FILE__,__LINE__);}
-
 namespace v8 {
 namespace internal {
 namespace wasm {
