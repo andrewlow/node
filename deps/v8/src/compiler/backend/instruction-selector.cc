@@ -1,9 +1,7 @@
+#pragma options("-Wc,TBYDBG\(-qdebug=unreproduced:nprunereg:np6align:nflb:spillfsnss:nspillfs:nlalign:nebbpass2:nsch3:nbshd2:nlateded:nrepl:nrecoil:ncross2:nprolt:npostspl:nbr_spu:nww6k:nvn4:NLRUSE:NRPREMAT:NTRIV:npstore:nqb:nnewspec:nbelruse:nupdtuse:nebbpass1:nbshd1:nspec:nsftppln:ngrepl:mxg:mxg3929\)")
 // Copyright 2014 the V8 project authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#if V8_TARGET_ARCH_S390X
-#pragma options("-qNOINLINE")
-#endif
 
 #include "src/compiler/backend/instruction-selector.h"
 
