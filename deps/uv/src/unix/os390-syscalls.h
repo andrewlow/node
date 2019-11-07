@@ -58,6 +58,7 @@ typedef struct {
 uv__os390_epoll* epoll_create1(int flags);
 int epoll_ctl(uv__os390_epoll* ep, int op, int fd, struct epoll_event *event);
 int epoll_wait(uv__os390_epoll* ep, struct epoll_event *events, int maxevents, int timeout);
+void epoll_queue_close(uv__os390_epoll* lst);
 int epoll_file_close(int fd);
 
 /* utility functions */
