@@ -152,8 +152,12 @@ int SyncProcessStdioPipe::Start() {
   lifecycle_ = kStarted;
 
   if (readable()) {
+#if defined(__MVS__)
+    { // write even if len is 0
+#else
     if (input_buffer_.len > 0) {
       CHECK_NOT_NULL(input_buffer_.base);
+#endif
 
       int r = uv_write(&write_req_,
                        uv_stream(),
@@ -163,7 +167,7 @@ int SyncProcessStdioPipe::Start() {
       if (r < 0)
         return r;
 #if defined(__MVS__)
-	  // close the pipe after writing input data 
+      // must close the pipe after writing input data 
       close(uv_stream()->io_watcher.fd);
 #endif
     }
