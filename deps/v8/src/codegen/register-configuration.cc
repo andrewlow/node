@@ -1,10 +1,7 @@
+#pragma options("-Wc,TBYDBG\(-qdebug=unreproduced:nprunereg:np6align:nflb:spillfsnss:nspillfs:nlalign:nebbpass2:nsch3:nbshd2:nlateded:nrepl:nrecoil:ncross2:nprolt:npostspl:nbr_spu:nww6k:nvn4:NLRUSE:NRPREMAT:NTRIV:npstore:nqb:nnewspec:nbelruse:nupdtuse:nebbpass1:nbshd1:nspec:nsftppln:ngrepl:nglobshd:nremclb:nrnn:nmidcoal:nhummer:ncracku:nmodbreakbaseregs:nmodmerge:nmodremat:nmodreg:nnewmod:nsch1:nsch:ndotp:nsbp:nipra:ninlpg:ncnv:nbe:ncomdiv:nvn3:nspillpre:ncnv:nsuperbl:nmsb:ngunroll:nunroll:nbrbe:nfixload:nldstm:nds3:nibmg:nunspec:ncomm2:nrecan:nvn2:nsubwordopt:ndi:nbool:nwiden:nvac:ndivmult:ngcp:nww:npgcp:npunroll:nunsw:nerrata:ndcera:stricti:nracyc:nra:nds2:ncoalauto:naddkill:ntrapmov:nsm:nds1:nlds:nds:nfindclr2:nuninit:ncomm1\)")
 // Copyright 2014 the V8 project authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifdef V8_TARGET_ARCH_S390X
-#pragma options("-qNOINLINE")
-#endif
-
 #include "src/codegen/register-configuration.h"
 #include "src/base/lazy-instance.h"
 #include "src/codegen/cpu-features.h"
