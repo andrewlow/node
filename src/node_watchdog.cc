@@ -118,7 +118,11 @@ void* SigintWatchdogHelper::RunSigintWatchdog(void* arg) {
   bool is_stopping;
 
   do {
+#ifndef __MVS__
     uv_sem_wait(&instance.sem_);
+#else
+    __sem_wait(&instance.sem_);
+#endif
     is_stopping = InformWatchdogsAboutSignal();
   } while (!is_stopping);
 
@@ -127,7 +131,11 @@ void* SigintWatchdogHelper::RunSigintWatchdog(void* arg) {
 
 
 void SigintWatchdogHelper::HandleSignal(int signum) {
+#ifndef __MVS__
   uv_sem_post(&instance.sem_);
+#else
+  __sem_post(&instance.sem_);
+#endif
 }
 
 #else
@@ -235,7 +243,11 @@ bool SigintWatchdogHelper::Stop() {
   }
 
   // Wake up the helper thread.
+#ifndef __MVS__
   uv_sem_post(&sem_);
+#else
+  __sem_post(&sem_);
+#endif
 
   // Wait for the helper thread to finish.
   CHECK_EQ(0, pthread_join(thread_, nullptr));
@@ -291,7 +303,12 @@ SigintWatchdogHelper::SigintWatchdogHelper()
 #ifdef __POSIX__
   has_running_thread_ = false;
   stopping_ = false;
+#ifndef __MVS__
   CHECK_EQ(0, uv_sem_init(&sem_, 0));
+#else
+  // On z/OS, we need to initialize this in shared memory
+  CHECK_EQ(0, __sem_init(&sem_, 1, 0));
+#endif
 #else
   watchdog_disabled_ = false;
 #endif
@@ -304,7 +321,11 @@ SigintWatchdogHelper::~SigintWatchdogHelper() {
 
 #ifdef __POSIX__
   CHECK_EQ(has_running_thread_, false);
+#ifndef __MVS__
   uv_sem_destroy(&sem_);
+#else
+  __sem_destroy(&sem_);
+#endif
 #endif
 }
 
