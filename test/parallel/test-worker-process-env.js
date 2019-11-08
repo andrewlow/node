@@ -45,7 +45,11 @@ if (!workerData && process.argv[2] !== 'child') {
     child_process.spawnSync(process.execPath, [__filename, 'child']);
   assert.strictEqual(stderr.toString(), '', stderr.toString());
 } else if (workerData === 'resetEnv') {
-  assert.deepStrictEqual(Object.keys(process.env), ['MANUALLY_SET']);
+  if (common.isZOS)
+    // LIBPATH is always set on Node for z/OS
+    assert.deepStrictEqual(Object.keys(process.env), ['LIBPATH', 'MANUALLY_SET']);
+  else
+    assert.deepStrictEqual(Object.keys(process.env), ['MANUALLY_SET']);
   assert.strictEqual(process.env.MANUALLY_SET, 'true');
 } else {
   // Child processes inherit the parent's env, even from Workers.
