@@ -27,9 +27,17 @@
 #include "uv.h"
 #include "node_mutex.h"
 #include <vector>
-
-#ifdef __POSIX__
+#include <assert.h>
+#include <builtins.h>
+#include <errno.h>
 #include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <unistd.h>
+#ifdef __MVS__
+#include "zos.h"
 #endif
 
 namespace node {
@@ -94,7 +102,11 @@ class SigintWatchdogHelper {
 
 #ifdef __POSIX__
   pthread_t thread_;
-  uv_sem_t sem_;
+#ifndef __MVS__
+  uv_sem_t  sem_;
+#else
+  __sem_t sem_;
+#endif
   bool has_running_thread_;
   bool stopping_;
 
