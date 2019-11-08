@@ -64,7 +64,7 @@ static unsigned CpuFeaturesImpliedByCompiler() {
 
 static bool supportsCPUFeature(const char* feature) {
 #if V8_OS_ZOS
-  return false;
+  return true;
 #else
   static std::set<std::string>& features = *new std::set<std::string>();
   static std::set<std::string>& all_available_features =
@@ -110,7 +110,15 @@ static bool supportsCPUFeature(const char* feature) {
 // Check whether Store Facility STFLE instruction is available on the platform.
 // Instruction returns a bit vector of the enabled hardware facilities.
 static bool supportsSTFLE() {
-#if V8_HOST_ARCH_S390 && !V8_OS_ZOS
+#if V8_HOST_ARCH_S390 
+#if V8_OS_ZOS
+  // for ZOS
+  if (((unsigned char*)200)[0] & 0x01)
+    return true;
+  else
+    return false;
+#else 
+  // for Linux on Z 
   static bool read_tried = false;
   static uint32_t auxv_hwcap = 0;
 
@@ -158,6 +166,7 @@ static bool supportsSTFLE() {
   // hardcoded in case that include file does not exist.
   const uint32_t _HWCAP_S390_STFLE = 4;
   return (auxv_hwcap & _HWCAP_S390_STFLE);
+#endif // V8_OS_ZOS
 #else
   // STFLE is not available on non-s390 hosts
   return false;
@@ -177,7 +186,6 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
 
   static bool performSTFLE = supportsSTFLE();
 
-#if !V8_OS_ZOS //TODO - Add z/OS support
 // Need to define host, as we are generating inlined S390 assembly to test
 // for facilities.
 #if V8_HOST_ARCH_S390
@@ -190,6 +198,11 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
     //   Bit 45 - Distinct Operands for instructions like ARK, SRK, etc.
     // As such, we require only 1 double word
     int64_t facilities[3] = {0L};
+#if V8_OS_ZOS
+    int64_t reg0 = 2;
+    // for ZOS
+    asm(" stfle %0":"=m"(facilities),"+NR:r0"(reg0)::"cc");
+#else
     int16_t reg0;
     // LHI sets up GPR0
     // STFLE is specified as .insn, as opcode is not recognized.
@@ -200,7 +213,7 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
         : "=Q"(facilities), "=r"(reg0)
         :
         : "cc", "r0");
-
+#endif
     uint64_t one = static_cast<uint64_t>(1);
     // Test for Distinct Operands Facility - Bit 45
     if (facilities[0] & (one << (63 - 45))) {
@@ -240,7 +253,6 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
   USE(supportsCPUFeature);
   supported_ |= (1u << VECTOR_FACILITY);
   supported_ |= (1u << VECTOR_ENHANCE_FACILITY_1);
-#endif
 #endif
   supported_ |= (1u << FPU);
 }

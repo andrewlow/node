@@ -2529,7 +2529,6 @@ extern "C" void __cpu_relax(__crwa_t* p) {
 }
 
 extern "C" void __tcp_clear_to_close(int socket, unsigned int secs) {
-  if (getenv("__tcp_clear_to_close_bypass")) return;
   struct linger lg;
   lg.l_onoff = 1;
   lg.l_linger = secs;
