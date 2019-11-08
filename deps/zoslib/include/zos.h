@@ -23,6 +23,18 @@ typedef enum {
   CLOCK_HIGHRES,
   CLOCK_THREAD_CPUTIME_ID
 } clockid_t;
+
+typedef struct __sem {
+  volatile unsigned int value;
+  volatile unsigned int id; // 0 for non shared (thread), pid for share
+  volatile unsigned int waitcnt;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+} ____sem_t;
+
+typedef struct Semaphore {
+  ____sem_t *_s;
+} __sem_t;
 struct timespec;
 extern void* _convert_e2a(void* dst, const void* src, size_t size);
 extern void* _convert_a2e(void* dst, const void* src, size_t size);
@@ -104,6 +116,13 @@ typedef struct __cpu_relax_workarea {
 } __crwa_t;
 
 extern void __cpu_relax(__crwa_t *);
+extern int __sem_init(__sem_t *s0, int shared, unsigned int val);
+extern int __sem_post(__sem_t *s0);
+extern int __sem_trywait(____sem_t *s0);
+extern int __sem_timedwait(____sem_t *s0, const struct timespec *abs_timeout);
+extern int __sem_wait(__sem_t *s0);
+extern int __sem_getvalue(__sem_t *s0, int *sval);
+extern int __sem_destroy(__sem_t *s0);
 
 #ifdef __cplusplus
 }
