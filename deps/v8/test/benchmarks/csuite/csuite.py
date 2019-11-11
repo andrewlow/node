@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Copyright 2018 the V8 project authors. All rights reserved.
 '''
 C S u i t e                                         because who can remember?
