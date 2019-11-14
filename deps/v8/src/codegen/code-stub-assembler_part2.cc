@@ -6284,7 +6284,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
                 SmiConstant(CompareOperationFeedback::kAny));
           }
           result.Bind(CallRuntime(Runtime::kBigIntEqualToNumber,
-                                  NoContextConstant(), left, right));
+NoContextConstant(), left, right));
           Goto(&end);
         }
 
@@ -7183,6 +7183,9 @@ TNode<JSReceiver> CodeStubAssembler::SpeciesConstructor(
   return var_result.value();
 }
 
+//--SECTION1
+
+
 Node* CodeStubAssembler::InstanceOf(Node* object, Node* callable,
                                     Node* context) {
   VARIABLE(var_result, MachineRepresentation::kTagged);
@@ -7473,6 +7476,8 @@ TNode<JSObject> CodeStubAssembler::AllocateJSIteratorResult(
   return CAST(result);
 }
 
+// SECTION2
+
 Node* CodeStubAssembler::AllocateJSIteratorResultForEntry(Node* context,
                                                           Node* key,
                                                           Node* value) {
@@ -7589,6 +7594,9 @@ CodeStubArguments::CodeStubArguments(
       assembler_->UncheckedCast<RawPtrT>(assembler_->IntPtrAdd(fp_, offset));
 }
 
+//-----
+
+
 TNode<Object> CodeStubArguments::GetReceiver() const {
   DCHECK_EQ(receiver_mode_, ReceiverMode::kHasReceiver);
   return assembler_->UncheckedCast<Object>(assembler_->LoadFullTagged(
@@ -7625,6 +7633,7 @@ TNode<Object> CodeStubArguments::AtIndex(int index) const {
   return AtIndex(assembler_->IntPtrConstant(index));
 }
 
+//------
 TNode<Object> CodeStubArguments::GetOptionalArgumentValue(
     int index, TNode<Object> default_value) {
   CodeStubAssembler::TVariable<Object> result(assembler_);
@@ -7667,34 +7676,7 @@ TNode<Object> CodeStubArguments::GetOptionalArgumentValue(
   return result.value();
 }
 
-void CodeStubArguments::ForEach(
-    const CodeStubAssembler::VariableList& vars,
-    const CodeStubArguments::ForEachBodyFunction& body, Node* first, Node* last,
-    CodeStubAssembler::ParameterMode mode) {
-  assembler_->Comment("CodeStubArguments::ForEach");
-  if (first == nullptr) {
-    first = assembler_->IntPtrOrSmiConstant(0, mode);
-  }
-  if (last == nullptr) {
-    DCHECK_EQ(mode, argc_mode_);
-    last = argc_;
-  }
-  Node* start = assembler_->IntPtrSub(
-      assembler_->UncheckedCast<IntPtrT>(base_),
-      assembler_->ElementOffsetFromIndex(first, SYSTEM_POINTER_ELEMENTS, mode));
-  Node* end = assembler_->IntPtrSub(
-      assembler_->UncheckedCast<IntPtrT>(base_),
-      assembler_->ElementOffsetFromIndex(last, SYSTEM_POINTER_ELEMENTS, mode));
-  assembler_->BuildFastLoop(
-      vars, start, end,
-      [this, &body](Node* current) {
-        Node* arg = assembler_->Load(MachineType::AnyTagged(), current);
-        body(arg);
-      },
-      -kSystemPointerSize, CodeStubAssembler::INTPTR_PARAMETERS,
-      CodeStubAssembler::IndexAdvanceMode::kPost);
-}
-
+//----
 void CodeStubArguments::PopAndReturn(Node* value) {
   Node* pop_count;
   if (receiver_mode_ == ReceiverMode::kHasReceiver) {
@@ -7780,6 +7762,7 @@ TNode<BoolT> CodeStubAssembler::IsElementsKindInRange(
       Int32Sub(target_kind, Int32Constant(lower_reference_kind)),
       Int32Constant(higher_reference_kind - lower_reference_kind));
 }
+
 
 Node* CodeStubAssembler::IsDebugActive() {
   Node* is_debug_active = Load(
