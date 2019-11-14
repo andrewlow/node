@@ -1039,7 +1039,6 @@
          ],
          'cflags': [
            '-qasmlib=sys1.maclib:sys1.modgen',
-           '-qinline=:::300',
            '-qcsect=v8',
          ]
       }],
@@ -1128,6 +1127,13 @@
         'conditions': [
           [ 'v8_no_strict_aliasing==1', {
             'cflags': [ '-fno-strict-aliasing' ],
+          }],
+        ],  # conditions
+      }],
+      ['OS=="zos"', {
+        'conditions': [
+          [ 'v8_no_strict_aliasing==1', {
+            'cflags': [ '-qnoansialias' ],
           }],
         ],  # conditions
       }],

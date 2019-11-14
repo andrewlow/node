@@ -1,4 +1,3 @@
-#pragma options("-Wc,TBYDBG\(-qdebug=unreproduced:nprunereg:np6align:nflb:spillfsnss:nspillfs:nlalign:nebbpass2:nsch3:nbshd2:nlateded:nrepl:nrecoil:ncross2:nprolt:npostspl:nbr_spu:nww6k:nvn4:NLRUSE:NRPREMAT:NTRIV:npstore:nqb:nnewspec:nbelruse:nupdtuse:nebbpass1:nbshd1:nspec\)")
 // Copyright (c) 1994-2006 Sun Microsystems Inc.
 // All Rights Reserved.
 //
