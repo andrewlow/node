@@ -27,7 +27,7 @@ constexpr inline
     typename std::enable_if<std::is_unsigned<T>::value && sizeof(T) <= 8,
                             unsigned>::type
     CountPopulation(T value) {
-#if V8_HAS_BUILTIN_POPCOUNT
+#if V8_HAS_BUILTIN_POPCOUNT && !defined(__MVS__)
   return sizeof(T) == 8 ? __builtin_popcountll(static_cast<uint64_t>(value))
                         : __builtin_popcount(static_cast<uint32_t>(value));
 #else
@@ -69,7 +69,7 @@ inline constexpr
                             unsigned>::type
     CountLeadingZeros(T value) {
   static_assert(bits > 0, "invalid instantiation");
-#if V8_HAS_BUILTIN_CLZ
+#if V8_HAS_BUILTIN_CLZ && !defined(__MVS__)
   return value == 0
              ? bits
              : bits == 64
@@ -102,7 +102,7 @@ inline constexpr
     typename std::enable_if<std::is_integral<T>::value && sizeof(T) <= 8,
                             unsigned>::type
     CountTrailingZeros(T value) {
-#if V8_HAS_BUILTIN_CTZ
+#if V8_HAS_BUILTIN_CTZ && !defined(__MVS__)
   return value == 0 ? bits
                     : bits == 64 ? __builtin_ctzll(static_cast<uint64_t>(value))
                                  : __builtin_ctz(static_cast<uint32_t>(value));
