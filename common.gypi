@@ -204,6 +204,9 @@
             # pull in V8's postmortem metadata
             'ldflags': [ '-Wl,-z,allextract' ]
           }],
+          ['OS=="zos"', {
+            'cflags': [ '-qINLINE=::150:100000' ]
+          }],
           ['OS!="mac" and OS!="win" and OS!="zos"', {
             'cflags': [ '-fno-omit-frame-pointer' ],
           }],
