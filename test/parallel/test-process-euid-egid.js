@@ -39,9 +39,15 @@ if (process.getuid() !== 0) {
     process.setegid('nobody');
   }, /(?:EPERM, .+|Group identifier does not exist: nobody)$/);
 
-  assert.throws(() => {
-    process.seteuid('nobody');
-  }, /^Error: (?:EPERM, .+|User identifier does not exist: nobody)$/);
+  // z/OS does not have a nobody user
+  if (common.isZOS)
+    assert.throws(() => {
+        process.seteuid('nobody');
+    }, /^Error \[ERR_UNKNOWN_CREDENTIAL\]: User identifier does not exist: nobody/);
+  else
+    assert.throws(() => {
+        process.seteuid('nobody');
+    }, /^Error: (?:EPERM, .+|.+User identifier does not exist: nobody)$/);
 
   return;
 }
