@@ -27,7 +27,7 @@ constexpr inline
     typename std::enable_if<std::is_unsigned<T>::value && sizeof(T) <= 8,
                             unsigned>::type
     CountPopulation(T value) {
-#if V8_HAS_BUILTIN_POPCOUNT && !defined(__MVS__)
+#if V8_HAS_BUILTIN_POPCOUNT
   return sizeof(T) == 8 ? __builtin_popcountll(static_cast<uint64_t>(value))
                         : __builtin_popcount(static_cast<uint32_t>(value));
 #else
@@ -98,11 +98,17 @@ inline constexpr unsigned CountLeadingZeros64(uint64_t value) {
 // least significant 1 bit in |value| if |value| is non-zero, otherwise it
 // returns {sizeof(T) * 8}.
 template <typename T, unsigned bits = sizeof(T) * 8>
-inline constexpr
+#ifdef __MVS__
+// Defect 163430: Node.js: registers clobbered with __builtin_ctz when inlined
+__attribute__((noinline))
+#else
+inline
+#endif
+constexpr
     typename std::enable_if<std::is_integral<T>::value && sizeof(T) <= 8,
                             unsigned>::type
     CountTrailingZeros(T value) {
-#if V8_HAS_BUILTIN_CTZ && !defined(__MVS__)
+#if V8_HAS_BUILTIN_CTZ
   return value == 0 ? bits
                     : bits == 64 ? __builtin_ctzll(static_cast<uint64_t>(value))
                                  : __builtin_ctz(static_cast<uint32_t>(value));
