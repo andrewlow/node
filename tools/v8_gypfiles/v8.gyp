@@ -406,7 +406,6 @@
     {
       'target_name': 'v8_snapshot',
       'type': 'static_library',
-      'asmflags': ['-m GOFF'],
       'toolsets': ['target'],
       'conditions': [
         ['want_separate_host_toolset', {
@@ -463,10 +462,13 @@
           'inputs': [
             '<(mksnapshot_exec)',
           ],
-          'outputs': ["<(INTERMEDIATE_DIR)/snapshot.cc", "<(INTERMEDIATE_DIR)/snapshot_hlasm.S"],
-
           'process_outputs_as_sources': 1,
           'conditions': [
+            ['OS=="zos"', {
+              'outputs': ["<(INTERMEDIATE_DIR)/snapshot.cc", "<(INTERMEDIATE_DIR)/snapshot_hlasm.S"],
+            }, {
+              'outputs': ["<(INTERMEDIATE_DIR)/snapshot.cc"],
+            }],
             ['v8_enable_embedded_builtins', {
               # In this case we use `embedded_variant "Default"`
               # and `suffix = ''` for the template `embedded${suffix}.S`.

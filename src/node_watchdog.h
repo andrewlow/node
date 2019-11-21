@@ -28,7 +28,6 @@
 #include "node_mutex.h"
 #include <vector>
 #include <assert.h>
-#include <builtins.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
@@ -37,6 +36,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #ifdef __MVS__
+#include <builtins.h>
 #include "zos.h"
 #endif
 
