@@ -535,6 +535,7 @@
         'cflags': [
           '-q64',
           '-Wc,DLL',
+          '-Wa,GOFF',
           '-qARCH=9',
           '-qASCII',
           '-qTUNE=10',
