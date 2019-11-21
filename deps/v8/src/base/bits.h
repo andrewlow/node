@@ -69,7 +69,7 @@ inline constexpr
                             unsigned>::type
     CountLeadingZeros(T value) {
   static_assert(bits > 0, "invalid instantiation");
-#if V8_HAS_BUILTIN_CLZ && !defined(__MVS__)
+#if V8_HAS_BUILTIN_CLZ
   return value == 0
              ? bits
              : bits == 64
@@ -98,13 +98,7 @@ inline constexpr unsigned CountLeadingZeros64(uint64_t value) {
 // least significant 1 bit in |value| if |value| is non-zero, otherwise it
 // returns {sizeof(T) * 8}.
 template <typename T, unsigned bits = sizeof(T) * 8>
-#ifdef __MVS__
-// Defect 163430: Node.js: registers clobbered with __builtin_ctz when inlined
-__attribute__((noinline))
-#else
-inline
-#endif
-constexpr
+inline constexpr
     typename std::enable_if<std::is_integral<T>::value && sizeof(T) <= 8,
                             unsigned>::type
     CountTrailingZeros(T value) {
