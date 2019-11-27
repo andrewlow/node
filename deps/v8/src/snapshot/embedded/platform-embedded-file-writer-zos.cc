@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "src/snapshot/embedded/platform-embedded-file-writer-zos.h"
+#include <stdarg.h>
 
 namespace v8 {
 namespace internal {
