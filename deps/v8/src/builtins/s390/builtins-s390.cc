@@ -577,8 +577,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     __ LoadRR(r4, r3);
     __ LoadRR(r3, r2);
     __ LoadRR(r2, r1);
-    __ LoadP(r5, MemOperand(sp, 2048 + 728)); // arg4
-    __ LoadP(r6, MemOperand(sp, 2048 + 736)); // arg5
+    __ LoadMultipleP(r5, r6, MemOperand(sp, 2048 + 728)); 
     __ LoadP(r0, MemOperand(sp, 2048 + 744)); // arg6
     __ StoreP(r0, MemOperand(sp, 160)); // arg6
 #endif
