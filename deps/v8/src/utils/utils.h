@@ -977,7 +977,7 @@ bool StringToArrayIndex(Stream* stream, uint32_t* index);
 V8_EXPORT_PRIVATE V8_NOINLINE uintptr_t GetCurrentStackPosition();
 
 static inline uint16_t ByteReverse16(uint16_t value) {
-#if V8_HAS_BUILTIN_BSWAP16
+#if V8_HAS_BUILTIN_BSWAP16 && !defined(__MVS__)
   return __builtin_bswap16(value);
 #else
   return value << 8 | (value >> 8 & 0x00FF);
@@ -985,7 +985,7 @@ static inline uint16_t ByteReverse16(uint16_t value) {
 }
 
 static inline uint32_t ByteReverse32(uint32_t value) {
-#if V8_HAS_BUILTIN_BSWAP32
+#if V8_HAS_BUILTIN_BSWAP32 && !defined(__MVS__)
   return __builtin_bswap32(value);
 #else
   return value << 24 | ((value << 8) & 0x00FF0000) |
@@ -994,7 +994,7 @@ static inline uint32_t ByteReverse32(uint32_t value) {
 }
 
 static inline uint64_t ByteReverse64(uint64_t value) {
-#if V8_HAS_BUILTIN_BSWAP64
+#if V8_HAS_BUILTIN_BSWAP64 && !defined(__MVS__)
   return __builtin_bswap64(value);
 #else
   size_t bits_of_v = sizeof(value) * kBitsPerByte;
