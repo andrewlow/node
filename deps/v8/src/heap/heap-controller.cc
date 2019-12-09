@@ -96,8 +96,14 @@ template <typename Trait>
 double MemoryController<Trait>::DynamicGrowingFactor(double gc_speed,
                                                      double mutator_speed,
                                                      double max_factor) {
+#ifdef __MVS__ && defined(DEBUG)
+  // TODO workaround a compiler bug with constexpr
+  DCHECK_LE((double)1.1, max_factor);
+  DCHECK_GE((double)4.0, max_factor);
+#else
   DCHECK_LE(Trait::kMinGrowingFactor, max_factor);
   DCHECK_GE(Trait::kMaxGrowingFactor, max_factor);
+#endif
   if (gc_speed == 0 || mutator_speed == 0) return max_factor;
 
   const double speed_ratio = gc_speed / mutator_speed;
@@ -109,7 +115,11 @@ double MemoryController<Trait>::DynamicGrowingFactor(double gc_speed,
   // The factor is a / b, but we need to check for small b first.
   double factor = (a < b * max_factor) ? a / b : max_factor;
   factor = Min(factor, max_factor);
+#ifdef __MVS__ && defined(DEBUG)
+  factor = Max(factor, (double)1.1);
+#else
   factor = Max(factor, Trait::kMinGrowingFactor);
+#endif
   return factor;
 }
 
@@ -135,7 +145,11 @@ size_t MemoryController<Trait>::CalculateAllocationLimit(
       factor = Min(factor, Trait::kConservativeGrowingFactor);
       break;
     case Heap::HeapGrowingMode::kMinimal:
+#ifdef __MVS__ && defined(DEBUG)
+      factor = (double)1.1;
+#else
       factor = Trait::kMinGrowingFactor;
+#endif
       break;
     case Heap::HeapGrowingMode::kDefault:
       break;
