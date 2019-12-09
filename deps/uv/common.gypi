@@ -36,6 +36,8 @@
         'conditions': [
           ['OS != "zos"', {
             'cflags': [ '-O0', '-fwrapv' ]
+          }, {
+            'cflags': [ '-O0' ]
           }],
           ['OS == "android"', {
             'cflags': [ '-fPIE' ],
