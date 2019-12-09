@@ -275,7 +275,7 @@
         ],
       },
     }],
-    [ 'coverage=="true" and node_shared=="false" and OS in "mac freebsd linux"', {
+    [ 'coverage=="true" and node_shared=="false" and OS in "mac freebsd linux zos"', {
       'cflags!': [ '-O3' ],
       'ldflags': [ '--coverage',
                    '-g',
