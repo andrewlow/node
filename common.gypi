@@ -164,6 +164,9 @@
             'cflags': [ '-fPIC' ],
             'ldflags': [ '-fPIC' ]
           }],
+          ['OS == "zos"', {
+            'defines!': [ 'DEBUG' ]         # makes npm i very slow; add to CFLAGS & CXXFLAGS if needed
+          }],
         ],
         'msvs_settings': {
           'VCCLCompilerTool': {
