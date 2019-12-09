@@ -154,14 +154,11 @@
           ],
         },
         'defines': [ 'DEBUG', '_DEBUG', 'V8_ENABLE_CHECKS' ],
-        'cflags': [ '-g' ],
+        'cflags': [ '-O0', '-g' ],
         'conditions': [
           ['OS=="aix"', {
             'cflags': [ '-gxcoff' ],
             'ldflags': [ '-Wl,-bbigtoc' ],
-          }],
-          ['OS != "zos"', {
-            'cflags': [ '-O0' ],
           }],
           ['OS == "android"', {
             'cflags': [ '-fPIE' ],
