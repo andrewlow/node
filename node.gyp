@@ -595,8 +595,6 @@
         'src/udp_wrap.cc',
         'src/util.cc',
         'src/uv.cc',
-        'src/node_snapshot_stub.cc',
-        'src/node_code_cache_stub.cc',
         'src/node_report_utils.cc',
         # headers to make for a more pleasant IDE experience
         'src/aliased_buffer.h',
