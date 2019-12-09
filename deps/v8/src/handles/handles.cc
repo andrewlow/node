@@ -108,9 +108,12 @@ void HandleScope::DeleteExtensions(Isolate* isolate) {
 #ifdef ENABLE_HANDLE_ZAPPING
 void HandleScope::ZapRange(Address* start, Address* end) {
   DCHECK_LE(end - start, kHandleBlockSize);
+#ifndef __MVS__
+  //TODO: this causes a 0C4 on z (for at least appmetrics)
   for (Address* p = start; p != end; p++) {
     *p = static_cast<Address>(kHandleZapValue);
   }
+#endif
 }
 #endif
 
