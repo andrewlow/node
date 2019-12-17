@@ -527,7 +527,7 @@ TNode<HeapObject> RegExpBuiltinsAssembler::RegExpExecInternal(
         IntPtrAdd(BitcastTaggedToWord(code),
                   IntPtrConstant(Code::kHeaderSize - kHeapObjectTag)));
 
-    TNode<Int32T> result = UncheckedCast<Int32T>(CallCFunction(
+    TNode<Int32T> result = UncheckedCast<Int32T>(CallCFunctionWithoutFunctionDescriptor(
         code_entry, retval_type, std::make_pair(arg0_type, arg0),
         std::make_pair(arg1_type, arg1), std::make_pair(arg2_type, arg2),
         std::make_pair(arg3_type, arg3), std::make_pair(arg4_type, arg4),

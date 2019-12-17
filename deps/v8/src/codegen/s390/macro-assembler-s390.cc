@@ -1886,37 +1886,49 @@ void TurboAssembler::MovToFloatParameters(DoubleRegister src1,
 
 void TurboAssembler::CallCFunction(ExternalReference function,
                                    int num_reg_arguments,
-                                   int num_double_arguments) {
+                                   int num_double_arguments,
+                                   bool has_function_descriptor) {
   Move(ip, function);
-  CallCFunctionHelper(ip, num_reg_arguments, num_double_arguments);
+  CallCFunctionHelper(ip, num_reg_arguments, num_double_arguments,
+                      has_function_descriptor);
 }
 
 void TurboAssembler::CallCFunction(Register function, int num_reg_arguments,
-                                   int num_double_arguments) {
-  CallCFunctionHelper(function, num_reg_arguments, num_double_arguments);
+                                   int num_double_arguments, bool has_function_descriptor) {
+  CallCFunctionHelper(function, num_reg_arguments, num_double_arguments, 
+                      has_function_descriptor);
 }
 
 void TurboAssembler::CallCFunction(ExternalReference function,
-                                   int num_arguments) {
-  CallCFunction(function, num_arguments, 0);
+                                   int num_arguments,
+                                   bool has_function_descriptor) {
+  CallCFunction(function, num_arguments, 0, has_function_descriptor);
 }
 
-void TurboAssembler::CallCFunction(Register function, int num_arguments) {
-  CallCFunction(function, num_arguments, 0);
+void TurboAssembler::CallCFunction(Register function, int num_arguments,
+                                   bool has_function_descriptor) {
+  CallCFunction(function, num_arguments, 0, has_function_descriptor);
 }
 
 void TurboAssembler::CallCFunctionHelper(Register function,
                                          int num_reg_arguments,
-                                         int num_double_arguments) {
+                                         int num_double_arguments,
+                                         bool has_function_descriptor) {
   DCHECK_LE(num_reg_arguments + num_double_arguments, kMaxCParameters);
   DCHECK(has_frame());
-  
+
 #if V8_OS_ZOS
+  // Shuffle input arguments
   LoadRR(r1, r2);
   LoadRR(r2, r3);
   LoadRR(r3, r4);
 
-  // XPLINK linkage requires args in r5,r6 to be passed on the stack.
+  // XPLINK treats r7 as voliatile return register, but r14 as preserved
+  // Since Linux is the other way around, perserve r7 value in r14 across
+  // the call.
+  LoadRR(r14, r7);
+
+  // XPLINK linkage requires args in r5,r6,r7,r8,r9 to be passed on the stack.
   // However, for DirectAPI C calls, there may not be stack slots
   // for these 4th and 5th parameters if num_reg_arguments are less
   // than 3.  In that case, we need to still preserve r5/r6 into
@@ -1925,15 +1937,11 @@ void TurboAssembler::CallCFunctionHelper(Register function,
      StoreP(r5, MemOperand(sp, 19 * kPointerSize));
      StoreP(r6, MemOperand(sp, 6 * kPointerSize));
   } else if (num_reg_arguments >= 5) {
+     // Save original r5 - r6  to Stack, r7 - r9 already saved to Stack
      StoreMultipleP(r5, r6, MemOperand(sp, 19 * kPointerSize));
   } else {
      StoreMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
   }
-
-  // XPLINK treats r7 as voliatile return register, but r14 as preserved
-  // Since Linux is the other way around, perserve r7 value in r14 across
-  // the call.
-  LoadRR(r14, r7);
 
   // Set up the system stack pointer with the XPLINK bias.
   lay(r4, MemOperand(sp, -kStackPointerBias));
@@ -1954,8 +1962,11 @@ void TurboAssembler::CallCFunctionHelper(Register function,
   }
 
 #if ABI_USES_FUNCTION_DESCRIPTORS && !defined(USE_SIMULATOR)
-  LoadMultipleP(r5, r6, MemOperand(function, 0));
-  Register dest = r6;
+  Register dest = function;
+  if (has_function_descriptor) {
+    LoadMultipleP(r5, r6, MemOperand(function, 0));
+    dest = r6;
+  }
 #else
   // Just call directly. The function called cannot cause a GC, or
   // allow preemption, so the return address in the link register
@@ -1968,9 +1979,13 @@ void TurboAssembler::CallCFunctionHelper(Register function,
 #endif
 
 #ifdef V8_OS_ZOS
-  CallC(dest);
+  if (has_function_descriptor) {
+    CallC(dest);
+  } else {
+    basr(r7, dest);
+  }
 
-  // Restore r5-r7 from the appropriate stack locations (see notes above).
+  // Restore r5-r9 from the appropriate stack locations (see notes above).
   if (num_reg_arguments == 4) {
      LoadP(r5, MemOperand(sp, 19 * kPointerSize));
      LoadP(r6, MemOperand(sp, 6 * kPointerSize));
@@ -1980,10 +1995,11 @@ void TurboAssembler::CallCFunctionHelper(Register function,
      LoadMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
   }
 
+  // Restore original r7
   LoadRR(r7, r14);
 
-  //Shuffle the result
-  LoadRR (r2,r3);
+  // Shuffle the result
+  LoadRR (r2, r3);
 #else
   Call(dest);
 #endif

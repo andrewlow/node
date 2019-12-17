@@ -997,6 +997,23 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
       Node* function, MachineType return_type, SaveFPRegsMode mode,
       std::initializer_list<CFunctionArg> args);
 
+  // Call to a C function without a function discriptor on AIX/zOS
+  template <class... CArgs>
+  Node* CallCFunctionWithoutFunctionDescriptor(Node* function,
+                                               MachineType return_type,
+                                               CArgs... cargs) {
+    static_assert(v8::internal::conjunction<
+                      std::is_convertible<CArgs, CFunctionArg>...>::value,
+                  "invalid argument types");
+    return CallCFunctionWithoutFunctionDescriptor(function, return_type,
+                                                  {cargs...});
+  }
+
+  Node* CallCFunctionWithoutFunctionDescriptor(
+      Node* function, MachineType return_type,
+      std::initializer_list<CFunctionArg> args);
+
+
   // ===========================================================================
   // The following utility methods deal with control flow, hence might switch
   // the current basic block or create new basic blocks for labels.
