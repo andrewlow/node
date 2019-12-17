@@ -257,7 +257,7 @@ int NativeRegExpMacroAssembler::Execute(
 
   auto fn = GeneratedCode<RegexpMatcherSig>::FromCode(code);
   int result =
-      fn.CallIrregexp(input.ptr(), start_offset, input_start, input_end, output,
+      fn.Call(input.ptr(), start_offset, input_start, input_end, output,
                       output_size, stack_base, direct_call, isolate);
   DCHECK(result >= RETRY);
 

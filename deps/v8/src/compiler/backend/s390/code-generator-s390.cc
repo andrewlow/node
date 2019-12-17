@@ -1510,8 +1510,16 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       AssemblePrepareTailCall();
       break;
     case kArchCallCFunction: {
-      int const num_parameters = MiscField::decode(instr->opcode());
+      int misc_field = MiscField::decode(instr->opcode());
+      int num_parameters = misc_field;
+      bool has_function_descriptor = false;
       Label return_location;
+#ifdef __MVS__
+      int kNumParametersMask = kHasFunctionDescriptorBitMask - 1;
+      num_parameters = kNumParametersMask & misc_field;
+      has_function_descriptor =
+          (misc_field & kHasFunctionDescriptorBitMask) != 0;
+#endif
       // Put the return address in a stack slot.
       if (linkage()->GetIncomingDescriptor()->IsWasmCapiFunction()) {
         // Put the return address in a stack slot.
@@ -1520,10 +1528,10 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       }
       if (instr->InputAt(0)->IsImmediate()) {
         ExternalReference ref = i.InputExternalReference(0);
-        __ CallCFunction(ref, num_parameters);
+        __ CallCFunction(ref, num_parameters, has_function_descriptor);
       } else {
         Register func = i.InputRegister(0);
-        __ CallCFunction(func, num_parameters);
+        __ CallCFunction(func, num_parameters, has_function_descriptor);
       }
       __ bind(&return_location);
       RecordSafepoint(instr->reference_map(), Safepoint::kNoLazyDeopt);
