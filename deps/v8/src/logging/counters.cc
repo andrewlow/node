@@ -117,6 +117,8 @@ void TimedHistogram::RecordAbandon(base::ElapsedTimer* timer,
   }
 }
 
+//MVS TODO: temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
+#ifndef __MVS__
 Counters::Counters(Isolate* isolate)
     : isolate_(isolate),
       stats_table_(this),
@@ -258,6 +260,7 @@ Counters::Counters(Isolate* isolate)
     this->*counter.member = StatsCounter(this, counter.caption);
   }
 }
+#endif
 
 void Counters::ResetCounterFunction(CounterLookupCallback f) {
   stats_table_.SetCounterFunction(f);
