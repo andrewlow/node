@@ -5,19 +5,17 @@ var mr = require('npm-registry-mock')
 var Tacks = require('tacks')
 var File = Tacks.File
 var Dir = Tacks.Dir
-var extend = Object.assign || require('util')._extend
 var common = require('../common-tap.js')
 
-var basedir = path.join(__dirname, path.basename(__filename, '.js'))
+var basedir = common.pkg
 var testdir = path.join(basedir, 'testdir')
-var cachedir = path.join(basedir, 'cache')
+var cachedir = common.cache
 var globaldir = path.join(basedir, 'global')
 var tmpdir = path.join(basedir, 'tmp')
-var escapeArg = require('../../lib/utils/escape-arg.js')
 
 var conf = {
   cwd: testdir,
-  env: extend({
+  env: Object.assign({
     npm_config_cache: cachedir,
     npm_config_tmp: tmpdir,
     npm_config_prefix: globaldir,
@@ -40,8 +38,8 @@ var fixture = new Tacks(Dir({
         // add this to the end of the command to preserve the debug log:
         // || mv npm-debug.log real-debug.log
         // removed for windows compat reasons
-        abc: escapeArg(common.nodeBin) + ' ' + escapeArg(common.bin) + ' shrinkwrap',
-        shrinkwrap: escapeArg(common.nodeBin) + ' scripts/shrinkwrap.js'
+        abc: 'node ' + JSON.stringify(common.bin) + ' shrinkwrap',
+        shrinkwrap: 'node scripts/shrinkwrap.js'
       }
     }),
     scripts: Dir({

@@ -10,7 +10,7 @@ var mockLog = {
 
 var actions
 test('setup', function (t) {
-  npm.load(function () {
+  npm.load({ 'unsafe-perm': true }, function () {
     log.disableProgress()
     actions = require('../../lib/install/actions.js').actions
     t.end()
@@ -56,8 +56,10 @@ test('->optdep:a->dep:b', function (t) {
   moduleB.parent = tree
 
   t.plan(3)
-  actions.postinstall('/', '/', moduleA, mockLog, function (er) {
-    t.is(er && er.code, 'ELIFECYCLE', 'Lifecycle failed')
+  return actions.postinstall('/', moduleA, mockLog).then(() => {
+    throw new Error('was not supposed to succeed')
+  }, (err) => {
+    t.is(err && err.code, 'ELIFECYCLE', 'Lifecycle failed')
     t.ok(moduleA.failed, 'moduleA (optional dep) is marked failed')
     t.ok(moduleB.failed, 'moduleB (direct dep of moduleA) is marked as failed')
     t.end()
@@ -89,6 +91,7 @@ test('->dep:b,->optdep:a->dep:b', function (t) {
   moduleA.requires = [moduleB]
 
   var tree = {
+    name: 'tree',
     path: '/',
     package: {
       dependencies: {
@@ -107,11 +110,8 @@ test('->dep:b,->optdep:a->dep:b', function (t) {
   moduleA.parent = tree
   moduleB.parent = tree
 
-  t.plan(3)
-  actions.postinstall('/', '/', moduleA, mockLog, function (er) {
-    t.ok(er && er.code === 'ELIFECYCLE', 'Lifecycle failed')
+  return actions.postinstall('/', moduleA, mockLog).then(() => {
     t.ok(moduleA.failed, 'moduleA (optional dep) is marked failed')
     t.ok(!moduleB.failed, 'moduleB (direct dep of moduleA) is marked as failed')
-    t.end()
   })
 })

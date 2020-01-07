@@ -7,9 +7,8 @@ var Symlink = Tacks.Symlink
 var Dir = Tacks.Dir
 var common = require('../common-tap.js')
 var mr = require('npm-registry-mock')
-var extend = Object.assign || require('util')._extend
 
-var testdir = path.join(__dirname, path.basename(__filename, '.js'))
+var testdir = common.pkg
 var bugdir = path.join(testdir, 'modules', 'bug')
 
 // This is an absolutely minimal version of the optimist included with
@@ -27,6 +26,7 @@ var optimist = Dir({
     minimist: Dir({
       'package.json': File({
         _shasum: 'd7aa327bcecf518f9106ac6b8f003fa3bcea8566',
+        _resolve: 'foo',
         name: 'minimist',
         version: '0.0.5'
       })
@@ -34,6 +34,7 @@ var optimist = Dir({
     wordwrap: Dir({
       'package.json': File({
         _shasum: 'b79669bb42ecb409f83d583cad52ca17eaa1643f',
+        _resolve: 'foo',
         name: 'wordwrap',
         version: '0.0.2'
       })
@@ -43,7 +44,6 @@ var optimist = Dir({
 
 var fixture = new Tacks(
   Dir({
-    cache: Dir({}),
     global: Dir({
       lib: Dir({
         node_modules: Dir({
@@ -120,25 +120,24 @@ test('setup', function (t) {
 test('shared-linked', function (t) {
   var options = {
     cwd: bugdir,
-    env: extend(extend({}, process.env), {
+    env: Object.assign({}, process.env, {
       npm_config_prefix: path.join(testdir, 'global')
     })
   }
   var config = [
-    '--cache', path.join(testdir, 'cache'),
+    '--cache', common.cache,
     '--registry', common.registry,
     '--unicode', 'false'
   ]
 
-  common.npm(config.concat(['install', '--dry-run']), options, function (err, code, stdout, stderr) {
+  common.npm(config.concat(['install', '--dry-run', '--parseable']), options, function (err, code, stdout, stderr) {
     if (err) throw err
     t.is(code, 0)
-    var got = stdout.trim().replace(/\s+\n/g, '\n')
+    var got = stdout.trim().replace(/\s+\n/g, '\n').replace(/\\/g, '/')
     var expected =
-      'bug@10800.0.0 ' + bugdir + '\n' +
-      '`-- optimist@0.6.0\n' +
-      '  +-- minimist@0.0.5\n' +
-      '  `-- wordwrap@0.0.2'
+      'add\tminimist\t0.0.5\tnode_modules/minimist\n' +
+      'add\twordwrap\t0.0.2\tnode_modules/wordwrap\n' +
+      'add\toptimist\t0.6.0\tnode_modules/optimist'
     t.is(got, expected, 'just an optimist install please')
     server.done()
     t.end()

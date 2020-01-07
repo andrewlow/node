@@ -2,17 +2,18 @@
 // open a subshell to the package folder.
 
 module.exports = explore
-explore.usage = 'npm explore <pkg> [ -- <cmd>]'
+explore.usage = 'npm explore <pkg> [ -- <command>]'
 explore.completion = require('./utils/completion/installed-shallow.js')
 
 var npm = require('./npm.js')
 var spawn = require('./utils/spawn')
 var path = require('path')
 var fs = require('graceful-fs')
-var isWindowsShell = require('./utils/is-windows-shell.js')
+var isWindows = require('./utils/is-windows.js')
 var escapeExecPath = require('./utils/escape-exec-path.js')
 var escapeArg = require('./utils/escape-arg.js')
 var output = require('./utils/output.js')
+var log = require('npmlog')
 
 function explore (args, cb) {
   if (args.length < 1 || !args[0]) return cb(explore.usage)
@@ -23,7 +24,7 @@ function explore (args, cb) {
 
   var shellArgs = []
   if (args) {
-    if (isWindowsShell) {
+    if (isWindows) {
       var execCmd = escapeExecPath(args.shift())
       var execArgs = [execCmd].concat(args.map(escapeArg))
       opts.windowsVerbatimArguments = true
@@ -49,6 +50,7 @@ function explore (args, cb) {
       )
     }
 
+    log.silly('explore', {sh, shellArgs, opts})
     var shell = spawn(sh, shellArgs, opts)
     shell.on('close', function (er) {
       // only fail if non-interactive.
