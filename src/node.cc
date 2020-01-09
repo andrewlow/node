@@ -28,6 +28,22 @@
 #include "node_watchdog.h"
 #include "util.h"
 #include "zos.h"
+
+#ifndef NJS_PRODUCT_OWNER
+#error "NJS_PRODUCT_OWNER must be defined"
+#endif
+
+#ifndef NJS_FEATURE_NAME
+#error "NJS_FEATURE_NAME must be defined"
+#endif
+
+#ifndef NJS_PRODUCT_NAME
+#error "NJS_PRODUCT_NAME must be defined"
+#endif
+
+#ifndef NJS_PID
+#error "NJS_PID must be defined"
+#endif
 #endif
 
 #include "debug_utils.h"
@@ -1144,6 +1160,14 @@ void TearDownOncePerProcess() {
 int Start(int argc, char** argv) {
 #ifdef __MVS__
   OS390ThreadManager threadPoolObj;
+
+  unsigned long long rc =
+      __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
+                        NJS_PRODUCT_NAME, NJS_PID);
+
+  if (rc)
+    fprintf(stderr, "WARNING: Could not register product for tailored fit "
+                    "pricing, rc = %llu\n", rc);
 #endif
 
   InitializationResult result = InitializeOncePerProcess(argc, argv);

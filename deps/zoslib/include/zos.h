@@ -44,6 +44,11 @@ extern void __xfer_env(void);
 extern int __chgfdccsid(int fd, unsigned short ccsid);
 extern int __getfdccsid(int fd);
 extern int __setfdccsid(int fd, int t_ccsid);
+extern unsigned long long __registerProduct(int node_major_version,
+                                     const char *product_owner,
+                                     const char *feature_name,
+                                     const char *product_name,
+                                     const char *pid);
 extern size_t __e2a_l(char* bufptr, size_t szLen);
 extern size_t __a2e_l(char* bufptr, size_t szLen);
 extern size_t __e2a_s(char* string);
