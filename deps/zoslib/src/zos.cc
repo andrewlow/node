@@ -2841,6 +2841,367 @@ extern "C" void __tcp_clear_to_close(int socket, unsigned int secs) {
     s = read(socket, buffer, 4096);
   }
 }
+
+// Interfaces to call 24/32-bit services
+typedef struct thunk24 {
+  unsigned short _force_address_align;
+  unsigned short sam24;
+  unsigned short basr;
+  unsigned short sam64;
+  unsigned short loadr14[3];
+  unsigned short br14;
+  void *braddr;
+  unsigned int dsa[18];
+  unsigned int upperhalf[15];
+} thunk24_t;
+
+typedef struct loadmod {
+  char modname[8];
+  unsigned load_r1;
+  unsigned load_r15;
+  thunk24_t *thptr;
+  void *reg15;
+  void *reg1;
+  void *reg13;
+  unsigned int dsa[18];
+  unsigned int upperhalf[15];
+  char *_1[32];
+} loadmod_t;
+
+extern void __unloadmod(void *mod) {
+  loadmod_t *m = (loadmod_t *)mod;
+  if (!m)
+    return;
+  __asm(" lgr 0,%1\n"
+        " svc 9\n"
+        " st 15,%0\n"
+        : "=m"(m->load_r15)
+        : "r"(m->modname)
+        : "r0", "r1", "r15");
+  if (m->thptr)
+    free(m->thptr);
+  free(m);
+}
+extern void *__loadmod(const char *name) {
+  loadmod_t *m = (loadmod_t *)__malloc31(sizeof(loadmod_t));
+  if (!m)
+    return 0; // fail to allocate
+  memset(m, 0, sizeof(loadmod_t));
+  size_t len = strlen(name);
+  if (len > 8)
+    len = 8;
+  memcpy(m->modname, name, len);
+  if (len < 8) {
+    memset(len + m->modname, 0x40, 8 - len);
+  }
+  m->load_r1 = 0x80000000;
+  __asm(" lgr 0,%3\n"
+        " l  1,%1\n"
+        " svc 8\n"
+        " stg 0,%0\n"
+        " st 1,%1\n"
+        " st 15,%2\n"
+        : "=m"(m->reg15), "+m"(m->load_r1), "=m"(m->load_r15)
+        : "r"(m->modname)
+        : "r0", "r1", "r15");
+  if (m->load_r15) {
+    free(m);
+    return 0;
+  }
+  if ((unsigned long)m->reg15 & 0x0000000080000000UL) {
+    // module is amode-31
+    m->reg13 = m->dsa;
+  } else {
+    // module is amode-24
+    thunk24_t *t24 = (thunk24_t *)__malloc24(sizeof(thunk24_t));
+    if (!t24) {
+      // fail to allocate
+      __unloadmod(m);
+      return 0;
+    }
+    m->thptr = t24;
+    t24->sam24 = 0x010c;      // sam 24
+    t24->basr = 0x0def;       // basr 14,15
+    t24->sam64 = 0x010e;      // sam64
+    t24->loadr14[0] = 0xc4e8; // lgrl 14,+8  64 bit branch back
+    t24->loadr14[1] = 0x0000;
+    t24->loadr14[2] =
+        (offsetof(thunk24_t, braddr) - offsetof(thunk24_t, loadr14)) / 2;
+    t24->br14 = 0x07fe;
+    m->reg13 = t24->dsa;
+  }
+  return m;
+}
+
+// FIXME: noinline is specified, otherwise we get an error: No active USING for
+// operand H3090
+__attribute__((noinline)) extern long __callmod(void *mod, void *plist) {
+  loadmod_t *m = (loadmod_t *)mod;
+  long rc;
+  if (!mod)
+    return -1;
+  m->reg1 = plist;
+  if (m->thptr) {
+    // amode 24 call
+    __asm(" BASR 14,0 \n"
+          " USING *,14 \n"
+          " LG 1,%3 \n"
+          " LG 13,%4 \n"
+          " LG 15,%5 \n"
+          " LA 14,H3090 \n" // get the branch back address
+          " DROP 14 \n"
+          " STG 14,%1 \n" // store in braddr
+          " LGR 14,%2 \n" // load r4 to point to SAM24 instruction
+          " STMH 14,12,72(13)\n"
+          " BR 14 \n"                 // branch to thunk
+          "H3090 LMH  14,12,72(13)\n" // just in case program mess with the
+                                      // upper half of registers.
+          " LGR %0,15 \n"
+          : "=r"(rc), "=m"(m->thptr->braddr)
+          : "r"(&(m->thptr->sam24)), "m"(m->reg1), "m"(m->reg13), "m"(m->reg15)
+          : "r1", "r13", "r14", "r15");
+  } else {
+    // amode 31 call
+    __asm(" LG 1,%1 \n"
+          " LG 13,%2 \n"
+          " LG 15,%3 \n"
+          " SAM31 \n"
+          " STMH 14,12,72(13)\n"
+          " BASR 14,15 \n"
+          " LMH  14,12,72(13)\n" // just in case program mess with the upper
+                                 // half of registers
+          " SAM64 \n"
+          " LGR %0,15 \n"
+          : "=r"(rc)
+          : "m"(m->reg1), "m"(m->reg13), "m"(m->reg15)
+          : "r1", "r13", "r14", "r15");
+  }
+  return rc;
+}
+
+// IFAED Interfaces
+/*  Type for TYPE operand of IFAEDREG                                */
+typedef int IfaedType;
+
+/*  Type for Product Owner                                           */
+typedef char IfaedProdOwner[16];
+
+/*  Type for Product Name                                            */
+typedef char IfaedProdName[16];
+
+/*  Type for Feature Name                                            */
+typedef char IfaedFeatureName[16];
+
+/*  Type for Product Version                                         */
+typedef char IfaedProdVers[2];
+
+/*  Type for Product Release                                         */
+typedef char IfaedProdRel[2];
+
+/*  Type for Product Modification level                              */
+typedef char IfaedProdMod[2];
+
+/*  Type for Product ID                                              */
+typedef char IfaedProdID[8];
+
+/*  Type for Product Token                                           */
+typedef char IfaedProdToken[8];
+
+/*  Type for Features Length                                         */
+typedef int IfaedFeaturesLen;
+
+/*  Type for Return Code                                             */
+typedef int IfaedReturnCode;
+
+/*  Type for user supplied EDOI                                      */
+typedef struct {
+  struct {
+    int EdoiRegistered : 1;             /* The product is registered    */
+    int EdoiStatusNotDefined : 1;       /* The product is not known to
+                             be enabled or disabled                     */
+    int EdoiStatusEnabled : 1;          /* The product is enabled       */
+    int EdoiNotAllFeaturesReturned : 1; /* The featureslen
+                       area was too small to hold the features
+                       provided at registration time. Field
+                       EdoiNeededFeaturesLen contains the size
+                       provided at registration time.              */
+    int Rsvd0 : 4;                      /* Reserved                     */
+  } EdoiFlags;
+  char Rsvd1[3];             /* Reserved                            */
+  int EdoiNeededFeaturesLen; /* The featureslen size provided at
+                                 registration time                  */
+  struct {
+    IfaedProdVers EdoiProdVers; /* The version information
+                  provided at registration time                 */
+    IfaedProdRel EdoiProdRel;   /* The release information
+                  provided at registration time                 */
+    IfaedProdMod EdoiProdMod;   /* The mod level information
+                  provided at registration time                 */
+  } EdoiProdVersRelMod;
+  char Rsvd[2]; /* Reserved                            */
+} EDOI;
+
+typedef struct IFAEDSTA_parms {
+  void *__ptr32 args[8];
+  char cpo[16];    // PRODUCT OWNER
+  char cpnpp[16];  // PRODUCT NAME
+  char cfnpp[16];  // FEATURE NAME
+  char cpidpp[16]; // PID
+  int coinfo[4];
+  int cflpp;
+  int cfspp[256];
+  int crcpp;
+} IFAEDSTA_parms_t;
+
+typedef struct IFAARGS {
+  int prefix;
+  char id[8];
+  short listlen;
+  char version;
+  char request;
+  char prodowner[16];
+  char prodname[16];
+  char prodvers[8];
+  char prodqual[8];
+  char prodid[8];
+  char domain;
+  char scope;
+  char rsv0001;
+  char flags;
+  char *__ptr32 prtoken_addr;
+  char *__ptr32 begtime_addr;
+  char *__ptr32 data_addr;
+  char xformat;
+  char rsv0002[3];
+  char *__ptr32 currentdata_addr;
+  char *__ptr32 enddata_addr;
+  char *__ptr32 endtime_addr;
+} IFAARGS_t;
+
+#pragma convert("IBM-1047")
+const char *MODULE_QUERY_STATUS = "IFAEDSTA";
+const char *MODULE_REGISTER_USAGE = "IFAUSAGE";
+#pragma convert(pop)
+
+unsigned long long __registerProduct(int node_major_version,
+                                     const char *product_owner,
+                                     const char *feature_name,
+                                     const char *product_name,
+                                     const char *pid) {
+
+  // Check if SMF/Usage is Active first
+  char *xx = ((char *__ptr32 *__ptr32 *)0)[4][49];
+  if (0 == xx) {
+    fprintf(stderr, "WARNING: SMF or Usage Not Active\n");
+    return 1;
+  }
+  if (0 == (*xx & 0x04)) {
+    fprintf(stderr, "WARNING: SMF or Usage Not Active\n");
+    return 2;
+  }
+
+  // Creates buffers for registration product info
+  char str_product_owner[17];
+  char str_feature_name[17];
+  char str_product_name[17];
+  char str_pid[9];
+
+  // Left justify with space padding and convert to ebcdic
+  snprintf(str_product_owner, sizeof(str_product_owner), "%-16s",
+           product_owner);
+  __a2e_s(str_product_owner);
+  snprintf(str_feature_name, sizeof(str_feature_name), "%-16s", feature_name);
+  __a2e_s(str_feature_name);
+  snprintf(str_product_name, sizeof(str_product_name), "%-16s", product_name);
+  __a2e_s(str_product_name);
+  snprintf(str_pid, sizeof(str_pid), "%-8s", pid);
+  __a2e_s(str_pid);
+
+  // We use the Query_Status service (IFAEDSTA) to request information
+  // about the registration or enablement status of Node.js on z/OS.
+  void *mod = __loadmod(MODULE_QUERY_STATUS);
+  IFAEDSTA_parms_t *plist = 0;
+  if (!mod) {
+    fprintf(stderr, "WARNING: Failed to load IFAEDSTA");
+    return 3;
+  }
+
+  int rc;
+  plist = (IFAEDSTA_parms_t *)__malloc31(sizeof(IFAEDSTA_parms_t));
+  assert(plist);
+
+  // Copy string buffers to 32-bit address list
+  memcpy(plist->cpidpp, str_pid, 8);
+  memcpy(plist->cfnpp, str_feature_name, 16);
+  memcpy(plist->cpnpp, str_product_name, 16);
+  memcpy(plist->cpo, str_product_owner, 16);
+  memset(plist->coinfo, 0x00, 16);
+
+  plist->cflpp = 1024;
+  plist->crcpp = 1;
+  plist->args[0] = plist->cpo;
+  plist->args[1] = plist->cpnpp;
+  plist->args[2] = plist->cfnpp;
+  plist->args[3] = plist->cpidpp;
+  plist->args[4] = plist->coinfo;
+  plist->args[5] = &plist->cflpp;
+  plist->args[6] = plist->cfspp;
+  plist->args[7] = &plist->crcpp;
+  plist->args[7] =
+      (void *__ptr32)(0x80000000 | ((unsigned long)plist->args[7]));
+
+  rc = __callmod(mod, plist);
+  assert(rc != -1);
+  __unloadmod(mod);
+
+  if (!((EDOI *)(plist->coinfo))->EdoiFlags.EdoiStatusEnabled) {
+    fprintf(stderr, "WARNING: IFAEDSTA status is not enabled.");
+    free(plist);
+    return 4;
+  }
+
+  // Register Product with IFAUSAGE
+  IFAARGS_t *arg = (IFAARGS_t *)__malloc31(sizeof(IFAARGS_t));
+  assert(arg);
+  memset(arg, 0, sizeof(IFAARGS_t));
+  memcpy(arg->id, MODULE_REGISTER_USAGE, 8);
+  arg->listlen = sizeof(IFAARGS_t);
+  arg->version = 1;
+  arg->request = 1; // 1=REGISTER
+  memcpy(arg->prodowner, plist->cpo, 16);
+  memcpy(arg->prodname, plist->cpnpp, 16);
+
+  // Insert node major version
+  char version[9] = {0};
+  snprintf(version, 9, "%-8d", node_major_version);
+  __a2e_s(version);
+
+  memcpy(arg->prodvers, version, 8);
+  memcpy(arg->prodqual, "NONE    ", 8);
+  memcpy(arg->prodid, plist->cpidpp, 8);
+  arg->domain = 1;
+  arg->scope = 1;
+  unsigned long long ifausage_rc = 0xFFFFFFFFFFFFFFFF;
+
+  arg->prtoken_addr = (char *__ptr32)__malloc31(sizeof(char *__ptr32));
+  arg->begtime_addr = (char *__ptr32)__malloc31(sizeof(char *__ptr32));
+
+  // Load 25 (IFAUSAGE) into reg15 and call via SVC
+  asm(" la 15,25\n"
+      " svc 109\n"
+      " stg 15,%0\n"
+      : "=m"(ifausage_rc)
+      : "NR:r1"(arg)
+      : "r15");
+
+  free(arg);
+
+  if (plist)
+    free(plist);
+
+  return ifausage_rc;
+}
+
 #if TRACE_ON  // for debugging use
 class Fdtype {
   char buffer[64];
