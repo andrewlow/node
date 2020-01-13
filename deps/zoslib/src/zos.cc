@@ -1699,7 +1699,9 @@ struct iarv64parm {
   unsigned xpageframesize_2g : 1;                           //  168(4)
   unsigned xtype_fixed : 1;                                 //  168(5)
   unsigned xflags9_rsvd1 : 2;                               //  168(6)
-  unsigned char xrsv0005[7];                                //  169
+  unsigned xkeyused_inorigin : 1;                           //  169
+  unsigned x_rsv0005 : 7;                                   //  169(1)
+  unsigned char xrsv0006[6];                                //  170
 };
 static long long __iarv64(void* parm, void** ptr, long long* reason_code_ptr) {
   long long rc;
@@ -1743,6 +1745,47 @@ static void* __iarv64_alloc(int segs, const char* token) {
   parm.xuse2gto64g_yes = 1;
   parm.xexecutable_yes = 1;
   parm.keyused_ttoken = 1;
+  memcpy(&parm.xttoken, token, 16);
+  rc = __iarv64(&parm, &ptr, &reason);
+  if (mem_account())
+    dprintf(2,
+            "__iarv64_alloc: pid %d tid %d ptr=%p size=%lu(0x%lx) rc=%lx, "
+            "reason=%lx\n",
+            getpid(),
+            (int)(pthread_self().__ & 0x7fffffff),
+            parm.xorigin,
+            (unsigned long)(segs * 1024 * 1024),
+            (unsigned long)(segs * 1024 * 1024),
+            rc,
+            reason);
+  if (rc == 0) {
+    return parm.xorigin;
+  }
+  return 0;
+}
+
+static void* __iarv64_alloc_inorigin(int segs,
+                                     const char* token,
+                                     void* inorigin) {
+  void* ptr = 0;
+  long long rc, reason;
+  struct iarv64parm parm __attribute__((__aligned__(16)));
+  memset(&parm, 0, sizeof(parm));
+  parm.xversion = 6;
+  parm.xrequest = 1;
+  parm.xcond_yes = 1;
+  parm.xsegments = segs;
+  parm.xorigin = 0;
+  parm.xdumppriority = 99;
+  parm.xtype_pageable = 1;
+  parm.xdump = 32;
+  parm.xsadmp_no = 1;
+  parm.xpageframesize_pageable1meg = 1;
+  parm.xuse2gto64g_yes = 0;
+  parm.xexecutable_yes = 1;
+  parm.keyused_ttoken = 1;
+  parm.xkeyused_inorigin = 1;
+  parm.xmemobjstart = inorigin;
   memcpy(&parm.xttoken, token, 16);
   rc = __iarv64(&parm, &ptr, &reason);
   if (mem_account())
