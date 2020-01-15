@@ -1703,32 +1703,24 @@ struct iarv64parm {
   unsigned x_rsv0005 : 7;                                   //  169(1)
   unsigned char xrsv0006[6];                                //  170
 };
-static long long __iarv64(void* parm, void** ptr, long long* reason_code_ptr) {
+
+static long long __iarv64(void* parm, long long* reason_code_ptr) {
   long long rc;
   long long reason;
-  void* out = 0;
-  __asm volatile(
-      " llgtr 14,14 \n"
-      " l 14,16(0,0) \n"
-      " l 14,772(14,0) \n"
-      " l 14,208(14,0) \n"
-      " la 15,14 \n"
-      " or 14,15 \n"
-      " pc 0(14) \n"
-      " lgr %0,1 \n"
-      " lgr %1,15 \n"
-      " lgr %2,0 \n"
-      : "=r"(out), "=r"(rc), "=r"(reason), "+NR:r1"(parm)::"r0", "r14", "r15");
+  char* code = ((char* __ptr32* __ptr32* __ptr32*)0)[4][193][52];
+  code = (char *)(((unsigned long long)code) | 14);  // offset to the entry
+  asm(" pc 0(%3)"
+      : "=NR:r0"(reason), "+NR:r1"(parm), "=NR:r15"(rc)
+      : "r"(code)
+      :);
   rc = (rc & 0x0ffff);
   if (rc != 0 && reason_code_ptr != 0) {
     *reason_code_ptr = (0x0ffff & reason);
   }
-  if (out) *ptr = out;
   return rc;
 }
 
 static void* __iarv64_alloc(int segs, const char* token) {
-  void* ptr = 0;
   long long rc, reason;
   struct iarv64parm parm __attribute__((__aligned__(16)));
   memset(&parm, 0, sizeof(parm));
@@ -1746,7 +1738,7 @@ static void* __iarv64_alloc(int segs, const char* token) {
   parm.xexecutable_yes = 1;
   parm.keyused_ttoken = 1;
   memcpy(&parm.xttoken, token, 16);
-  rc = __iarv64(&parm, &ptr, &reason);
+  rc = __iarv64(&parm, &reason);
   if (mem_account())
     dprintf(2,
             "__iarv64_alloc: pid %d tid %d ptr=%p size=%lu(0x%lx) rc=%lx, "
@@ -1767,7 +1759,6 @@ static void* __iarv64_alloc(int segs, const char* token) {
 static void* __iarv64_alloc_inorigin(int segs,
                                      const char* token,
                                      void* inorigin) {
-  void* ptr = 0;
   long long rc, reason;
   struct iarv64parm parm __attribute__((__aligned__(16)));
   memset(&parm, 0, sizeof(parm));
@@ -1787,7 +1778,7 @@ static void* __iarv64_alloc_inorigin(int segs,
   parm.xkeyused_inorigin = 1;
   parm.xmemobjstart = inorigin;
   memcpy(&parm.xttoken, token, 16);
-  rc = __iarv64(&parm, &ptr, &reason);
+  rc = __iarv64(&parm, &reason);
   if (mem_account())
     dprintf(2,
             "__iarv64_alloc: pid %d tid %d ptr=%p size=%lu(0x%lx) rc=%lx, "
@@ -1818,7 +1809,7 @@ static int __iarv64_free(void* ptr, const char* token) {
   parm.xmemobjstart = ptr;
   parm.keyused_ttoken = 1;
   memcpy(&parm.xttoken, token, 16);
-  rc = __iarv64(&parm, &ptr, &reason);
+  rc = __iarv64(&parm, &reason);
   if (mem_account())
     dprintf(2,
             "__iarv64_free pid %d tid %d ptr=%p rc=%lld\n",
