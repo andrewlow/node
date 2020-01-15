@@ -3221,6 +3221,7 @@ unsigned long long __registerProduct(int node_major_version,
 
   memcpy(arg->prodvers, version, 8);
   memcpy(arg->prodqual, "NONE    ", 8);
+  __a2e_s(arg->prodqual);
   memcpy(arg->prodid, plist->cpidpp, 8);
   arg->domain = 1;
   arg->scope = 1;
@@ -3230,12 +3231,10 @@ unsigned long long __registerProduct(int node_major_version,
   arg->begtime_addr = (char *__ptr32)__malloc31(sizeof(char *__ptr32));
 
   // Load 25 (IFAUSAGE) into reg15 and call via SVC
-  asm(" la 15,25\n"
-      " svc 109\n"
-      " stg 15,%0\n"
-      : "=m"(ifausage_rc)
-      : "NR:r1"(arg)
-      : "r15");
+  asm( " svc 109\n"
+      : "=NR:r15"(ifausage_rc)
+      : "NR:r1"(arg),"NR:r15"(25)
+      : );
 
   free(arg);
 
