@@ -1128,13 +1128,17 @@ int Start(int argc, char** argv) {
 #ifdef __MVS__
   OS390ThreadManager threadPoolObj;
 
-  unsigned long long rc =
-      __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
-                        NJS_PRODUCT_NAME, NJS_PID);
+  std::string val;
+  if (!credentials::SafeGetenv("DISABLE_NODEJS_SMF89_REGISTRATION", &val)) {
+    unsigned long long rc =
+        __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
+                          NJS_PRODUCT_NAME, NJS_PID);
 
-  if (rc)
-    fprintf(stderr, "WARNING: Could not register product for tailored fit "
-                    "pricing, rc = %llu\n", rc);
+    if (rc)
+        fprintf(stderr, "WARNING: Could not register product for tailored fit "
+                        "pricing, rc = %llu\n",
+                rc);
+  }
 #endif
 
   InitializationResult result = InitializeOncePerProcess(argc, argv);
