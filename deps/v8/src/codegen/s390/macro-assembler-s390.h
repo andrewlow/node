@@ -522,7 +522,11 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
 
   void push(Register src) {
     lay(sp, MemOperand(sp, -kPointerSize));
+#ifdef __MVS__
+    StoreMultipleP(src, src, MemOperand(sp, 0));
+#else
     StoreP(src, MemOperand(sp));
+#endif
   }
 
   void pop(DoubleRegister dst) {
@@ -546,16 +550,27 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   // Push two registers.  Pushes leftmost register first (to highest address).
   void Push(Register src1, Register src2) {
     lay(sp, MemOperand(sp, -kPointerSize * 2));
+#ifdef __MVS__
+    StoreMultipleP(src1, src1, MemOperand(sp, kPointerSize));
+    StoreMultipleP(src2, src2, MemOperand(sp, 0));
+#else
     StoreP(src1, MemOperand(sp, kPointerSize));
     StoreP(src2, MemOperand(sp, 0));
+#endif
   }
 
   // Push three registers.  Pushes leftmost register first (to highest address).
   void Push(Register src1, Register src2, Register src3) {
     lay(sp, MemOperand(sp, -kPointerSize * 3));
+#ifdef __MVS__
+    StoreMultipleP(src1, src1, MemOperand(sp, kPointerSize * 2));
+    StoreMultipleP(src2, src2, MemOperand(sp, kPointerSize));
+    StoreMultipleP(src3, src3, MemOperand(sp, 0));
+#else
     StoreP(src1, MemOperand(sp, kPointerSize * 2));
     StoreP(src2, MemOperand(sp, kPointerSize));
     StoreP(src3, MemOperand(sp, 0));
+#endif
   }
 
   // Push four registers.  Pushes leftmost register first (to highest address).

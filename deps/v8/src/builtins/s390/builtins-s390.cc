@@ -571,9 +571,9 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
 
 #if V8_OS_ZOS
-    __ StoreMultipleP(r4, sp,  MemOperand(r4, 1472));
-    __ lay(r4, MemOperand(r4,-576));
-    __ LoadRR(sp, r4);
+    __ StoreMultipleP(sp /*r4*/, r4 /*r15*/,  MemOperand(sp, 1472));
+    __ lay(sp, MemOperand(sp, -576));
+    //__ LoadRR(sp, r4);
     __ LoadRR(r4, r3);
     __ LoadRR(r3, r2);
     __ LoadRR(r2, r1);
@@ -611,10 +611,9 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     //    Requires us to save the callee-preserved registers r6-r13
     //    General convention is to also save r14 (return addr) and
     //    sp/r15 as well in a single STM/STMG
-    __ lay(sp, MemOperand(sp, -10 * kPointerSize));
 #if V8_OS_ZOS
-// no need to save
 #else
+    __ lay(sp, MemOperand(sp, -10 * kPointerSize));
     __ StoreMultipleP(r6, sp, MemOperand(sp, 0));
 #endif
     pushed_stack_space += (kNumCalleeSaved + 2) * kPointerSize;
@@ -759,8 +758,8 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 // no need to restore
 #else
   __ LoadMultipleP(r6, sp, MemOperand(sp, 0));
-#endif
   __ la(sp, MemOperand(sp, 10 * kPointerSize));
+#endif
 
 // saving floating point registers
 #if V8_TARGET_ARCH_S390X
@@ -784,7 +783,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
 #ifdef V8_OS_ZOS
   __ LoadRR(r3, r2);
-  __ LoadMultipleP(r4, sp, MemOperand(sp, 2048));
+  __ LoadMultipleP(sp /*r4*/, r4 /*sp*/, MemOperand(sp, 2048));
   __ b(r7);
 #else
   __ b(r14);
@@ -2814,9 +2813,9 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   __ LoadRR(r3, r4);
   int stack_space = 16;
   stack_space += 5;
-  __ lay(r4, MemOperand(sp, -((stack_space *kPointerSize) + kStackPointerBias)));
+  __ lay(sp, MemOperand(sp, -((stack_space *kPointerSize) + kStackPointerBias)));
   __ StoreMultipleP(r5, r7,
-                    MemOperand(r4, kStackPointerBias + 19*kPointerSize));
+                    MemOperand(sp, kStackPointerBias + 19*kPointerSize));
   // Load environment from slot 0 of fn desc.
   __ LoadP(r5, MemOperand(r7));
 #if !defined(USE_SIMULATOR)
@@ -2833,6 +2832,7 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   __ StoreReturnAddressAndCall(target);
 
 #if V8_OS_ZOS
+  __ lay(sp, MemOperand(sp, ((stack_space *kPointerSize) + kStackPointerBias)));
   // TODO(mcornac): r9 and r13 are used to store argc and argv on z/OS instead
   // of r6 and r8 since r6 is not callee saved.
   __ LoadRR(r6, r9);
@@ -3170,7 +3170,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
   }
 
   // Update System Stack Pointer with the appropriate XPLINK stack bias.
-  __ lay(r4, MemOperand(sp, -kStackPointerBias));
+  __ lay(sp, MemOperand(sp, -kStackPointerBias));
   __ LoadRR(r13, r7);
 #endif
 
@@ -3185,6 +3185,8 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 #endif
 
 #ifdef V8_OS_ZOS
+  // Update System Stack Pointer with the appropriate XPLINK stack bias.
+  __ lay(sp, MemOperand(sp, kStackPointerBias));
   __ LoadRR(r7, r13);
 #endif
 

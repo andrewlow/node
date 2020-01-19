@@ -650,6 +650,7 @@ Address CodeObjectRegistry::GetCodeObjectStartFromInnerAddress(
   // of already existing code objects.
   Address already_existing_set_ = 0;
   Address newly_allocated_set_ = 0;
+printf("TESTING\n");
   if (!code_object_registry_already_existing_.empty()) {
     auto it =
         std::upper_bound(code_object_registry_already_existing_.begin(),
@@ -658,6 +659,7 @@ Address CodeObjectRegistry::GetCodeObjectStartFromInnerAddress(
       already_existing_set_ = *(--it);
     }
   }
+printf("TESTING1\n");
 
   // Next, let's find the object which comes right before address in the set
   // of newly allocated code objects.

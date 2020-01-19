@@ -47,7 +47,11 @@ void Deoptimizer::GenerateDeoptimizationEntries(MacroAssembler* masm,
 
   // Push all GPRs onto the stack
   __ lay(sp, MemOperand(sp, -kNumberOfRegisters * kPointerSize));
+#ifdef __MVS__
+  __ StoreMultipleP(r0, r4 /*r15*/, MemOperand(sp));  // Save all 16 registers
+#else
   __ StoreMultipleP(r0, sp, MemOperand(sp));  // Save all 16 registers
+#endif
 
   __ mov(r1, Operand(ExternalReference::Create(
                  IsolateAddressId::kCEntryFPAddress, isolate)));

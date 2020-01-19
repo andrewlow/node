@@ -1346,8 +1346,8 @@ void MacroAssembler::CheckDebugHook(Register fun, Register new_target,
   ExternalReference debug_hook_active =
       ExternalReference::debug_hook_on_function_call_address(isolate());
   Move(r6, debug_hook_active);
-  tm(MemOperand(r6), Operand::Zero());
-  bne(&skip_hook);
+  tm(MemOperand(r6), Operand(0xFF));
+  beq(&skip_hook);
 
   {
     // Load receiver to pass it later to DebugOnFunctionCall hook.
@@ -1942,9 +1942,9 @@ void TurboAssembler::CallCFunctionHelper(Register function,
   } else {
      StoreMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
   }
-
   // Set up the system stack pointer with the XPLINK bias.
-  lay(r4, MemOperand(sp, -kStackPointerBias));
+  lay(sp, MemOperand(sp, -kStackPointerBias));
+
 #endif
 
   // Save the frame pointer and PC so that the stack layout remains iterable,
@@ -1984,6 +1984,8 @@ void TurboAssembler::CallCFunctionHelper(Register function,
   } else {
     basr(r7, dest);
   }
+
+  lay(sp, MemOperand(sp, kStackPointerBias));
 
   // Restore r5-r9 from the appropriate stack locations (see notes above).
   if (num_reg_arguments == 4) {

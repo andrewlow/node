@@ -12,9 +12,15 @@ namespace v8 {
 namespace internal {
 
 // clang-format off
+#ifdef __MVS__
+#define GENERAL_REGISTERS(V)                              \
+  V(r0)  V(r1)  V(r2)  V(r3)  V(sp)  V(r5)  V(r6)  V(r7)  \
+  V(r8)  V(r9)  V(r10) V(fp) V(ip) V(r13) V(r14) V(r4)
+#else
 #define GENERAL_REGISTERS(V)                              \
   V(r0)  V(r1)  V(r2)  V(r3)  V(r4)  V(r5)  V(r6)  V(r7)  \
   V(r8)  V(r9)  V(r10) V(fp) V(ip) V(r13) V(r14) V(sp)
+#endif
 
 #define ALLOCATABLE_GENERAL_REGISTERS(V)                  \
   V(r2)  V(r3)  V(r4)  V(r5)  V(r6)  V(r7)                \

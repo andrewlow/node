@@ -263,7 +263,7 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
       Address recv = params.receiver->ptr();
       Address** argv = reinterpret_cast<Address**>(params.argv);
       RuntimeCallTimerScope timer(isolate, RuntimeCallCounterId::kJS_Execution);
-#if __MVS__
+#ifndef __MVS__
       char *__new[1];
       char **__old;
       char ***__le_savstack_async_addr = (42 + ((char ****__ptr32 *)1208)[0][11]);
@@ -273,7 +273,7 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
 #endif
       value = Object(stub_entry.Call(isolate->isolate_data()->isolate_root(),
                                      orig_func, func, recv, params.argc, argv));
-#if __MVS__
+#ifndef __MVS__
       *__le_savstack_async_addr = __old;
 #endif
     } else {
