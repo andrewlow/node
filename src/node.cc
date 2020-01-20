@@ -3647,6 +3647,8 @@ static void PrintHelp() {
          "                             V6      same as node V6 always convert data\n"
          "                                     from ccsid 1047 to ccsid 819 (DEFAULT)\n"
          "                             STRICT  do not convert data\n"
+         "DISABLE_NODEJS_SMF89_REGISTRATION    Disable the creation of SMF 89 records\n"
+         "                                     with IFAUSAGE for tailored fit pricing\n"
          "\n"
          "Documentation can be found at https://nodejs.org/\n");
 #pragma convert(pop)
@@ -4722,13 +4724,16 @@ int Start(int argc, char** argv) {
 
 #ifdef __MVS__
   // Register product for tailored fit pricing
-  unsigned long long rc =
-      __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
-                        NJS_PRODUCT_NAME, NJS_PID);
+  std::string val;
+  if (!SafeGetenv("DISABLE_NODEJS_SMF89_REGISTRATION", &val)) {
+    unsigned long long rc =
+        __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
+                          NJS_PRODUCT_NAME, NJS_PID);
 
-  if (rc)
-    fprintf(stderr, "WARNING: Could not register product for tailored fit "
-                    "pricing, rc = %llu\n", rc);
+    if (rc)
+      fprintf(stderr, "WARNING: Could not register product for tailored fit "
+                      "pricing, rc = %llu\n", rc);
+  }
 
   for (int i = 0; i < argc; i++)
     __e2a_s(argv[i]);
