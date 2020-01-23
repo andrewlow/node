@@ -898,7 +898,7 @@ static void RealPath(const FunctionCallbackInfo<Value>& args) {
   BufferValue path(env->isolate(), args[0]);
   ASSERT_PATH(path)
 
-  const enum encoding encoding = ParseEncoding(env->isolate(), args[1], EBCDIC);
+  const enum encoding encoding = ParseEncoding(env->isolate(), args[1], UTF8);
 
   Local<Value> callback = Null(env->isolate());
   if (argc == 3)
@@ -912,7 +912,11 @@ static void RealPath(const FunctionCallbackInfo<Value>& args) {
 
     Local<Value> error;
     MaybeLocal<Value> rc = StringBytes::Encode(env->isolate(),
+#ifdef __MVS__
+                                               *E2A(link_path),
+#else
                                                link_path,
+#endif
                                                encoding,
                                                &error);
     if (rc.IsEmpty()) {
