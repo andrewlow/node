@@ -90,6 +90,10 @@
 #include "src/diagnostics/unwinding-info-win64.h"
 #endif  // V8_OS_WIN64
 
+#if defined(__MVS__)
+#include "zos.h"
+#endif
+
 extern "C" const uint8_t* v8_Default_embedded_blob_;
 extern "C" uint32_t v8_Default_embedded_blob_size_;
 
@@ -3393,6 +3397,9 @@ bool Isolate::Init(ReadOnlyDeserializer* read_only_deserializer,
     // using one thread.
     ExecutionAccess lock(this);
     stack_guard()->InitThread(lock);
+#if defined(__MVS__)
+    expandStack(FLAG_stack_size*KB);
+#endif
   }
 
   // SetUp the object heap.
