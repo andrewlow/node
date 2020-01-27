@@ -49,6 +49,10 @@ char** __argv;
 extern void __settimelimit(int secs);
 static int shmid_value(void);
 
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+
 static inline void* __convert_one_to_one(const void* table,
                                          void* dst,
                                          size_t size,
@@ -466,6 +470,10 @@ extern "C" int __console_printf(const char* fmt, ...) {
 quit:
   __ae_thread_swapmode(mode);
   return len;
+}
+
+extern "C" int gettid() {
+  return (int)(pthread_self().__ & 0x7fffffff);
 }
 
 extern "C" int vdprintf(int fd, const char* fmt, va_list ap) {
@@ -3610,3 +3618,33 @@ int __open(const char* file, int oflag, int mode) {
   return rv;
 }
 #endif  // for debugging use
+
+extern "C" void expandStack(unsigned long stack_size_in_bytes) {
+  const int MB = 1024*1024;
+  stack_size_in_bytes = max(MB,stack_size_in_bytes);
+  if (stack_size_in_bytes % MB) {
+    stack_size_in_bytes = stack_size_in_bytes + MB - (stack_size_in_bytes % MB);
+  }
+  //dprintf(2,"\n");
+  unsigned long i = 0;
+  unsigned long total_iterations = stack_size_in_bytes/MB;
+
+  __asm volatile(
+        "&suffix SETA &suffix+1\n"
+        "beg&suffix CGR      %0,%1\n"    // Compare
+        " JNL  end&suffix\n"
+        " AGFI 4,-1048576\n"   // Grow the stack by 1MB
+        " STMG %0,%0,0(4)\n"   // Cause Stack overflow
+        " AGHI      %0,1\n"    // Increment by 1
+        " J beg&suffix\n"      // Iterate
+        "end&suffix LGHI      %0,0\n"
+        "&suffix SETA &suffix+1\n"
+        "beg&suffix CGR      %0,%1\n"   // Compare
+        " JNL  end&suffix\n"
+        " AGFI 4,1048576\n"   // Shrink the stack by 1MB
+        " AGHI      %0,1\n"    // Increment by 1
+        " J beg&suffix\n"      // Iterate
+        "end&suffix DS 0D\n"
+        : "+NR:r6"(i)
+        : "r"(total_iterations) );
+}
