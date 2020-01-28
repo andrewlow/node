@@ -1263,11 +1263,7 @@ DEFINE_UINT(serialization_chunk_size, 4096,
 // Regexp
 DEFINE_BOOL(regexp_optimization, true, "generate optimized regexp code")
 DEFINE_BOOL(regexp_mode_modifiers, false, "enable inline flags in regexp.")
-#ifdef V8_OS_ZOS
 DEFINE_BOOL(regexp_interpret_all, false, "interpret all regexp code")
-#else
-DEFINE_BOOL(regexp_interpret_all, false, "interpret all regexp code")
-#endif
 DEFINE_BOOL(regexp_tier_up, false,
             "enable regexp interpreter and tier up to the compiler")
 DEFINE_NEG_IMPLICATION(regexp_interpret_all, regexp_tier_up)
