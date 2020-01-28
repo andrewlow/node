@@ -635,20 +635,18 @@ Handle<HeapObject> RegExpMacroAssemblerS390::GetCode(Handle<String> source) {
   //    General convention is to also save r14 (return addr) and
   //    sp/r15 as well in a single STM/STMG
 #if V8_OS_ZOS
-  __ LoadRR(sp, r4);
-
   // Move stack down by (12*8) to save r4-r15
-  __ lay(sp, MemOperand(sp, -12 * kPointerSize));
+  __ lay(r4, MemOperand(r4, -12 * kPointerSize));
 
   // Store r4..r15 (sp) to stack
-  __ StoreMultipleP(r4, sp, MemOperand(sp, 0));
+  __ StoreMultipleP(r4, sp, MemOperand(r4, 0));
+  __ LoadRR(sp, r4);
 
   // Load C args from stack to registers
-  __ LoadMultipleP(r5, r10, MemOperand(r4, kStackPointerBias + (19 * kPointerSize)));
+  __ LoadMultipleP(r5, r10, MemOperand(r4, (12 * kPointerSize) + kStackPointerBias + (19 * kPointerSize)));
   __ LoadRR(r4, r3);
   __ LoadRR(r3, r2);
   __ LoadRR(r2, r1);
-
 #else
   __ StoreMultipleP(r6, sp, MemOperand(sp, 6 * kPointerSize));
   // Load stack parameters from caller stack frame
@@ -670,7 +668,9 @@ Handle<HeapObject> RegExpMacroAssemblerS390::GetCode(Handle<String> source) {
   // Set frame pointer in space for it if this is not a direct call
   // from generated code.
   __ LoadRR(frame_pointer(), sp);
+#ifdef V8_OS_ZOS
   __ StoreP(r10, MemOperand(frame_pointer(), kIsolate));
+#endif
   __ lay(sp, MemOperand(sp, -10 * kPointerSize));
   __ mov(r1, Operand::Zero());  // success counter
   __ LoadRR(r0, r1);            // offset of location
@@ -899,7 +899,7 @@ Handle<HeapObject> RegExpMacroAssemblerS390::GetCode(Handle<String> source) {
 #ifdef V8_OS_ZOS
   __ LoadRR(r3, r2);
   __ LoadMultipleP(r4, sp, MemOperand(sp, 0));
-  __ lay(sp, MemOperand(sp, 12 * kPointerSize));
+  __ lay(r4, MemOperand(r4, 12 * kPointerSize));
   __ b(r7);
 #else
   __ b(r14);
@@ -1116,8 +1116,41 @@ void RegExpMacroAssemblerS390::CallCheckStackGuardState(Register scratch) {
       ExternalReference::re_check_stack_guard_state(isolate());
 
   __ mov(ip, Operand(stack_guard_check));
+#if V8_OS_ZOS
+  // Shuffle input arguments
+  __ LoadRR(r1, r2);
+  __ LoadRR(r2, r3);
+  __ LoadRR(r3, r4);
 
-  __ CallCFunction(ip, num_arguments);
+  // XPLINK treats r7 as voliatile return register, but r14 as preserved
+  // Since Linux is the other way around, perserve r7 value in r14 across
+  // the call.
+  __ LoadRR(r14, r7);
+
+  __ StoreMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
+
+  // Set up the system stack pointer with the XPLINK bias.
+  __ lay(r4, MemOperand(sp, -kStackPointerBias));
+#endif
+
+#ifdef V8_OS_ZOS
+ // Obtain code entry based on function pointer
+ __ LoadMultipleP(r5, r6, MemOperand(ip, 0));
+ __ StoreReturnAddressAndCall(r6);
+#else
+ __ StoreReturnAddressAndCall(ip);
+#endif
+
+#ifdef V8_OS_ZOS
+  // Restore r5 and r6
+  __ LoadMultipleP(r5, r6, MemOperand(sp, 5 * kPointerSize));
+
+  // Restore original r7
+  __ LoadRR(r7, r14);
+
+  // Shuffle the result
+  __ LoadRR (r2, r3);
+#endif
 
   if (base::OS::ActivationFrameAlignment() > kPointerSize) {
     __ LoadP(sp, MemOperand(sp, (kNumRequiredStackFrameSlots * kPointerSize)));
@@ -1269,8 +1302,8 @@ void RegExpMacroAssemblerS390::CallCFunctionUsingStub(
   __ mov(code_pointer(), Operand(masm_->CodeObject()));
 }
 
-#ifdef __MVS__
 //FIXME: need noinline here due to runtime error
+#ifdef V8_OS_ZOS
 __attribute__((noinline))
 #endif
 void RegExpMacroAssemblerS390::LoadCurrentCharacterUnchecked(int cp_offset,
