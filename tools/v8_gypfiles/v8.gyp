@@ -1552,6 +1552,19 @@
                 'mips_use_msa=<(mips_use_msa)',
               ],
             }],
+            ['is_debug and not v8_optimized_debug', {
+              'variables': {
+                'v8_dump_build_config_args': [
+                  'is_full_debug=1',
+                ],
+              },
+            }, {
+              'variables': {
+                'v8_dump_build_config_args': [
+                  'is_full_debug=0',
+                ],
+              },
+            }],
           ],
           'action': [
             'python', '<(V8_ROOT)/tools/testrunner/utils/dump_build_config_gyp.py',
