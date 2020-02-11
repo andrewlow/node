@@ -91,7 +91,7 @@ rules. `module` may be either a path to a file, or a node module name.
 
 ### `--insecure-http-parser`
 <!-- YAML
-added: REPLACEME
+added: v6.17.0.2
 -->
 
 Use an insecure HTTP parser that accepts invalid HTTP headers. This may allow

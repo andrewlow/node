@@ -1523,7 +1523,7 @@ connected to.
 <!-- YAML
 added: v0.1.13
 changes:
-  - version: v6.17.0
+  - version: v6.17.0.2
     pr-url: https://github.com/nodejs/node/pull/31448
     description: The `insecureHTTPParser` option is supported now.
 -->
@@ -1622,7 +1622,7 @@ Defaults to 8KB. Configurable using the [`--max-http-header-size`][] CLI option.
 <!-- YAML
 added: v0.3.6
 changes:
-  - version: REPLACEME
+  - version: v6.17.0.2
     pr-url: https://github.com/nodejs/node/pull/31448
     description: The `insecureHTTPParser` option is supported now.
 -->
