@@ -67,6 +67,10 @@ const uint32_t kOnExecute = 4;
   int name##_(const char* at, size_t length)
 
 
+inline bool IsOWS(char c) {
+  return c == '\x20' || c == '\x9';
+}
+
 // helper class for the Parser
 struct StringPtr {
   StringPtr() {
@@ -126,10 +130,19 @@ struct StringPtr {
 
 
   Local<String> ToString(Environment* env) const {
-    if (str_)
+    if (size_ != 0)
       return OneByteString(env->isolate(), str_, size_);
     else
       return String::Empty(env->isolate());
+  }
+
+
+  // Strip trailing OWS (SPC or HTAB) from string.
+  Local<String> ToTrimmedString(Environment* env) {
+    while (size_ > 0 && IsOWS(str_[size_ - 1])) {
+      size_--;
+    }
+    return ToString(env);
   }
 
 
@@ -648,7 +661,7 @@ class Parser : public AsyncWrap {
       size_t j = 0;
       while (i < num_values_ && j < arraysize(argv) / 2) {
         argv[j * 2] = fields_[i].ToString(env());
-        argv[j * 2 + 1] = values_[i].ToString(env());
+        argv[j * 2 + 1] = values_[i].ToTrimmedString(env());
         i++;
         j++;
       }
