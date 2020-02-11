@@ -262,7 +262,6 @@ const struct message requests[] =
   ,.type= HTTP_REQUEST
   ,.raw= "\x50\x4f\x53\x54\x20\x2f\x70\x6f\x73\x74\x5f\x69\x64\x65\x6e\x74\x69\x74\x79\x5f\x62\x6f\x64\x79\x5f\x77\x6f\x72\x6c\x64\x3f\x71\x3d\x73\x65\x61\x72\x63\x68\x23\x68\x65\x79\x20\x48\x54\x54\x50\x2f\x31\x2e\x31\xd\xa"
          "\x41\x63\x63\x65\x70\x74\x3a\x20\x2a\x2f\x2a\xd\xa"
-         "\x54\x72\x61\x6e\x73\x66\x65\x72\x2d\x45\x6e\x63\x6f\x64\x69\x6e\x67\x3a\x20\x69\x64\x65\x6e\x74\x69\x74\x79\xd\xa"
          "\x43\x6f\x6e\x74\x65\x6e\x74\x2d\x4c\x65\x6e\x67\x74\x68\x3a\x20\x35\xd\xa"
          "\xd\xa"
          "\x57\x6f\x72\x6c\x64"
@@ -275,10 +274,9 @@ const struct message requests[] =
   ,.fragment= "\x68\x65\x79"
   ,.request_path= "\x2f\x70\x6f\x73\x74\x5f\x69\x64\x65\x6e\x74\x69\x74\x79\x5f\x62\x6f\x64\x79\x5f\x77\x6f\x72\x6c\x64"
   ,.request_url= "\x2f\x70\x6f\x73\x74\x5f\x69\x64\x65\x6e\x74\x69\x74\x79\x5f\x62\x6f\x64\x79\x5f\x77\x6f\x72\x6c\x64\x3f\x71\x3d\x73\x65\x61\x72\x63\x68\x23\x68\x65\x79"
-  ,.num_headers= 3
+  ,.num_headers= 2
   ,.headers=
     { { "\x41\x63\x63\x65\x70\x74", "\x2a\x2f\x2a" }
-    , { "\x54\x72\x61\x6e\x73\x66\x65\x72\x2d\x45\x6e\x63\x6f\x64\x69\x6e\x67", "\x69\x64\x65\x6e\x74\x69\x74\x79" }
     , { "\x43\x6f\x6e\x74\x65\x6e\x74\x2d\x4c\x65\x6e\x67\x74\x68", "\x35" }
     }
   ,.body= "\x57\x6f\x72\x6c\x64"
@@ -1193,6 +1191,61 @@ const struct message requests[] =
   ,.headers= { { "Host", "example.com" } }
   ,.body= ""
   }
+
+#define POST_MULTI_TE_LAST_CHUNKED 43
+, {.name= "post - multi coding transfer-encoding chunked body"
+  ,.type= HTTP_REQUEST
+  ,.raw= "POST / HTTP/1.1\r\n"
+         "Transfer-Encoding: deflate, chunked\r\n"
+         "\r\n"
+         "1e\r\nall your base are belong to us\r\n"
+         "0\r\n"
+         "\r\n"
+  ,.should_keep_alive= TRUE
+  ,.message_complete_on_eof= FALSE
+  ,.http_major= 1
+  ,.http_minor= 1
+  ,.method= HTTP_POST
+  ,.query_string= ""
+  ,.fragment= ""
+  ,.request_path= "/"
+  ,.request_url= "/"
+  ,.num_headers= 1
+  ,.headers=
+    { { "Transfer-Encoding" , "deflate, chunked" }
+    }
+  ,.body= "all your base are belong to us"
+  ,.num_chunks_complete= 2
+  ,.chunk_lengths= { 0x1e }
+  }
+
+#define POST_MULTI_LINE_TE_LAST_CHUNKED 43
+, {.name= "post - multi coding transfer-encoding chunked body"
+  ,.type= HTTP_REQUEST
+  ,.raw= "POST / HTTP/1.1\r\n"
+         "Transfer-Encoding: deflate,\r\n"
+         " chunked\r\n"
+         "\r\n"
+         "1e\r\nall your base are belong to us\r\n"
+         "0\r\n"
+         "\r\n"
+  ,.should_keep_alive= TRUE
+  ,.message_complete_on_eof= FALSE
+  ,.http_major= 1
+  ,.http_minor= 1
+  ,.method= HTTP_POST
+  ,.query_string= ""
+  ,.fragment= ""
+  ,.request_path= "/"
+  ,.request_url= "/"
+  ,.num_headers= 1
+  ,.headers=
+    { { "Transfer-Encoding" , "deflate, chunked" }
+    }
+  ,.body= "all your base are belong to us"
+  ,.num_chunks_complete= 2
+  ,.chunk_lengths= { 0x1e }
+  }
 };
 
 /* * R E S P O N S E S * */
@@ -1969,6 +2022,28 @@ const struct message responses[] =
     }
   ,.num_chunks_complete= 3
   ,.chunk_lengths= { 2, 2 }
+  }
+#define HTTP_200_MULTI_TE_NOT_LAST_CHUNKED 28
+, {.name= "HTTP 200 response with `chunked` being *not last* Transfer-Encoding"
+  ,.type= HTTP_RESPONSE
+  ,.raw= "HTTP/1.1 200 OK\r\n"
+         "Transfer-Encoding: chunked, identity\r\n"
+         "\r\n"
+         "2\r\n"
+         "OK\r\n"
+         "0\r\n"
+         "\r\n"
+  ,.should_keep_alive= FALSE
+  ,.message_complete_on_eof= TRUE
+  ,.http_major= 1
+  ,.http_minor= 1
+  ,.status_code= 200
+  ,.response_status= "OK"
+  ,.num_headers= 1
+  ,.headers= { { "Transfer-Encoding", "chunked, identity" }
+             }
+  ,.body= "2\r\nOK\r\n0\r\n\r\n"
+  ,.num_chunks_complete= 0
   }
 };
 
@@ -3663,7 +3738,7 @@ test_chunked_content_length_error (int req)
   parsed = http_parser_execute(&parser, &settings_null, buf, strlen(buf));
   assert(parsed == strlen(buf));
 
-  buf = "\x54\x72\x61\x6e\x73\x66\x65\x72\x2d\x45\x6e\x63\x6f\x64\x69\x6e\x67\x3a\x20\x63\x68\x75\x6e\x6b\x65\x64\xd\xaC\x6f\x6e\x74\x65\x6e\x74\x2d\x4c\x65\x6e\x67\x74\x68\x3a\x20\x31\xd\xa\xd\xa";
+  buf = "\x54\x72\x61\x6e\x73\x66\x65\x72\x2d\x45\x6e\x63\x6f\x64\x69\x6e\x67\x3a\x20\x61\x6e\x79\x74\x68\x69\x6e\x67\xd\xa\x43\x6f\x6e\x74\x65\x6e\x74\x2d\x4c\x65\x6e\x67\x74\x68\x3a\x20\x31\xd\xa\xd\xa";
   size_t buflen = strlen(buf);
 
   parsed = http_parser_execute(&parser, &settings_null, buf, buflen);
@@ -4331,6 +4406,12 @@ main (void)
               "\xd\xa"
               "\x66\x6f\x6f\x62\x61",
               HPE_OK);
+
+  // Unknown Transfer-Encoding in request
+  test_simple("GET / HTTP/1.1\r\n"
+              "Transfer-Encoding: unknown\r\n"
+              "\r\n",
+              HPE_INVALID_TRANSFER_ENCODING);
 
   static const char *all_methods[] = {
     "\x44\x45\x4c\x45\x54\x45",

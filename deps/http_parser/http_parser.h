@@ -28,7 +28,7 @@ extern "C" {
 /* Also update SONAME in the Makefile whenever you change these. */
 #define HTTP_PARSER_VERSION_MAJOR 2
 #define HTTP_PARSER_VERSION_MINOR 9
-#define HTTP_PARSER_VERSION_PATCH 1
+#define HTTP_PARSER_VERSION_PATCH 3
 
 #include <stddef.h>
 #if defined(_WIN32) && !defined(__MINGW32__) && \
@@ -226,6 +226,7 @@ enum flags
   , F_UPGRADE               = 1 << 5
   , F_SKIPBODY              = 1 << 6
   , F_CONTENTLENGTH         = 1 << 7
+  , F_TRANSFER_ENCODING     = 1 << 8
   };
 
 
@@ -272,6 +273,8 @@ enum flags
      "\x75\x6e\x65\x78\x70\x65\x63\x74\x65\x64\x20\x63\x6f\x6e\x74\x65\x6e\x74\x2d\x6c\x65\x6e\x67\x74\x68\x20\x68\x65\x61\x64\x65\x72")                             \
   XX(INVALID_CHUNK_SIZE,                                             \
      "\x69\x6e\x76\x61\x6c\x69\x64\x20\x63\x68\x61\x72\x61\x63\x74\x65\x72\x20\x69\x6e\x20\x63\x68\x75\x6e\x6b\x20\x73\x69\x7a\x65\x20\x68\x65\x61\x64\x65\x72")                       \
+  XX(INVALID_TRANSFER_ENCODING,                                      \
+     "\x72\x65\x71\x75\x65\x73\x74\x20\x68\x61\x73\x20\x69\x6e\x76\x61\x6c\x69\x64\x20\x74\x72\x61\x6e\x73\x66\x65\x72\x2d\x65\x6e\x63\x6f\x64\x69\x6e\x67")                        \
   XX(INVALID_CONSTANT, "\x69\x6e\x76\x61\x6c\x69\x64\x20\x63\x6f\x6e\x73\x74\x61\x6e\x74\x20\x73\x74\x72\x69\x6e\x67")                    \
   XX(INVALID_INTERNAL_STATE, "\x65\x6e\x63\x6f\x75\x6e\x74\x65\x72\x65\x64\x20\x75\x6e\x65\x78\x70\x65\x63\x74\x65\x64\x20\x69\x6e\x74\x65\x72\x6e\x61\x6c\x20\x73\x74\x61\x74\x65")\
   XX(STRICT, "\x73\x74\x72\x69\x63\x74\x20\x6d\x6f\x64\x65\x20\x61\x73\x73\x65\x72\x74\x69\x6f\x6e\x20\x66\x61\x69\x6c\x65\x64")                         \
@@ -294,11 +297,11 @@ enum http_errno {
 struct http_parser {
   /** PRIVATE **/
   unsigned int type : 2;         /* enum http_parser_type */
-  unsigned int flags : 8;        /* F_* values from 'flags' enum; semi-public */
   unsigned int state : 7;        /* enum state from http_parser.c */
   unsigned int header_state : 7; /* enum header_state from http_parser.c */
   unsigned int index : 7;        /* index into current matcher */
   unsigned int lenient_http_headers : 1;
+  unsigned int flags : 16;       /* F_* values from 'flags' enum; semi-public */
 
   uint32_t nread;          /* # bytes read in various scenarios */
   uint64_t content_length; /* # bytes in body (0 if no Content-Length header) */
