@@ -1505,15 +1505,14 @@ static Local<Object> X509ToObject(Environment* env, X509* cert) {
     if (index < 0)
       continue;
 
-    X509_EXTENSION* ext;
-    int rv;
-
-    ext = X509_get_ext(cert, index);
+    X509_EXTENSION* ext = X509_get_ext(cert, index);
     CHECK_NE(ext, nullptr);
 
-    if (!SafeX509ExtPrint(bio, ext)) {
-      rv = X509V3_EXT_print(bio, ext, 0, 0);
-      CHECK_EQ(rv, 1);
+    if (!SafeX509ExtPrint(bio, ext) &&
+        X509V3_EXT_print(bio, ext, 0, 0) != 1) {
+      info->Set(keys[i], Null(env->isolate()));
+      (void) BIO_reset(bio);
+      continue;
     }
 
     BIO_get_mem_ptr(bio, &mem);
