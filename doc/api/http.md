@@ -1522,7 +1522,18 @@ connected to.
 ## http.createServer([requestListener])
 <!-- YAML
 added: v0.1.13
+changes:
+  - version: v6.17.0
+    pr-url: https://github.com/nodejs/node/pull/31448
+    description: The `insecureHTTPParser` option is supported now.
 -->
+
+* `options` {Object}
+  * `insecureHTTPParser` {boolean} Use an insecure HTTP parser that accepts
+    invalid HTTP headers when `true`. Using the insecure parser should be
+    avoided. See [`--insecure-http-parser`][] for more information.
+    **Default:** `false`
+* `requestListener` {Function}
 
 * Returns: {http.Server}
 
@@ -1610,6 +1621,10 @@ Defaults to 8KB. Configurable using the [`--max-http-header-size`][] CLI option.
 ## http.request(options[, callback])
 <!-- YAML
 added: v0.3.6
+changes:
+  - version: REPLACEME
+    pr-url: https://github.com/nodejs/node/pull/31448
+    description: The `insecureHTTPParser` option is supported now.
 -->
 
 * `options` {Object}
@@ -1622,6 +1637,10 @@ added: v0.3.6
     `hostname`. Valid values are `4` or `6`. When unspecified, both IP v4 and
     v6 will be used.
   * `port` {number} Port of remote server. Defaults to 80.
+  * `insecureHTTPParser` {boolean} Use an insecure HTTP parser that accepts
+    invalid HTTP headers when `true`. Using the insecure parser should be
+    avoided. See [`--insecure-http-parser`][] for more information.
+    Defaults to `false`.
   * `localAddress` {string} Local interface to bind for network connections.
   * `socketPath` {string} Unix Domain Socket (use one of host:port or
     socketPath).
@@ -1724,6 +1743,7 @@ There are a few special headers that should be noted.
 * Sending an Authorization header will override using the `auth` option
   to compute basic authentication.
 
+[`--insecure-http-parser`]: cli.html#cli_insecure_http_parser
 [`--max-http-header-size`]: cli.html#cli_max_http_header_size_size
 [`'checkContinue'`]: #http_event_checkcontinue
 [`'listening'`]: net.html#net_event_listening
