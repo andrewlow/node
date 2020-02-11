@@ -20,9 +20,13 @@
  */
 #include "http_parser.h"
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+
+/* 8 gb */
+static const int64_t kBytes = 8LL << 30;
 
 static const char data[] =
     "\x50\x4f\x53\x54\x20\x2f\x6a\x6f\x79\x65\x6e\x74\x2f\x68\x74\x74\x70\x2d\x70\x61\x72\x73\x65\x72\x20\x48\x54\x54\x50\x2f\x31\x2e\x31\xd\xa"
@@ -38,7 +42,7 @@ static const char data[] =
     "\x52\x65\x66\x65\x72\x65\x72\x3a\x20\x68\x74\x74\x70\x73\x3a\x2f\x2f\x67\x69\x74\x68\x75\x62\x2e\x63\x6f\x6d\x2f\x6a\x6f\x79\x65\x6e\x74\x2f\x68\x74\x74\x70\x2d\x70\x61\x72\x73\x65\x72\xd\xa"
     "\x43\x6f\x6e\x6e\x65\x63\x74\x69\x6f\x6e\x3a\x20\x6b\x65\x65\x70\x2d\x61\x6c\x69\x76\x65\xd\xa"
     "\x54\x72\x61\x6e\x73\x66\x65\x72\x2d\x45\x6e\x63\x6f\x64\x69\x6e\x67\x3a\x20\x63\x68\x75\x6e\x6b\x65\x64\xd\xa"
-    "\x43\x61\x63\x68\x65\x2d\x43\x6f\x6e\x74\x72\x6f\x6c\x3a\x20\x6d\x61\x78\x2d\x61\x67\x65\x3d\x30\xd\xa\xd\xab\xd\xa\x68\x65\x6c\x6c\x6f\x20\x77\x6f\x72\x6c\x64\xd\xa0\xd\xa\xd\xa";
+    "\x43\x61\x63\x68\x65\x2d\x43\x6f\x6e\x74\x72\x6f\x6c\x3a\x20\x6d\x61\x78\x2d\x61\x67\x65\x3d\x30\xd\xa\xd\xa\x62\xd\xa\x68\x65\x6c\x6c\x6f\x20\x77\x6f\x72\x6c\x64\xd\xa\x30\xd\xa";
 static const size_t data_len = sizeof(data) - 1;
 
 static int on_info(http_parser* p) {
@@ -67,13 +71,13 @@ int bench(int iter_count, int silent) {
   int err;
   struct timeval start;
   struct timeval end;
-  float rps;
 
   if (!silent) {
     err = gettimeofday(&start, NULL);
     assert(err == 0);
   }
 
+  fprintf(stderr, "req_len=%d\n", (int) data_len);
   for (i = 0; i < iter_count; i++) {
     size_t parsed;
     http_parser_init(&parser, HTTP_REQUEST);
@@ -83,17 +87,27 @@ int bench(int iter_count, int silent) {
   }
 
   if (!silent) {
+    double elapsed;
+    double bw;
+    double total;
+
     err = gettimeofday(&end, NULL);
     assert(err == 0);
 
     fprintf(stdout, "Benchmark result:\n");
 
-    rps = (float) (end.tv_sec - start.tv_sec) +
-          (end.tv_usec - start.tv_usec) * 1e-6f;
-    fprintf(stdout, "Took %f seconds to run\n", rps);
+    elapsed = (double) (end.tv_sec - start.tv_sec) +
+              (end.tv_usec - start.tv_usec) * 1e-6f;
 
-    rps = (float) iter_count / rps;
-    fprintf(stdout, "%f req/sec\n", rps);
+    total = (double) iter_count * data_len;
+    bw = (double) total / elapsed;
+
+    fprintf(stdout, "%.2f mb | %.2f mb/s | %.2f req/sec | %.2f s\n",
+        (double) total / (1024 * 1024),
+        bw / (1024 * 1024),
+        (double) iter_count / elapsed,
+        elapsed);
+
     fflush(stdout);
   }
 
@@ -101,11 +115,14 @@ int bench(int iter_count, int silent) {
 }
 
 int main(int argc, char** argv) {
+  int64_t iterations;
+
+  iterations = kBytes / (int64_t) data_len;
   if (argc == 2 && strcmp(argv[1], "\x69\x6e\x66\x69\x6e\x69\x74\x65") == 0) {
     for (;;)
-      bench(5000000, 1);
+      bench(iterations, 1);
     return 0;
   } else {
-    return bench(5000000, 0);
+    return bench(iterations, 0);
   }
 }
