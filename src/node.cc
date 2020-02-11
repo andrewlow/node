@@ -240,6 +240,9 @@ std::string icu_data_dir;  // NOLINT(runtime/string)
 
 uint64_t max_http_header_size = 8 * 1024;
 
+// Set in node.cc by ParseArgs when --insecure-http-parser is used.
+bool insecure_http_parser = false;
+
 // used by C++ modules as well
 bool no_deprecation = false;
 
@@ -3265,6 +3268,11 @@ void SetupProcessObject(Environment* env,
     preload_modules.clear();
   }
 
+  // --insecure-http-parser
+  if (insecure_http_parser) {
+    READONLY_PROPERTY(process, "insecureHTTPParser", True(env->isolate()));
+  }
+
   // --no-deprecation
   if (no_deprecation) {
     READONLY_PROPERTY(process, "noDeprecation", True(env->isolate()));
@@ -3539,6 +3547,8 @@ static void PrintHelp() {
          "  --inspect-port=[host:]port\n"
          "                             set host:port for inspector\n"
 #endif
+         "  --insecure-http-parser     use an insecure HTTP parser that\n"
+         "                             accepts invalid HTTP headers\n"
          "  --no-deprecation           silence deprecation warnings\n"
          "  --max-http-header-size     Specify the maximum size of HTTP\n"
          "                             headers in bytes. Defaults to 8KB.\n"
@@ -3686,6 +3696,7 @@ static void CheckIfAllowedInEnv(const char* exe, bool is_env,
   static const char* whitelist[] = {
     // Node options, sorted in `node --help` order for ease of comparison.
     "--require", "-r",
+    "--insecure-http-parser",
     "--inspect",
     "--inspect-brk",
     "--inspect-port",
@@ -3832,6 +3843,8 @@ static void ParseArgs(int* argc,
       syntax_check_only = true;
     } else if (strcmp(arg, "--interactive") == 0 || strcmp(arg, "-i") == 0) {
       force_repl = true;
+    } else if (strcmp(arg, "--insecure-http-parser") == 0) {
+      insecure_http_parser = true;
     } else if (strcmp(arg, "--no-deprecation") == 0) {
       no_deprecation = true;
     } else if (strcmp(arg, "--napi-modules") == 0) {

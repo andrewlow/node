@@ -131,6 +131,17 @@ Useful when activating the inspector by sending the `SIGUSR1` signal.
 Default host is 127.0.0.1.
 
 
+### `--insecure-http-parser`
+<!-- YAML
+added: REPLACEME
+-->
+
+Use an insecure HTTP parser that accepts invalid HTTP headers. This may allow
+interoperability with non-conformant HTTP implementations. It may also allow
+request smuggling and other HTTP attacks that rely on invalid headers being
+accepted. Avoid using this option.
+
+
 ### `--no-deprecation`
 <!-- YAML
 added: v0.8.0
@@ -476,6 +487,7 @@ Node.js options that are allowed are:
 - `--enable-fips`
 - `--force-fips`
 - `--icu-data-dir`
+- `--insecure-http-parser`
 - `--inspect-brk`
 - `--inspect-port`
 - `--inspect`
