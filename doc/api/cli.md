@@ -89,6 +89,17 @@ Follows `require()`'s module resolution
 rules. `module` may be either a path to a file, or a node module name.
 
 
+### `--insecure-http-parser`
+<!-- YAML
+added: REPLACEME
+-->
+
+Use an insecure HTTP parser that accepts invalid HTTP headers. This may allow
+interoperability with non-conformant HTTP implementations. It may also allow
+request smuggling and other HTTP attacks that rely on invalid headers being
+accepted. Avoid using this option.
+
+
 ### `--no-deprecation`
 <!-- YAML
 added: v0.8.0
@@ -357,6 +368,7 @@ Node options that are allowed are:
 - `--enable-fips`
 - `--force-fips`
 - `--icu-data-dir`
+- `--insecure-http-parser`
 - `--debug-brk`
 - `--debug-port`
 - `--debug`

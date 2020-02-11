@@ -159,7 +159,7 @@ class Parser : public AsyncWrap {
         current_buffer_len_(0),
         current_buffer_data_(nullptr) {
     Wrap(object(), this);
-    Init(type);
+    Init(type, false);
   }
 
 
@@ -456,6 +456,7 @@ class Parser : public AsyncWrap {
 
   static void Reinitialize(const FunctionCallbackInfo<Value>& args) {
     Environment* env = Environment::GetCurrent(args);
+    bool lenient = args[1]->IsTrue();
 
     http_parser_type type =
         static_cast<http_parser_type>(args[0]->Int32Value());
@@ -465,7 +466,7 @@ class Parser : public AsyncWrap {
     ASSIGN_OR_RETURN_UNWRAP(&parser, args.Holder());
     // Should always be called from the same context.
     CHECK_EQ(env, parser->env());
-    parser->Init(type);
+    parser->Init(type, lenient);
   }
 
 
@@ -699,8 +700,9 @@ class Parser : public AsyncWrap {
   }
 
 
-  void Init(enum http_parser_type type) {
+  void Init(enum http_parser_type type, bool lenient) {
     http_parser_init(&parser_, type);
+    parser_.lenient_http_headers = lenient;
     url_.Reset();
     status_message_.Reset();
     num_fields_ = 0;

@@ -93,6 +93,13 @@ Preload the specified module at startup. Follows `require()`'s module resolution
 rules. \fImodule\fR may be either a path to a file, or a node module name.
 
 .TP
+.BR \-\-insecure\-http\-parser
+Use an insecure HTTP parser that accepts invalid HTTP headers. This may allow
+interoperability with non-conformant HTTP implementations. It may also allow
+request smuggling and other HTTP attacks that rely on invalid headers being
+accepted. Avoid using this option.
+
+.TP
 .BR \-\-max\-http\-header-size \fI=size\fR
 Specify the maximum size of HTTP headers in bytes. Defaults to 8KB.
 

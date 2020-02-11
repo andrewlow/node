@@ -186,6 +186,9 @@ static std::string icu_data_dir;  // NOLINT(runtime/string)
 
 uint64_t max_http_header_size = 8 * 1024;
 
+// Set in node.cc by ParseArgs when --insecure-http-parser is used.
+bool insecure_http_parser = false;
+
 // used by C++ modules as well
 bool no_deprecation = false;
 
@@ -3602,6 +3605,11 @@ void SetupProcessObject(Environment* env,
     preload_modules.clear();
   }
 
+  // --insecure-http-parser
+  if (insecure_http_parser) {
+    READONLY_PROPERTY(process, "\x69\x6e\x73\x65\x63\x75\x72\x65\x48\x54\x54\x50\x50\x61\x72\x73\x65\x72", True(env->isolate()));
+  }
+
   // --no-deprecation
   if (no_deprecation) {
     READONLY_PROPERTY(process, "\x6e\x6f\x44\x65\x70\x72\x65\x63\x61\x74\x69\x6f\x6e", True(env->isolate()));
@@ -3967,6 +3975,8 @@ static void PrintHelp() {
          u8"  -i, --interactive     always enter the REPL even if stdin\n"
          u8"                        does not appear to be a terminal\n"
          u8"  -r, --require         module to preload (option can be repeated)\n"
+         u8"  --insecure-http-parser     use an insecure HTTP parser that\n"
+         u8"                             accepts invalid HTTP headers\n"
          u8"  --no-deprecation      silence deprecation warnings\n"
          u8"  --trace-deprecation   show stack traces on deprecations\n"
          u8"  --throw-deprecation   throw an exception anytime a deprecated "
@@ -4096,6 +4106,7 @@ static void CheckIfAllowedInEnv(const char* exe, bool is_env,
   static const char* whitelist[] = {
     // Node options, sorted in `node --help` order for ease of comparison.
     u8"--require", u8"-r",
+    u8"--insecure-http-parser",
     u8"--debug",
     u8"--debug-brk",
     u8"--debug-port",
@@ -4231,6 +4242,8 @@ static void ParseArgs(int* argc,
       syntax_check_only = true;
     } else if (strcmp(arg, "\x2d\x2d\x69\x6e\x74\x65\x72\x61\x63\x74\x69\x76\x65") == 0 || strcmp(arg, "\x2d\x69") == 0) {
       force_repl = true;
+    } else if (strcmp(arg, "\x2d\x2d\x69\x6e\x73\x65\x63\x75\x72\x65\x2d\x68\x74\x74\x70\x2d\x70\x61\x72\x73\x65\x72") == 0) {
+      insecure_http_parser = true;
     } else if (strcmp(arg, "\x2d\x2d\x6e\x6f\x2d\x64\x65\x70\x72\x65\x63\x61\x74\x69\x6f\x6e") == 0) {
       no_deprecation = true;
     } else if (strcmp(arg, "\x2d\x2d\x6e\x61\x70\x69\x2d\x6d\x6f\x64\x75\x6c\x65\x73") == 0) {
