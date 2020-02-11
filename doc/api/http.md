@@ -1721,11 +1721,30 @@ A collection of all the standard HTTP response status codes, and the
 short description of each. For example, `http.STATUS_CODES[404] === 'Not
 Found'`.
 
-## http.createServer([requestListener])
+## http.createServer([options][, requestListener])
 <!-- YAML
 added: v0.1.13
+changes:
+  - version: REPLACEME
+    pr-url: https://github.com/nodejs/node/pull/31448
+    description: The `insecureHTTPParser` option is supported now.
+  - version: v9.6.0, v8.12.0
+    pr-url: https://github.com/nodejs/node/pull/15752
+    description: The `options` argument is supported now.
 -->
-- `requestListener` {Function}
+
+* `options` {Object}
+  * `IncomingMessage` {http.IncomingMessage} Specifies the `IncomingMessage`
+    class to be used. Useful for extending the original `IncomingMessage`.
+    **Default:** `IncomingMessage`.
+  * `ServerResponse` {http.ServerResponse} Specifies the `ServerResponse` class
+    to be used. Useful for extending the original `ServerResponse`. **Default:**
+    `ServerResponse`.
+  * `insecureHTTPParser` {boolean} Use an insecure HTTP parser that accepts
+    invalid HTTP headers when `true`. Using the insecure parser should be
+    avoided. See [`--insecure-http-parser`][] for more information.
+    **Default:** `false`
+* `requestListener` {Function}
 
 * Returns: {http.Server}
 
@@ -1820,6 +1839,9 @@ Defaults to 8KB. Configurable using the [`--max-http-header-size`][] CLI option.
 <!-- YAML
 added: v0.3.6
 changes:
+  - version: REPLACEME
+    pr-url: https://github.com/nodejs/node/pull/31448
+    description: The `insecureHTTPParser` option is supported now.
   - version: v7.5.0
     pr-url: https://github.com/nodejs/node/pull/10638
     description: The `options` parameter can be a WHATWG `URL` object.
@@ -1835,6 +1857,10 @@ changes:
     `hostname`. Valid values are `4` or `6`. When unspecified, both IP v4 and
     v6 will be used.
   * `port` {number} Port of remote server. **Default:** `80`.
+  * `insecureHTTPParser` {boolean} Use an insecure HTTP parser that accepts
+    invalid HTTP headers when `true`. Using the insecure parser should be
+    avoided. See [`--insecure-http-parser`][] for more information.
+    **Default:** `false`
   * `localAddress` {string} Local interface to bind for network connections.
   * `socketPath` {string} Unix Domain Socket (use one of host:port or
     socketPath).
@@ -1993,6 +2019,7 @@ will be emitted in the following order:
 Note that setting the `timeout` option or using the `setTimeout` function will
 not abort the request or do anything besides add a `timeout` event.
 
+[`--insecure-http-parser`]: cli.html#cli_insecure_http_parser
 [`--max-http-header-size`]: cli.html#cli_max_http_header_size_size
 [`'checkContinue'`]: #http_event_checkcontinue
 [`'request'`]: #http_event_request
