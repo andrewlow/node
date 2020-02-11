@@ -133,7 +133,7 @@ Default host is 127.0.0.1.
 
 ### `--insecure-http-parser`
 <!-- YAML
-added: REPLACEME
+added: v8.17.0.1
 -->
 
 Use an insecure HTTP parser that accepts invalid HTTP headers. This may allow

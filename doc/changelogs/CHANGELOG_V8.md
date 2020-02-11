@@ -10,6 +10,7 @@
 </tr>
 <tr>
 <td valign="top">
+<a href="#8.17.0.1">8.17.0.1</a><br/>
 <a href="#8.17.0">8.17.0</a><br/>
 <a href="#8.16.2">8.16.2</a><br/>
 <a href="#8.16.1">8.16.1</a><br/>
@@ -65,6 +66,36 @@
 *Note*: Node.js v8 is covered by the
 [Node.js Long Term Support Plan](https://github.com/nodejs/LTS) and
 will be supported actively until April 2019 and maintained until December 2019.
+
+<a id="8.17.0-ptf5"></a>
+## Version 8.17.0.1 'Carbon' (LTS), PTF 5
+
+### Notable changes
+
+This is a security release.
+
+Vulnerabilities fixed:
+* **CVE-2019-15606**: HTTP header values do not have trailing OWS trimmed.
+* **CVE-2019-15605**: HTTP request smuggling using malformed Transfer-Encoding header.
+* **CVE-2019-15604**: Remotely trigger an assertion on a TLS server with a malformed certificate string.
+
+Also, HTTP parsing is more strict to be more secure. Since this may
+cause problems in interoperability with some non-conformant HTTP
+implementations, it is possible to disable the strict checks with the
+`--insecure-http-parser` command line flag, or the `insecureHTTPParser`
+http option. Using the insecure HTTP parser should be avoided.
+
+### Commits
+
+* [[`209767c7a2`](https://github.com/nodejs/node/commit/209767c7a2)] - **benchmark**: support optional headers with wrk (Sam Roberts) [nodejs-private/node-private#189](https://github.com/nodejs-private/node-private/pull/189)
+* [[`02c8905051`](https://github.com/nodejs/node/commit/02c8905051)] - **crypto**: fix assertion caused by unsupported ext (Fedor Indutny) [nodejs-private/node-private#175](https://github.com/nodejs-private/node-private/pull/175)
+* [[`8162f0e194`](https://github.com/nodejs/node/commit/8162f0e194)] - **deps**: upgrade http-parser to v2.9.3 (Sam Roberts) [nodejs-private/http-parser-private#4](https://github.com/nodejs-private/http-parser-private/pull/4)
+* [[`d41314ef99`](https://github.com/nodejs/node/commit/d41314ef99)] - **(SEMVER-MINOR)** **deps**: upgrade http-parser to v2.9.1 (Sam Roberts) [#30473](https://github.com/nodejs/node/pull/30473)
+* [[`7fc565666c`](https://github.com/nodejs/node/commit/7fc565666c)] - **(SEMVER-MINOR)** **http**: make --insecure-http-parser configurable per-stream or per-server (Anna Henningsen) [#31448](https://github.com/nodejs/node/pull/31448)
+* [[`496736ff78`](https://github.com/nodejs/node/commit/496736ff78)] - **(SEMVER-MINOR)** **http**: opt-in insecure HTTP header parsing (Sam Roberts) [#30567](https://github.com/nodejs/node/pull/30567)
+* [[`76fd8910e9`](https://github.com/nodejs/node/commit/76fd8910e9)] - **http**: strip trailing OWS from header values (Sam Roberts) [nodejs-private/node-private#189](https://github.com/nodejs-private/node-private/pull/189)
+* [[`9cd155eb4a`](https://github.com/nodejs/node/commit/9cd155eb4a)] - **test**: using TE to smuggle reqs is not possible (Sam Roberts) [nodejs-private/node-private#192](https://github.com/nodejs-private/node-private/pull/192)
+* [[`ab1fcb89cb`](https://github.com/nodejs/node/commit/ab1fcb89cb)] - **test**: check that --insecure-http-parser works (Sam Roberts) [#31253](https://github.com/nodejs/node/pull/31253)
 
 <a id="8.17.0"></a>
 ## 2019-12-17, Version 8.17.0 'Carbon' (LTS), @MylesBorins
