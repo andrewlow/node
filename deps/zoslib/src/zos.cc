@@ -3121,11 +3121,10 @@ typedef struct IFAARGS {
 } IFAARGS_t;
 
 #pragma convert("IBM-1047")
-const char *MODULE_QUERY_STATUS = "IFAEDSTA";
 const char *MODULE_REGISTER_USAGE = "IFAUSAGE";
 #pragma convert(pop)
 
-unsigned long long __registerProduct(int node_major_version,
+unsigned long long __registerProduct(const char *major_version,
                                      const char *product_owner,
                                      const char *feature_name,
                                      const char *product_name,
@@ -3159,49 +3158,6 @@ unsigned long long __registerProduct(int node_major_version,
   snprintf(str_pid, sizeof(str_pid), "%-8s", pid);
   __a2e_s(str_pid);
 
-  // We use the Query_Status service (IFAEDSTA) to request information
-  // about the registration or enablement status of Node.js on z/OS.
-  void *mod = __loadmod(MODULE_QUERY_STATUS);
-  IFAEDSTA_parms_t *plist = 0;
-  if (!mod) {
-    fprintf(stderr, "WARNING: Failed to load IFAEDSTA");
-    return 3;
-  }
-
-  int rc;
-  plist = (IFAEDSTA_parms_t *)__malloc31(sizeof(IFAEDSTA_parms_t));
-  assert(plist);
-
-  // Copy string buffers to 32-bit address list
-  memcpy(plist->cpidpp, str_pid, 8);
-  memcpy(plist->cfnpp, str_feature_name, 16);
-  memcpy(plist->cpnpp, str_product_name, 16);
-  memcpy(plist->cpo, str_product_owner, 16);
-  memset(plist->coinfo, 0x00, 16);
-
-  plist->cflpp = 1024;
-  plist->crcpp = 1;
-  plist->args[0] = plist->cpo;
-  plist->args[1] = plist->cpnpp;
-  plist->args[2] = plist->cfnpp;
-  plist->args[3] = plist->cpidpp;
-  plist->args[4] = plist->coinfo;
-  plist->args[5] = &plist->cflpp;
-  plist->args[6] = plist->cfspp;
-  plist->args[7] = &plist->crcpp;
-  plist->args[7] =
-      (void *__ptr32)(0x80000000 | ((unsigned long)plist->args[7]));
-
-  rc = __callmod(mod, plist);
-  assert(rc != -1);
-  __unloadmod(mod);
-
-  if (!((EDOI *)(plist->coinfo))->EdoiFlags.EdoiStatusEnabled) {
-    fprintf(stderr, "WARNING: IFAEDSTA status is not enabled.");
-    free(plist);
-    return 4;
-  }
-
   // Register Product with IFAUSAGE
   IFAARGS_t *arg = (IFAARGS_t *)__malloc31(sizeof(IFAARGS_t));
   assert(arg);
@@ -3210,18 +3166,18 @@ unsigned long long __registerProduct(int node_major_version,
   arg->listlen = sizeof(IFAARGS_t);
   arg->version = 1;
   arg->request = 1; // 1=REGISTER
-  memcpy(arg->prodowner, plist->cpo, 16);
-  memcpy(arg->prodname, plist->cpnpp, 16);
+  memcpy(arg->prodowner, str_product_owner, 16);
+  memcpy(arg->prodname, str_product_name, 16);
 
   // Insert node major version
   char version[9] = {0};
-  snprintf(version, 9, "%-8d", node_major_version);
+  snprintf(version, 9, "%-8s", major_version);
   __a2e_s(version);
 
-  memcpy(arg->prodvers, version, 8);
+  memcpy(arg->prodvers, major_version, 8);
   memcpy(arg->prodqual, "NONE    ", 8);
   __a2e_s(arg->prodqual);
-  memcpy(arg->prodid, plist->cpidpp, 8);
+  memcpy(arg->prodid, str_pid, 8);
   arg->domain = 1;
   arg->scope = 1;
   unsigned long long ifausage_rc = 0xFFFFFFFFFFFFFFFF;
@@ -3236,9 +3192,6 @@ unsigned long long __registerProduct(int node_major_version,
       : );
 
   free(arg);
-
-  if (plist)
-    free(plist);
 
   return ifausage_rc;
 }
