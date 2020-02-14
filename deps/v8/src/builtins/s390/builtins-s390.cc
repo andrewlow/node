@@ -723,18 +723,6 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ PopStackHandler();
   __ bind(&exit);  // r2 holds result
 
-// Test code to call C function
-#if IGOR
-  {
-    FrameScope frame(masm, StackFrame::MANUAL);
-    //__ PushSafepointRegisters();
-   // __ PrepareCallCFunction(1, r2);
-   // __ Move(r2, ExternalReference::isolate_address(masm->isolate()));
-    __ CallCFunction(ExternalReference::debug_zos(), 0);
-    //__ PopSafepointRegisters();
-  }
-#endif
-
   // Check if the current stack frame is marked as the outermost JS frame.
   Label non_outermost_js_2;
   __ pop(r7);

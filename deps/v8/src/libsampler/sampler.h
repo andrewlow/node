@@ -143,8 +143,8 @@ class V8_EXPORT_PRIVATE SamplerManager {
   // global lazy instance.
   friend class base::LeakyObject<SamplerManager>;
 
-#ifdef __MVS__
-  std::unordered_map<void*, SamplerList> sampler_map_;
+#ifdef V8_OS_ZOS
+  std::unordered_map<int, SamplerList> sampler_map_;
 #else
   std::unordered_map<pthread_t, SamplerList> sampler_map_;
 #endif
