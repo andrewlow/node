@@ -808,7 +808,8 @@ void Thread::Start() {
     // Default on AIX is 96kB -- bump up to 2MB
     stack_size = 2 * 1024 * 1024;
 #elif V8_OS_ZOS
-    // On z/OS if the _CEE_RUNOPTS THREADSTACK64 initial stack size is greater than the default 4 MB, use it instead
+    // On z/OS if the _CEE_RUNOPTS STACK64/THREADSTACK64 initial stack size is
+    // less than 4 MB (default for FLAG_stack_size), bump it to 4MB
     const size_t default_stack_size = 4 * 1024 * 1024;
     result = pthread_attr_getstacksize(&attr, &stack_size);
     DCHECK_EQ(0, result);

@@ -3385,7 +3385,11 @@ bool Isolate::Init(ReadOnlyDeserializer* read_only_deserializer,
     ExecutionAccess lock(this);
     stack_guard_.InitThread(lock);
 #if defined(__MVS__)
-    expandStack(FLAG_stack_size*KB);
+    // This is required because even though setting the initial stack size via
+    // runtime options STACK64 or THREADSTACK64 works, the runtime option
+    // RPTSTG(ON), if used, currently resets the initial stack size to 1M, and
+    // LE doesn't always automatically expand the stack in JS code.
+    volatile char buf[FLAG_stack_size*KB];
 #endif
   }
 
