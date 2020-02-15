@@ -3571,33 +3571,3 @@ int __open(const char* file, int oflag, int mode) {
   return rv;
 }
 #endif  // for debugging use
-
-extern "C" void expandStack(unsigned long stack_size_in_bytes) {
-  const int MB = 1024*1024;
-  stack_size_in_bytes = max(MB,stack_size_in_bytes);
-  if (stack_size_in_bytes % MB) {
-    stack_size_in_bytes = stack_size_in_bytes + MB - (stack_size_in_bytes % MB);
-  }
-  //dprintf(2,"\n");
-  unsigned long i = 0;
-  unsigned long total_iterations = stack_size_in_bytes/MB;
-
-  __asm volatile(
-        "&suffix SETA &suffix+1\n"
-        "beg&suffix CGR      %0,%1\n"    // Compare
-        " JNL  end&suffix\n"
-        " AGFI 4,-1048576\n"   // Grow the stack by 1MB
-        " STMG %0,%0,0(4)\n"   // Cause Stack overflow
-        " AGHI      %0,1\n"    // Increment by 1
-        " J beg&suffix\n"      // Iterate
-        "end&suffix LGHI      %0,0\n"
-        "&suffix SETA &suffix+1\n"
-        "beg&suffix CGR      %0,%1\n"   // Compare
-        " JNL  end&suffix\n"
-        " AGFI 4,1048576\n"   // Shrink the stack by 1MB
-        " AGHI      %0,1\n"    // Increment by 1
-        " J beg&suffix\n"      // Iterate
-        "end&suffix DS 0D\n"
-        : "+NR:r6"(i)
-        : "r"(total_iterations) );
-}

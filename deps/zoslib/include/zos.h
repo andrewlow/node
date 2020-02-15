@@ -54,7 +54,6 @@ extern size_t __a2e_l(char* bufptr, size_t szLen);
 extern size_t __e2a_s(char* string);
 extern size_t __a2e_s(char* string);
 extern int gettid();
-extern void expandStack(unsigned long stack_size_in_bytes);
 extern int dprintf(int fd, const char*, ...);
 extern int vdprintf(int fd, const char*, va_list ap);
 extern void __xfer_env(void);
