@@ -1146,8 +1146,14 @@ void RegisterProduct() {
         pid = NJS_PID;
 
     if (credentials::SafeGetenv("NODEJS_SMF89_REGISTRATION_VERBOSE", &val))
-        printf("SMF89 Registration data: %s - %s - %s - %s - %s\n", major_version.c_str(), product_owner.c_str(), 
-               feature_name.c_str(), product_name.c_str(), pid.c_str());
+        printf("SMF record type 89 registration data:\n"
+               "Product Name: %s\n"
+               "PID Name: %s\n" 
+               "Major Version: %s\n"
+               "Product Owner: %s\n"
+               "Feature Name: %s\n",  product_name.c_str(), pid.c_str(), 
+               major_version.c_str(), product_owner.c_str(), 
+               feature_name.c_str());
 
     unsigned long long rc =
         __registerProduct(major_version.c_str(), product_owner.c_str(), feature_name.c_str(),

@@ -3146,6 +3146,7 @@ unsigned long long __registerProduct(const char *major_version,
   char str_feature_name[17];
   char str_product_name[17];
   char str_pid[9];
+  char version[9];
 
   // Left justify with space padding and convert to ebcdic
   snprintf(str_product_owner, sizeof(str_product_owner), "%-16s",
@@ -3157,6 +3158,8 @@ unsigned long long __registerProduct(const char *major_version,
   __a2e_s(str_product_name);
   snprintf(str_pid, sizeof(str_pid), "%-8s", pid);
   __a2e_s(str_pid);
+  snprintf(version, sizeof(version), "%-8s", major_version);
+  __a2e_s(version);
 
   // Register Product with IFAUSAGE
   IFAARGS_t *arg = (IFAARGS_t *)__malloc31(sizeof(IFAARGS_t));
@@ -3166,17 +3169,14 @@ unsigned long long __registerProduct(const char *major_version,
   arg->listlen = sizeof(IFAARGS_t);
   arg->version = 1;
   arg->request = 1; // 1=REGISTER
+
+  // Insert properties
   memcpy(arg->prodowner, str_product_owner, 16);
   memcpy(arg->prodname, str_product_name, 16);
-
-  // Insert node major version
-  char version[9] = {0};
-  snprintf(version, 9, "%-8s", major_version);
-  __a2e_s(version);
-
-  memcpy(arg->prodvers, major_version, 8);
+  memcpy(arg->prodvers, version, 8);
+#pragma convert("IBM-1047")
   memcpy(arg->prodqual, "NONE    ", 8);
-  __a2e_s(arg->prodqual);
+#pragma convert(pop)
   memcpy(arg->prodid, str_pid, 8);
   arg->domain = 1;
   arg->scope = 1;
