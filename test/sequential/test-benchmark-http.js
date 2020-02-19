@@ -23,7 +23,8 @@ runBenchmark('http',
                'method=write',
                'n=1',
                'res=normal',
-               'type=asc'
+               'type=asc',
+               'w=0'
              ],
              {
                NODEJS_BENCHMARK_ZERO_ALLOWED: 1,
