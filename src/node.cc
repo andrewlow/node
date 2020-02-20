@@ -4725,6 +4725,52 @@ int Start(uv_loop_t* event_loop,
   return exit_code;
 }
 
+#ifdef __MVS__
+void RegisterProduct() {
+  std::string val;
+  if (!SafeGetenv("DISABLE_NODEJS_SMF89_REGISTRATION", &val)) {
+    std::string major_version;
+    char str_major_version[9];
+    std::string product_owner;
+    std::string feature_name;
+    std::string product_name;
+    std::string pid;
+
+    if (!SafeGetenv("NODEJS_SMF89_MAJOR_VERSION", &major_version))  {
+        __snprintf_a(str_major_version, 9, "%d", NODE_MAJOR_VERSION);
+        major_version = str_major_version;
+    }
+    if (!SafeGetenv("NODEJS_SMF89_PRODUCT_OWNER", &product_owner))
+        product_owner = NJS_PRODUCT_OWNER;
+    if (!SafeGetenv("NODEJS_SMF89_FEATURE_NAME", &feature_name))
+        feature_name = NJS_FEATURE_NAME;
+    if (!SafeGetenv("NODEJS_SMF89_PRODUCT_NAME", &product_name))
+        product_name = NJS_PRODUCT_NAME;
+    if (!SafeGetenv("NODEJS_SMF89_PID", &pid))
+        pid = NJS_PID;
+
+    if (SafeGetenv("NODEJS_SMF89_REGISTRATION_VERBOSE", &val))
+        dprintf(1, "SMF record type 89 registration data:\n"
+               "Product Name: %s\n"
+               "PID Name: %s\n" 
+               "Major Version: %s\n"
+               "Product Owner: %s\n"
+               "Feature Name: %s\n",  product_name.c_str(), pid.c_str(), 
+               major_version.c_str(), product_owner.c_str(), 
+               feature_name.c_str());
+
+    unsigned long long rc =
+        __registerProduct(major_version.c_str(), product_owner.c_str(), feature_name.c_str(),
+                          product_name.c_str(), pid.c_str());
+
+    if (rc)
+        dprintf(2, "WARNING: Could not register product for tailored fit "
+                        "pricing, rc = %llu\n",
+                rc);
+  }
+}
+#endif
+
 int Start(int argc, char** argv) {
   OS390ThreadManager threadPoolObj;
   PlatformInit();
@@ -4736,17 +4782,8 @@ int Start(int argc, char** argv) {
   argv = uv_setup_args(argc, argv);
 
 #ifdef __MVS__
-  // Register product for tailored fit pricing
-  std::string val;
-  if (!SafeGetenv("DISABLE_NODEJS_SMF89_REGISTRATION", &val)) {
-    unsigned long long rc =
-        __registerProduct(NODE_MAJOR_VERSION, NJS_PRODUCT_OWNER, NJS_FEATURE_NAME,
-                          NJS_PRODUCT_NAME, NJS_PID);
-
-    if (rc)
-      fprintf(stderr, "WARNING: Could not register product for tailored fit "
-                      "pricing, rc = %llu\n", rc);
-  }
+  // Register Node.js for Tailored Fit Pricing
+  RegisterProduct();
 
   for (int i = 0; i < argc; i++)
     __e2a_s(argv[i]);
