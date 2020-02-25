@@ -33,6 +33,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+#include <sys/mman.h>
 
 #include "zos.h"
 static int __debug_mode = 0;
@@ -1545,7 +1546,7 @@ extern "C" int __file_needs_conversion_init(const char* name, int fd) {
                 (const char*)_convert_e2a(alloca(len + 1), name, len + 1);
           }
           dprintf(2,
-                  "Warning: File \"%s\"is untagged and seems to contain EBCDIC "
+                  "Warning: File \"%s\" is untagged and seems to contain EBCDIC "
                   "characters\n",
                   filename);
         }
@@ -1566,7 +1567,6 @@ extern "C" unsigned long __mach_absolute_time(void) {
 // begin
 
 static const int kMegaByte = 1024 * 1024;
-#define MAP_FAILED ((void*)-1L)
 
 static int mem_account(void) {
   static int res = -1;
@@ -3571,3 +3571,44 @@ int __open(const char* file, int oflag, int mode) {
   return rv;
 }
 #endif  // for debugging use
+
+extern "C" void* roanon_mmap(void* _, size_t len, int prot, int flags, const char* filename, int fildes, off_t off) {
+  // TODO(gabylb): read-only anonymous mmap: the anon_mmap() call below is used
+  // rather than the OS's mmap() because mmap() doesn't convert .js with EBCDIC
+  // content to ASCII (in both tagged and untagged files).
+  // This function is currently called only by d8, and has been tested only
+  // when d8 processes its .js arg (from OS::MemoryMappedFile::open()), hence
+  // the first check below)
+  // With this, .js with either EBCDIC or ASCII, tagged or untagged can be
+  // processed; without it, d8 could not process .js with EBCDIC content
+  // (tagged and untagged).
+  
+  if (prot != PROT_READ || flags == MAP_SHARED) {
+    return mmap(_,len,prot,flags,fildes,off);
+  }
+  struct stat st;
+  if (fstat(fildes, &st)) {
+    perror("fstat");
+    return nullptr;
+  }
+  void* memory = anon_mmap(_, len);
+  if (memory == MAP_FAILED) {
+    return memory;
+  }
+  if (lseek(fildes, 0, SEEK_SET) != 0) {
+    perror("lseek");
+    return nullptr;
+  }
+  size_t nread = read(fildes, memory, len);
+  if (nread != len) {
+    perror("read");
+    return nullptr;
+  }
+  if (st.st_tag.ft_txtflag == 0 && st.st_tag.ft_ccsid == 0) {
+    __file_needs_conversion_init(filename, fildes);
+    if (__file_needs_conversion(fildes)) {
+      __e2a_l((char*)memory,len);
+    }
+  }
+  return memory;
+}
