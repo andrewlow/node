@@ -54,9 +54,6 @@
 #define MAP_FAILED ((void *)-1L)
 #endif
 
-extern "C" int dprintf(int, const char* fmt, ...);
-extern "C" void __display_backtrace(int fd);
-#define xdbg {dprintf(2,"TODO: in %s line %d\n",__FILE__,__LINE__);}
 
 namespace v8 {
 namespace base {
@@ -181,7 +178,6 @@ void OS::SignalCodeMovingGC() {
     OS::PrintError("Failed to open %s\n", OS::GetGCFakeMMapFile());
     OS::Abort();
   }
-xdbg
   void* addr = mmap(OS::GetRandomMmapAddr(), size, PROT_READ | PROT_EXEC,
                     MAP_PRIVATE, fileno(f), 0);
   DCHECK_NE(MAP_FAILED, addr);
@@ -202,75 +198,5 @@ inline int GetFirstFlagFrom(const char* format_e, int start = 0) {
 
 void OS::AdjustSchedulingParams() {}
 
-// All *MemoryMappedFile here were copied from platform-posix.cc for the
-// customized z/OS MemoryMappedFile::open()
-
-class PosixMemoryMappedFile final : public OS::MemoryMappedFile {
- public:
-  PosixMemoryMappedFile(FILE* file, void* memory, size_t size)
-      : file_(file), memory_(memory), size_(size) {}
-  ~PosixMemoryMappedFile() final;
-  void* memory() const final { return memory_; }
-  size_t size() const final { return size_; }
-
- private:
-  FILE* const file_;
-  void* const memory_;
-  size_t const size_;
-};
-
-// static
-OS::MemoryMappedFile* OS::MemoryMappedFile::open(const char* name,
-                                                 FileMode mode) {
-  const char* fopen_mode = (mode == FileMode::kReadOnly) ? "r" : "r+";
-  int open_mode = (mode == FileMode::kReadOnly) ? O_RDONLY : O_RDWR;
-  // use open() instead of fopen() to prevent auto-conversion
-  // (which doesn't support untagged file with ASCII content)
-  if (int fd = ::open(name, open_mode)) {
-    FILE *file = fdopen(fd,fopen_mode); // for PosixMemoryMappedFile()
-    long size = lseek(fd, 0, SEEK_END);
-    if (size == 0) return new PosixMemoryMappedFile(file, nullptr, 0);
-    if (size > 0) {
-      int prot = PROT_READ;
-      int flags = MAP_PRIVATE;
-      if (mode == FileMode::kReadWrite) {
-        prot |= PROT_WRITE;
-        flags = MAP_SHARED;
-      }
-      void* memory = roanon_mmap(OS::GetRandomMmapAddr(), size, prot, flags, name, fd, 0);
-      if (memory != MAP_FAILED) {
-        return new PosixMemoryMappedFile(file, memory, size);
-      }
-    } else {
-      perror("lseek");
-    }
-    fclose(file); //also closes fd
-  }
-  return nullptr;
-}
-
-// static
-OS::MemoryMappedFile* OS::MemoryMappedFile::create(const char* name,
-                                                   size_t size, void* initial) {
-  if (FILE* file = fopen(name, "w+")) {
-    if (size == 0) return new PosixMemoryMappedFile(file, 0, 0);
-    size_t result = fwrite(initial, 1, size, file);
-    if (result == size && !ferror(file)) {
-xdbg
-      void* memory = mmap(OS::GetRandomMmapAddr(), result,
-                          PROT_READ | PROT_WRITE, MAP_SHARED, fileno(file), 0);
-      if (memory != MAP_FAILED) {
-        return new PosixMemoryMappedFile(file, memory, result);
-      }
-    }
-    fclose(file);
-  }
-  return nullptr;
-}
-
-PosixMemoryMappedFile::~PosixMemoryMappedFile() {
-  if (memory_) CHECK(OS::Free(memory_, RoundUp(size_, OS::AllocatePageSize())));
-  fclose(file_);
-}
 }  // namespace base
 }  // namespace v8
