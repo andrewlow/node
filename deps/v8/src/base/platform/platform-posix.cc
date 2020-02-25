@@ -457,6 +457,7 @@ void OS::DebugBreak() {
 }
 
 
+#ifndef V8_OS_ZOS
 class PosixMemoryMappedFile final : public OS::MemoryMappedFile {
  public:
   PosixMemoryMappedFile(FILE* file, void* memory, size_t size)
@@ -472,7 +473,7 @@ class PosixMemoryMappedFile final : public OS::MemoryMappedFile {
 };
 
 
-// static
+// static 
 OS::MemoryMappedFile* OS::MemoryMappedFile::open(const char* name,
                                                  FileMode mode) {
   const char* fopen_mode = (mode == FileMode::kReadOnly) ? "r" : "r+";
@@ -522,7 +523,7 @@ PosixMemoryMappedFile::~PosixMemoryMappedFile() {
   if (memory_) CHECK(OS::Free(memory_, RoundUp(size_, OS::AllocatePageSize())));
   fclose(file_);
 }
-
+#endif //V8_OS_ZOS
 
 int OS::GetCurrentProcessId() {
   return static_cast<int>(getpid());
