@@ -457,6 +457,7 @@ void OS::DebugBreak() {
 }
 
 
+#ifndef V8_OS_ZOS
 class PosixMemoryMappedFile final : public OS::MemoryMappedFile {
  public:
   PosixMemoryMappedFile(FILE* file, void* memory, size_t size)
@@ -523,6 +524,7 @@ PosixMemoryMappedFile::~PosixMemoryMappedFile() {
   fclose(file_);
 }
 
+#endif //V8_OS_ZOS
 
 int OS::GetCurrentProcessId() {
   return static_cast<int>(getpid());

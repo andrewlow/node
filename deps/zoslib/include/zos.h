@@ -95,6 +95,7 @@ extern void __fd_close(int fd);
 
 extern unsigned long __mach_absolute_time(void);
 extern void* anon_mmap(void* _, size_t len);
+extern void* roanon_mmap(void* _, size_t len, int prot, int flags, const char* filename, int fildes, off_t off);
 extern int anon_munmap(void* addr, size_t len);
 extern int __cond_timed_wait(unsigned int secs,
                              unsigned int nsecs,
