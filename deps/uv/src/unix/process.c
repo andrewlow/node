@@ -386,6 +386,10 @@ static void uv__process_child_init(const uv_process_options_t* options,
     _exit(127);
   }
 
+  if (options->env != NULL) {
+    environ = options->env;
+  }
+
   /* Reset signal disposition.  Use a hard-coded limit because NSIG
    * is not fixed on Linux: it's either 32, 34 or 64, depending on
    * whether RT signals are enabled.  We are not allowed to touch
@@ -416,11 +420,7 @@ static void uv__process_child_init(const uv_process_options_t* options,
     _exit(127);
   }
 
-  if (options->env != NULL)
-    execvpe(options->file, options->args, options->env);
-  else
-    execvpe(options->file, options->args, environ);
-
+  execvpe(options->file, options->args, environ);
   uv__write_int(error_fd, UV__ERR(errno));
   _exit(127);
 }
