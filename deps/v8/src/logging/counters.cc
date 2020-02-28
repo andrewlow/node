@@ -117,8 +117,8 @@ void TimedHistogram::RecordAbandon(base::ElapsedTimer* timer,
   }
 }
 
-//MVS TODO: temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
-#ifndef __MVS__
+//ZOS TODO(gabylb): temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
+#ifndef V8_OS_ZOS
 Counters::Counters(Isolate* isolate)
     : isolate_(isolate),
       stats_table_(this),
@@ -429,7 +429,11 @@ void RuntimeCallTimer::Snapshot() {
   Resume(now);
 }
 
+//ZOS TODO(gabylb): temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
+//(move the static kNames outside the constructor def'n)
+#ifndef V8_OS_ZOS
 RuntimeCallStats::RuntimeCallStats() : in_use_(false) {
+#endif
   static const char* const kNames[] = {
 #define CALL_BUILTIN_COUNTER(name) "GC_" #name,
       FOR_EACH_GC_COUNTER(CALL_BUILTIN_COUNTER)  //
@@ -450,6 +454,9 @@ RuntimeCallStats::RuntimeCallStats() : in_use_(false) {
       FOR_EACH_HANDLER_COUNTER(CALL_BUILTIN_COUNTER)  //
 #undef CALL_BUILTIN_COUNTER
   };
+#ifdef V8_OS_ZOS
+RuntimeCallStats::RuntimeCallStats() : in_use_(false) {
+#endif
   for (int i = 0; i < kNumberOfCounters; i++) {
     this->counters_[i] = RuntimeCallCounter(kNames[i]);
   }

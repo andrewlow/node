@@ -1198,8 +1198,8 @@ class RuntimeCallTimerScope {
 // This file contains all the v8 counters that are in use.
 class Counters : public std::enable_shared_from_this<Counters> {
  public:
-//MVS TODO: temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
-#ifndef __MVS__
+//ZOS TODO(gabylb): temp workaround for RTC 163696: Node.js: invalid pointer for a static in a constructor defined outside the class
+#ifndef V8_OS_ZOS
   explicit Counters(Isolate* isolate);
 #else
   Counters(Isolate* isolate)
@@ -1344,7 +1344,7 @@ class Counters : public std::enable_shared_from_this<Counters> {
   }
 }
 //end of Counters(Isolate* isolate) def'n
-#endif // __MVS__
+#endif // V8_OS_ZOS
 
   // Register an application-defined function for recording
   // subsequent counter statistics. Note: Must be called on the main
