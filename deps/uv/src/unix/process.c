@@ -239,7 +239,7 @@ static int uv__process_open_stream(uv_stdio_container_t* container,
   if (!(container->flags & UV_CREATE_PIPE) || pipefds[0] < 0)
     return 0;
 
-  err = uv__close(pipefds[1]);
+  err = uv__close_nocheckstdio(pipefds[1]);
   if (err != 0)
     abort();
 
