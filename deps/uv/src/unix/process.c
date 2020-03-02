@@ -204,7 +204,16 @@ static int uv__process_init_stdio(uv_stdio_container_t* container, int fds[2], i
     if (container->data.stream->type != UV_NAMED_PIPE) {
       return UV_EINVAL;
     } else {
-      /* z/OS socketpair issue on stderr. */
+      // Force creation of socket pairs for IPC pipes since it allows read/write in both directions
+      // We can safely do this because according to the documentation:
+      // "Accessing the IPC channel fd in any way other than process.send() or using the IPC channel with a child process that is not a Node.js instance is not supported."
+      // Therefore, data is ensured to be in ASCII and no autoconvert facilities are required (which are only enabled in pipes on z/OS)
+      if (((uv_pipe_t*)(container->data.stream))->ipc)
+        use_pipe = 0;
+
+      /* Use pipes on z/OS when use_pipe is true because:
+         1.  socketpairs experience issues when dup'ing stderr.
+         2.  socketpairs do not support ASCII/EBCDIC auto-conversion using the ccsid tag */
       if (use_pipe)
         return uv__make_pipe(fds, 0);
       else
