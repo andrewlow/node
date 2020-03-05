@@ -694,6 +694,7 @@ static void os390_re_regfileint(uv_fs_event_t* handle) {
   if (handle == NULL || handle->path == NULL)
     return;
   char* savepath = uv__strdup(handle->path);
+  uv__handle_stop(handle);
   uv__free(handle->path);
   handle->path = NULL;
   handle->flags &= ~UV_HANDLE_ACTIVE;
