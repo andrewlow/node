@@ -728,7 +728,18 @@ static int os390_message_queue_handler(uv__os390_epoll* ep) {
     events = UV_CHANGE;
   else if (msg.__rfim_event == _RFIM_RENAME || msg.__rfim_event == _RFIM_UNLINK)
     events = UV_RENAME;
-  else
+  else if (msg.__rfim_event == 156) {
+    /*
+     * this (undocumented?) event seems to occur when the watched file
+     * is [re]moved, or an editor (like vim) renames then creates the file
+     * on save (for vim, that's when backupcopy=no|auto), which causes
+     * __w_pioctl to fail as the file wasn't yet created; the sleep is
+     * to help resolve the rename-create issue
+    */
+    events = UV_RENAME;
+    struct timespec timeout = { 0, 1000000 }; //1ms
+    nanosleep(&timeout, NULL);
+  } else
     /* Some event that we are not interested in. */
     return 0;
 
