@@ -86,6 +86,12 @@ namespace base {
 
 namespace {
 
+#if defined(V8_OS_ZOS)
+inline bool operator==(const pthread_t &_a, const pthread_t &_b) {
+  return _a.__ == _b.__;
+}
+#endif
+
 // 0 is never a valid thread id.
 #if V8_OS_ZOS
 const pthread_t kNoThread = {0};
