@@ -544,7 +544,9 @@ ssize_t os390_readlink(const char* path, char* buf, size_t len) {
   *delimiter = '\0';
   if (os390_realpath(tmpbuf, realpathstr) == NULL) {
     uv__free(tmpbuf);
-    return -1;
+    if (realpath(path, buf) == NULL)
+      return -1;
+    return strlen(buf);
   }
 
   /* realpathstr is not guaranteed to end with null byte.*/
