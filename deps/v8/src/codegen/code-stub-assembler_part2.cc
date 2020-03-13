@@ -47,7 +47,7 @@ TNode<T> CodeStubAssembler::LoadArrayElement(TNode<Array> array,
                                                  parameter_mode, header_size);
   CSA_ASSERT(this, IsOffsetInBounds(offset, LoadArrayLength(array),
                                     array_header_size));
-  constexpr MachineType machine_type = MachineTypeOf<T>::value;
+  static constexpr MachineType machine_type = MachineTypeOf<T>::value;
   // TODO(gsps): Remove the Load case once LoadFromObject supports poisoning
   if (needs_poisoning == LoadSensitivity::kSafe) {
     return UncheckedCast<T>(LoadFromObject(machine_type, array, offset));
