@@ -2062,7 +2062,6 @@ CodeStubAssembler::LoadArrayElement<DescriptorArray>(TNode<DescriptorArray>,
                                                      LoadSensitivity);
 #endif // __MVS__
 
-
 void CodeStubAssembler::FixedArrayBoundsCheck(TNode<FixedArrayBase> array,
                                               Node* index,
                                               int additional_offset,
@@ -6084,6 +6083,7 @@ void CodeStubAssembler::ThrowRangeError(Node* context, MessageTemplate message,
   Unreachable();
 }
 
+#ifndef __MVS__
 void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
                                        char const* arg0, char const* arg1) {
   Node* arg0_node = nullptr;
@@ -6093,7 +6093,6 @@ void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
   ThrowTypeError(context, message, arg0_node, arg1_node);
 }
 
-#ifndef __MVS__
 void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
                                        Node* arg0, Node* arg1, Node* arg2) {
   TNode<Smi> template_index = SmiConstant(static_cast<int>(message));

@@ -4,7 +4,10 @@
 
 #include "src/codegen/code-stub-assembler.h"
 
+#include "include/v8-internal.h"
+#include "src/base/macros.h"
 #include "src/codegen/code-factory.h"
+#include "src/common/globals.h"
 #include "src/execution/frames-inl.h"
 #include "src/execution/frames.h"
 #include "src/heap/heap-inl.h"  // For Page/MemoryChunk. TODO(jkummerow): Drop.
@@ -28,18 +31,6 @@ using TNode = compiler::TNode<T>;
 template <class T>
 using SloppyTNode = compiler::SloppyTNode<T>;
 
-template TNode<MaybeObject>
-CodeStubAssembler::LoadArrayElement<TransitionArray>(TNode<TransitionArray>,
-                                                     int, Node*, int,
-                                                     ParameterMode,
-                                                     LoadSensitivity);
-
-template TNode<MaybeObject>
-CodeStubAssembler::LoadArrayElement<DescriptorArray>(TNode<DescriptorArray>,
-                                                     int, Node*, int,
-                                                     ParameterMode,
-                                                     LoadSensitivity);
-
 template <typename Array, typename T>
 TNode<T> CodeStubAssembler::LoadArrayElement(TNode<Array> array,
                                              int array_header_size,
@@ -56,7 +47,7 @@ TNode<T> CodeStubAssembler::LoadArrayElement(TNode<Array> array,
                                                  parameter_mode, header_size);
   CSA_ASSERT(this, IsOffsetInBounds(offset, LoadArrayLength(array),
                                     array_header_size));
-  static constexpr MachineType machine_type = MachineTypeOf<T>::value;
+  constexpr MachineType machine_type = MachineTypeOf<T>::value;
   // TODO(gsps): Remove the Load case once LoadFromObject supports poisoning
   if (needs_poisoning == LoadSensitivity::kSafe) {
     return UncheckedCast<T>(LoadFromObject(machine_type, array, offset));
@@ -64,6 +55,18 @@ TNode<T> CodeStubAssembler::LoadArrayElement(TNode<Array> array,
     return UncheckedCast<T>(Load(machine_type, array, offset, needs_poisoning));
   }
 }
+
+template TNode<MaybeObject>
+CodeStubAssembler::LoadArrayElement<TransitionArray>(TNode<TransitionArray>,
+                                                     int, Node*, int,
+                                                     ParameterMode,
+                                                     LoadSensitivity);
+
+template TNode<MaybeObject>
+CodeStubAssembler::LoadArrayElement<DescriptorArray>(TNode<DescriptorArray>,
+                                                     int, Node*, int,
+                                                     ParameterMode,
+                                                     LoadSensitivity);
 
 TNode<Object> CodeStubAssembler::LoadFixedArrayElement(
     TNode<FixedArray> object, Node* index_node, int additional_offset,
@@ -103,14 +106,14 @@ TNode<Int32T> CodeStubAssembler::LoadAndUntagToWord32ArrayElement(
 #endif
   int32_t header_size = array_header_size + additional_offset - kHeapObjectTag +
                         endian_correction;
-  Node* offset = ElementOffsetFromIndex(index_node, HOLEY_ELEMENTS,
-                                        parameter_mode, header_size);
+  TNode<IntPtrT> offset = ElementOffsetFromIndex(index_node, HOLEY_ELEMENTS,
+                                                 parameter_mode, header_size);
   CSA_ASSERT(this, IsOffsetInBounds(offset, LoadArrayLength(object),
                                     array_header_size + endian_correction));
   if (SmiValuesAre32Bits()) {
     return UncheckedCast<Int32T>(Load(MachineType::Int32(), object, offset));
   } else {
-    return SmiToInt32(Load(MachineType::AnyTagged(), object, offset));
+    return SmiToInt32(Load(MachineType::TaggedSigned(), object, offset));
   }
 }
 
@@ -154,20 +157,21 @@ TNode<Object> CodeStubAssembler::LoadFixedArrayBaseElementAsTagged(
   Label done(this), if_packed(this), if_holey(this), if_packed_double(this),
       if_holey_double(this), if_dictionary(this, Label::kDeferred);
 
-  int32_t kinds[] = {// Handled by if_packed.
-                     PACKED_SMI_ELEMENTS, PACKED_ELEMENTS,
-                     PACKED_SEALED_ELEMENTS, PACKED_FROZEN_ELEMENTS,
-                     // Handled by if_holey.
-                     HOLEY_SMI_ELEMENTS, HOLEY_ELEMENTS, HOLEY_SEALED_ELEMENTS,
-                     HOLEY_FROZEN_ELEMENTS,
-                     // Handled by if_packed_double.
-                     PACKED_DOUBLE_ELEMENTS,
-                     // Handled by if_holey_double.
-                     HOLEY_DOUBLE_ELEMENTS};
+  int32_t kinds[] = {
+      // Handled by if_packed.
+      PACKED_SMI_ELEMENTS, PACKED_ELEMENTS, PACKED_NONEXTENSIBLE_ELEMENTS,
+      PACKED_SEALED_ELEMENTS, PACKED_FROZEN_ELEMENTS,
+      // Handled by if_holey.
+      HOLEY_SMI_ELEMENTS, HOLEY_ELEMENTS, HOLEY_NONEXTENSIBLE_ELEMENTS,
+      HOLEY_SEALED_ELEMENTS, HOLEY_FROZEN_ELEMENTS,
+      // Handled by if_packed_double.
+      PACKED_DOUBLE_ELEMENTS,
+      // Handled by if_holey_double.
+      HOLEY_DOUBLE_ELEMENTS};
   Label* labels[] = {// PACKED_{SMI,}_ELEMENTS
-                     &if_packed, &if_packed, &if_packed, &if_packed,
+                     &if_packed, &if_packed, &if_packed, &if_packed, &if_packed,
                      // HOLEY_{SMI,}_ELEMENTS
-                     &if_holey, &if_holey, &if_holey, &if_holey,
+                     &if_holey, &if_holey, &if_holey, &if_holey, &if_holey,
                      // PACKED_DOUBLE_ELEMENTS
                      &if_packed_double,
                      // HOLEY_DOUBLE_ELEMENTS
@@ -183,7 +187,7 @@ TNode<Object> CodeStubAssembler::LoadFixedArrayBaseElementAsTagged(
   BIND(&if_holey);
   {
     var_result = LoadFixedArrayElement(CAST(elements), index);
-    Branch(WordEqual(var_result.value(), TheHoleConstant()), if_hole, &done);
+    Branch(TaggedEqual(var_result.value(), TheHoleConstant()), if_hole, &done);
   }
 
   BIND(&if_packed_double);
@@ -221,11 +225,11 @@ TNode<Float64T> CodeStubAssembler::LoadDoubleWithHoleCheck(
     // compiler is able to fold addition of already complex |offset| with
     // |kIeeeDoubleExponentWordOffset| into one addressing mode.
     if (Is64()) {
-      Node* element = Load(MachineType::Uint64(), base, offset);
+      TNode<Uint64T> element = Load<Uint64T>(base, offset);
       GotoIf(Word64Equal(element, Int64Constant(kHoleNanInt64)), if_hole);
     } else {
-      Node* element_upper = Load(
-          MachineType::Uint32(), base,
+      TNode<Uint32T> element_upper = Load<Uint32T>(
+          base,
           IntPtrAdd(offset, IntPtrConstant(kIeeeDoubleExponentWordOffset)));
       GotoIf(Word32Equal(element_upper, Int32Constant(kHoleNanUpper32)),
              if_hole);
@@ -239,8 +243,17 @@ TNode<Float64T> CodeStubAssembler::LoadDoubleWithHoleCheck(
 }
 
 void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
+                                       char const* arg0, char const* arg1) {
+  Node* arg0_node = nullptr;
+  if (arg0) arg0_node = StringConstant(arg0);
+  Node* arg1_node = nullptr;
+  if (arg1) arg1_node = StringConstant(arg1);
+  ThrowTypeError(context, message, arg0_node, arg1_node);
+}
+
+void CodeStubAssembler::ThrowTypeError(Node* context, MessageTemplate message,
                                        Node* arg0, Node* arg1, Node* arg2) {
-  Node* template_index = SmiConstant(static_cast<int>(message));
+  TNode<Smi> template_index = SmiConstant(static_cast<int>(message));
   if (arg0 == nullptr) {
     CallRuntime(Runtime::kThrowTypeError, context, template_index);
   } else if (arg1 == nullptr) {
@@ -267,13 +280,6 @@ TNode<BoolT> CodeStubAssembler::IsDictionaryMap(SloppyTNode<Map> map) {
 TNode<BoolT> CodeStubAssembler::IsExtensibleMap(SloppyTNode<Map> map) {
   CSA_ASSERT(this, IsMap(map));
   return IsSetWord32<Map::IsExtensibleBit>(LoadMapBitField3(map));
-}
-
-TNode<BoolT> CodeStubAssembler::IsFrozenOrSealedElementsKindMap(
-    SloppyTNode<Map> map) {
-  CSA_ASSERT(this, IsMap(map));
-  return IsElementsKindInRange(LoadMapElementsKind(map), PACKED_SEALED_ELEMENTS,
-                               HOLEY_FROZEN_ELEMENTS);
 }
 
 TNode<BoolT> CodeStubAssembler::IsExtensibleNonPrototypeMap(TNode<Map> map) {
@@ -303,115 +309,114 @@ TNode<BoolT> CodeStubAssembler::IsUndetectableMap(SloppyTNode<Map> map) {
 }
 
 TNode<BoolT> CodeStubAssembler::IsNoElementsProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kNoElementsProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = NoElementsProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsArrayIteratorProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kArrayIteratorProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = ArrayIteratorProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsPromiseResolveProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kPromiseResolveProtector);
-  Node* cell_value = LoadObjectField(cell, Cell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<Cell> cell = PromiseResolveProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, Cell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsPromiseThenProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kPromiseThenProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = PromiseThenProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsArraySpeciesProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kArraySpeciesProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = ArraySpeciesProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsTypedArraySpeciesProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kTypedArraySpeciesProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = TypedArraySpeciesProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsRegExpSpeciesProtectorCellInvalid(
-    TNode<Context> native_context) {
-  CSA_ASSERT(this, IsNativeContext(native_context));
+    TNode<NativeContext> native_context) {
   TNode<PropertyCell> cell = CAST(LoadContextElement(
       native_context, Context::REGEXP_SPECIES_PROTECTOR_INDEX));
   TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
   TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
-  return WordEqual(cell_value, invalid);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsPromiseSpeciesProtectorCellInvalid() {
-  Node* invalid = SmiConstant(Isolate::kProtectorInvalid);
-  Node* cell = LoadRoot(RootIndex::kPromiseSpeciesProtector);
-  Node* cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
-  return WordEqual(cell_value, invalid);
+  TNode<Smi> invalid = SmiConstant(Isolate::kProtectorInvalid);
+  TNode<PropertyCell> cell = PromiseSpeciesProtectorConstant();
+  TNode<Object> cell_value = LoadObjectField(cell, PropertyCell::kValueOffset);
+  return TaggedEqual(cell_value, invalid);
 }
 
 TNode<BoolT> CodeStubAssembler::IsPrototypeInitialArrayPrototype(
     SloppyTNode<Context> context, SloppyTNode<Map> map) {
-  Node* const native_context = LoadNativeContext(context);
-  Node* const initial_array_prototype = LoadContextElement(
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
+  TNode<Object> const initial_array_prototype = LoadContextElement(
       native_context, Context::INITIAL_ARRAY_PROTOTYPE_INDEX);
-  Node* proto = LoadMapPrototype(map);
-  return WordEqual(proto, initial_array_prototype);
+  TNode<HeapObject> proto = LoadMapPrototype(map);
+  return TaggedEqual(proto, initial_array_prototype);
 }
 
 TNode<BoolT> CodeStubAssembler::IsPrototypeTypedArrayPrototype(
     SloppyTNode<Context> context, SloppyTNode<Map> map) {
-  TNode<Context> const native_context = LoadNativeContext(context);
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
   TNode<Object> const typed_array_prototype =
       LoadContextElement(native_context, Context::TYPED_ARRAY_PROTOTYPE_INDEX);
   TNode<HeapObject> proto = LoadMapPrototype(map);
   TNode<HeapObject> proto_of_proto = Select<HeapObject>(
       IsJSObject(proto), [=] { return LoadMapPrototype(LoadMap(proto)); },
       [=] { return NullConstant(); });
-  return WordEqual(proto_of_proto, typed_array_prototype);
+  return TaggedEqual(proto_of_proto, typed_array_prototype);
 }
 
 TNode<BoolT> CodeStubAssembler::IsFastAliasedArgumentsMap(
     TNode<Context> context, TNode<Map> map) {
-  TNode<Context> const native_context = LoadNativeContext(context);
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
   TNode<Object> const arguments_map = LoadContextElement(
       native_context, Context::FAST_ALIASED_ARGUMENTS_MAP_INDEX);
-  return WordEqual(arguments_map, map);
+  return TaggedEqual(arguments_map, map);
 }
 
 TNode<BoolT> CodeStubAssembler::IsSlowAliasedArgumentsMap(
     TNode<Context> context, TNode<Map> map) {
-  TNode<Context> const native_context = LoadNativeContext(context);
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
   TNode<Object> const arguments_map = LoadContextElement(
       native_context, Context::SLOW_ALIASED_ARGUMENTS_MAP_INDEX);
-  return WordEqual(arguments_map, map);
+  return TaggedEqual(arguments_map, map);
 }
 
 TNode<BoolT> CodeStubAssembler::IsSloppyArgumentsMap(TNode<Context> context,
                                                      TNode<Map> map) {
-  TNode<Context> const native_context = LoadNativeContext(context);
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
   TNode<Object> const arguments_map =
       LoadContextElement(native_context, Context::SLOPPY_ARGUMENTS_MAP_INDEX);
-  return WordEqual(arguments_map, map);
+  return TaggedEqual(arguments_map, map);
 }
 
 TNode<BoolT> CodeStubAssembler::IsStrictArgumentsMap(TNode<Context> context,
                                                      TNode<Map> map) {
-  TNode<Context> const native_context = LoadNativeContext(context);
+  TNode<NativeContext> const native_context = LoadNativeContext(context);
   TNode<Object> const arguments_map =
       LoadContextElement(native_context, Context::STRICT_ARGUMENTS_MAP_INDEX);
-  return WordEqual(arguments_map, map);
+  return TaggedEqual(arguments_map, map);
 }
 
 TNode<BoolT> CodeStubAssembler::TaggedIsCallable(TNode<Object> object) {
@@ -427,7 +432,7 @@ TNode<BoolT> CodeStubAssembler::IsCallable(SloppyTNode<HeapObject> object) {
 }
 
 TNode<BoolT> CodeStubAssembler::IsCell(SloppyTNode<HeapObject> object) {
-  return WordEqual(LoadMap(object), LoadRoot(RootIndex::kCellMap));
+  return TaggedEqual(LoadMap(object), CellMapConstant());
 }
 
 TNode<BoolT> CodeStubAssembler::IsCode(SloppyTNode<HeapObject> object) {
@@ -630,7 +635,7 @@ TNode<BoolT> CodeStubAssembler::IsJSAsyncGeneratorObject(
 }
 
 TNode<BoolT> CodeStubAssembler::IsContext(SloppyTNode<HeapObject> object) {
-  Node* instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return UncheckedCast<BoolT>(Word32And(
       Int32GreaterThanOrEqual(instance_type, Int32Constant(FIRST_CONTEXT_TYPE)),
       Int32LessThanOrEqual(instance_type, Int32Constant(LAST_CONTEXT_TYPE))));
@@ -642,7 +647,7 @@ TNode<BoolT> CodeStubAssembler::IsFixedArray(SloppyTNode<HeapObject> object) {
 
 TNode<BoolT> CodeStubAssembler::IsFixedArraySubclass(
     SloppyTNode<HeapObject> object) {
-  Node* instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return UncheckedCast<BoolT>(
       Word32And(Int32GreaterThanOrEqual(instance_type,
                                         Int32Constant(FIRST_FIXED_ARRAY_TYPE)),
@@ -652,7 +657,7 @@ TNode<BoolT> CodeStubAssembler::IsFixedArraySubclass(
 
 TNode<BoolT> CodeStubAssembler::IsNotWeakFixedArraySubclass(
     SloppyTNode<HeapObject> object) {
-  Node* instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return UncheckedCast<BoolT>(Word32Or(
       Int32LessThan(instance_type, Int32Constant(FIRST_WEAK_FIXED_ARRAY_TYPE)),
       Int32GreaterThan(instance_type,
@@ -700,7 +705,8 @@ TNode<BoolT> CodeStubAssembler::IsFixedArrayWithKind(
   if (IsDoubleElementsKind(kind)) {
     return IsFixedDoubleArray(object);
   } else {
-    DCHECK(IsSmiOrObjectElementsKind(kind) || IsSealedElementsKind(kind));
+    DCHECK(IsSmiOrObjectElementsKind(kind) || IsSealedElementsKind(kind) ||
+           IsNonextensibleElementsKind(kind));
     return IsFixedArraySubclass(object);
   }
 }
@@ -726,12 +732,6 @@ TNode<BoolT> CodeStubAssembler::IsAllocationSite(
   return IsAllocationSiteInstanceType(LoadInstanceType(object));
 }
 
-TNode<BoolT> CodeStubAssembler::IsAnyHeapNumber(
-    SloppyTNode<HeapObject> object) {
-  return UncheckedCast<BoolT>(
-      Word32Or(IsMutableHeapNumber(object), IsHeapNumber(object)));
-}
-
 TNode<BoolT> CodeStubAssembler::IsHeapNumber(SloppyTNode<HeapObject> object) {
   return IsHeapNumberMap(LoadMap(object));
 }
@@ -748,11 +748,6 @@ TNode<BoolT> CodeStubAssembler::IsOddball(SloppyTNode<HeapObject> object) {
 TNode<BoolT> CodeStubAssembler::IsOddballInstanceType(
     SloppyTNode<Int32T> instance_type) {
   return InstanceTypeEqual(instance_type, ODDBALL_TYPE);
-}
-
-TNode<BoolT> CodeStubAssembler::IsMutableHeapNumber(
-    SloppyTNode<HeapObject> object) {
-  return IsMutableHeapNumberMap(LoadMap(object));
 }
 
 TNode<BoolT> CodeStubAssembler::IsFeedbackCell(SloppyTNode<HeapObject> object) {
@@ -796,7 +791,7 @@ TNode<BoolT> CodeStubAssembler::IsInternalizedStringInstanceType(
 }
 
 TNode<BoolT> CodeStubAssembler::IsUniqueName(TNode<HeapObject> object) {
-  TNode<Int32T> instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return Select<BoolT>(
       IsInternalizedStringInstanceType(instance_type),
       [=] { return Int32TrueConstant(); },
@@ -804,7 +799,7 @@ TNode<BoolT> CodeStubAssembler::IsUniqueName(TNode<HeapObject> object) {
 }
 
 TNode<BoolT> CodeStubAssembler::IsUniqueNameNoIndex(TNode<HeapObject> object) {
-  TNode<Int32T> instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return Select<BoolT>(
       IsInternalizedStringInstanceType(instance_type),
       [=] {
@@ -849,16 +844,16 @@ TNode<BoolT> CodeStubAssembler::IsPrivateName(SloppyTNode<Symbol> symbol) {
 
 TNode<BoolT> CodeStubAssembler::IsNativeContext(
     SloppyTNode<HeapObject> object) {
-  return WordEqual(LoadMap(object), LoadRoot(RootIndex::kNativeContextMap));
+  return TaggedEqual(LoadMap(object), NativeContextMapConstant());
 }
 
 TNode<BoolT> CodeStubAssembler::IsFixedDoubleArray(
     SloppyTNode<HeapObject> object) {
-  return WordEqual(LoadMap(object), FixedDoubleArrayMapConstant());
+  return TaggedEqual(LoadMap(object), FixedDoubleArrayMapConstant());
 }
 
 TNode<BoolT> CodeStubAssembler::IsHashTable(SloppyTNode<HeapObject> object) {
-  Node* instance_type = LoadInstanceType(object);
+  TNode<Uint16T> instance_type = LoadInstanceType(object);
   return UncheckedCast<BoolT>(
       Word32And(Int32GreaterThanOrEqual(instance_type,
                                         Int32Constant(FIRST_HASH_TABLE_TYPE)),
@@ -1089,10 +1084,9 @@ TNode<Int32T> CodeStubAssembler::StringCharCodeAt(SloppyTNode<String> string,
 
   ToDirectStringAssembler to_direct(state(), string);
   to_direct.TryToDirect(&if_runtime);
-  Node* const offset = IntPtrAdd(index, to_direct.offset());
-  Node* const instance_type = to_direct.instance_type();
-
-  Node* const string_data = to_direct.PointerToData(&if_runtime);
+  TNode<IntPtrT> const offset = IntPtrAdd(index, to_direct.offset());
+  TNode<Int32T> const instance_type = to_direct.instance_type();
+  TNode<RawPtrT> const string_data = to_direct.PointerToData(&if_runtime);
 
   // Check if the {string} is a TwoByteSeqString or a OneByteSeqString.
   Branch(IsOneByteStringInstanceType(instance_type), &if_stringisonebyte,
@@ -1115,9 +1109,9 @@ TNode<Int32T> CodeStubAssembler::StringCharCodeAt(SloppyTNode<String> string,
 
   BIND(&if_runtime);
   {
-    Node* result = CallRuntime(Runtime::kStringCharCodeAt, NoContextConstant(),
-                               string, SmiTag(index));
-    var_result = SmiToInt32(result);
+    TNode<Object> result = CallRuntime(
+        Runtime::kStringCharCodeAt, NoContextConstant(), string, SmiTag(index));
+    var_result = SmiToInt32(CAST(result));
     Goto(&return_result);
   }
 
@@ -1136,15 +1130,14 @@ TNode<String> CodeStubAssembler::StringFromSingleCharCode(TNode<Int32T> code) {
   BIND(&if_codeisonebyte);
   {
     // Load the isolate wide single character string cache.
-    TNode<FixedArray> cache =
-        CAST(LoadRoot(RootIndex::kSingleCharacterStringCache));
+    TNode<FixedArray> cache = SingleCharacterStringCacheConstant();
     TNode<IntPtrT> code_index = Signed(ChangeUint32ToWord(code));
 
     // Check if we have an entry for the {code} in the single character string
     // cache already.
     Label if_entryisundefined(this, Label::kDeferred),
         if_entryisnotundefined(this);
-    Node* entry = UnsafeLoadFixedArrayElement(cache, code_index);
+    TNode<Object> entry = UnsafeLoadFixedArrayElement(cache, code_index);
     Branch(IsUndefined(entry), &if_entryisundefined, &if_entryisnotundefined);
 
     BIND(&if_entryisundefined);
@@ -1170,7 +1163,7 @@ TNode<String> CodeStubAssembler::StringFromSingleCharCode(TNode<Int32T> code) {
   BIND(&if_codeistwobyte);
   {
     // Allocate a new SeqTwoByteString for {code}.
-    Node* result = AllocateSeqTwoByteString(1);
+    TNode<String> result = AllocateSeqTwoByteString(1);
     StoreNoWriteBarrier(
         MachineRepresentation::kWord16, result,
         IntPtrConstant(SeqTwoByteString::kHeaderSize - kHeapObjectTag), code);
@@ -1201,7 +1194,7 @@ TNode<String> CodeStubAssembler::AllocAndCopyStringCharacters(
   BIND(&one_byte_sequential);
   {
     TNode<String> result = AllocateSeqOneByteString(
-        NoContextConstant(), Unsigned(TruncateIntPtrToInt32(character_count)));
+        Unsigned(TruncateIntPtrToInt32(character_count)));
     CopyStringCharacters(from, result, from_index, IntPtrConstant(0),
                          character_count, String::ONE_BYTE_ENCODING,
                          String::ONE_BYTE_ENCODING);
@@ -1213,7 +1206,7 @@ TNode<String> CodeStubAssembler::AllocAndCopyStringCharacters(
   BIND(&two_byte_sequential);
   {
     TNode<String> result = AllocateSeqTwoByteString(
-        NoContextConstant(), Unsigned(TruncateIntPtrToInt32(character_count)));
+        Unsigned(TruncateIntPtrToInt32(character_count)));
     CopyStringCharacters(from, result, from_index, IntPtrConstant(0),
                          character_count, String::TWO_BYTE_ENCODING,
                          String::TWO_BYTE_ENCODING);
@@ -1253,7 +1246,7 @@ TNode<String> CodeStubAssembler::SubString(TNode<String> string,
 
   TNode<String> direct_string = to_direct.TryToDirect(&runtime);
   TNode<IntPtrT> offset = IntPtrAdd(from, to_direct.offset());
-  Node* const instance_type = to_direct.instance_type();
+  TNode<Int32T> const instance_type = to_direct.instance_type();
 
   // The subject string can only be external or sequential string of either
   // encoding at this point.
@@ -1311,7 +1304,8 @@ TNode<String> CodeStubAssembler::SubString(TNode<String> string,
   // Handle external string.
   BIND(&external_string);
   {
-    Node* const fake_sequential_string = to_direct.PointerToString(&runtime);
+    TNode<RawPtrT> const fake_sequential_string =
+        to_direct.PointerToString(&runtime);
 
     var_result = AllocAndCopyStringCharacters(
         fake_sequential_string, instance_type, offset, substr_length);
@@ -1366,21 +1360,13 @@ TNode<String> CodeStubAssembler::SubString(TNode<String> string,
 }
 
 ToDirectStringAssembler::ToDirectStringAssembler(
-    compiler::CodeAssemblerState* state, Node* string, Flags flags)
+    compiler::CodeAssemblerState* state, TNode<String> string, Flags flags)
     : CodeStubAssembler(state),
-      var_string_(this, MachineRepresentation::kTagged, string),
-      var_instance_type_(this, MachineRepresentation::kWord32),
-      var_offset_(this, MachineType::PointerRepresentation()),
-      var_is_external_(this, MachineRepresentation::kWord32),
-      flags_(flags) {
-  CSA_ASSERT(this, TaggedIsNotSmi(string));
-  CSA_ASSERT(this, IsString(string));
-
-  var_string_.Bind(string);
-  var_offset_.Bind(IntPtrConstant(0));
-  var_instance_type_.Bind(LoadInstanceType(string));
-  var_is_external_.Bind(Int32Constant(0));
-}
+      var_string_(string, this),
+      var_instance_type_(LoadInstanceType(string), this),
+      var_offset_(IntPtrConstant(0), this),
+      var_is_external_(Int32Constant(0), this),
+      flags_(flags) {}
 
 TNode<String> ToDirectStringAssembler::TryToDirect(Label* if_bailout) {
   VariableList vars({&var_string_, &var_offset_, &var_instance_type_}, zone());
@@ -1406,7 +1392,7 @@ TNode<String> ToDirectStringAssembler::TryToDirect(Label* if_bailout) {
     };
     STATIC_ASSERT(arraysize(values) == arraysize(labels));
 
-    Node* const representation = Word32And(
+    TNode<Int32T> const representation = Word32And(
         var_instance_type_.value(), Int32Constant(kStringRepresentationMask));
     Switch(representation, if_bailout, values, labels, arraysize(values));
   }
@@ -1415,13 +1401,15 @@ TNode<String> ToDirectStringAssembler::TryToDirect(Label* if_bailout) {
   // Flat cons strings have an empty second part.
   BIND(&if_iscons);
   {
-    Node* const string = var_string_.value();
-    GotoIfNot(IsEmptyString(LoadObjectField(string, ConsString::kSecondOffset)),
+    TNode<String> const string = var_string_.value();
+    GotoIfNot(IsEmptyString(
+                  LoadObjectField<String>(string, ConsString::kSecondOffset)),
               if_bailout);
 
-    Node* const lhs = LoadObjectField(string, ConsString::kFirstOffset);
-    var_string_.Bind(lhs);
-    var_instance_type_.Bind(LoadInstanceType(lhs));
+    TNode<String> const lhs =
+        LoadObjectField<String>(string, ConsString::kFirstOffset);
+    var_string_ = lhs;
+    var_instance_type_ = LoadInstanceType(lhs);
 
     Goto(&dispatch);
   }
@@ -1432,14 +1420,15 @@ TNode<String> ToDirectStringAssembler::TryToDirect(Label* if_bailout) {
     if (!FLAG_string_slices || (flags_ & kDontUnpackSlicedStrings)) {
       Goto(if_bailout);
     } else {
-      Node* const string = var_string_.value();
-      Node* const sliced_offset =
+      TNode<String> const string = var_string_.value();
+      TNode<IntPtrT> const sliced_offset =
           LoadAndUntagObjectField(string, SlicedString::kOffsetOffset);
-      var_offset_.Bind(IntPtrAdd(var_offset_.value(), sliced_offset));
+      var_offset_ = IntPtrAdd(var_offset_.value(), sliced_offset);
 
-      Node* const parent = LoadObjectField(string, SlicedString::kParentOffset);
-      var_string_.Bind(parent);
-      var_instance_type_.Bind(LoadInstanceType(parent));
+      TNode<String> const parent =
+          LoadObjectField<String>(string, SlicedString::kParentOffset);
+      var_string_ = parent;
+      var_instance_type_ = LoadInstanceType(parent);
 
       Goto(&dispatch);
     }
@@ -1448,24 +1437,24 @@ TNode<String> ToDirectStringAssembler::TryToDirect(Label* if_bailout) {
   // Thin string. Fetch the actual string.
   BIND(&if_isthin);
   {
-    Node* const string = var_string_.value();
-    Node* const actual_string =
-        LoadObjectField(string, ThinString::kActualOffset);
-    Node* const actual_instance_type = LoadInstanceType(actual_string);
+    TNode<String> const string = var_string_.value();
+    TNode<String> const actual_string =
+        LoadObjectField<String>(string, ThinString::kActualOffset);
+    TNode<Uint16T> const actual_instance_type = LoadInstanceType(actual_string);
 
-    var_string_.Bind(actual_string);
-    var_instance_type_.Bind(actual_instance_type);
+    var_string_ = actual_string;
+    var_instance_type_ = actual_instance_type;
 
     Goto(&dispatch);
   }
 
   // External string.
   BIND(&if_isexternal);
-  var_is_external_.Bind(Int32Constant(1));
+  var_is_external_ = Int32Constant(1);
   Goto(&out);
 
   BIND(&out);
-  return CAST(var_string_.value());
+  return var_string_.value();
 }
 
 TNode<RawPtrT> ToDirectStringAssembler::TryToSequential(
@@ -1494,7 +1483,7 @@ TNode<RawPtrT> ToDirectStringAssembler::TryToSequential(
     GotoIf(IsUncachedExternalStringInstanceType(var_instance_type_.value()),
            if_bailout);
 
-    TNode<String> string = CAST(var_string_.value());
+    TNode<String> string = var_string_.value();
     TNode<IntPtrT> result =
         LoadObjectField<IntPtrT>(string, ExternalString::kResourceDataOffset);
     if (ptr_kind == PTR_TO_STRING) {
@@ -1509,35 +1498,33 @@ TNode<RawPtrT> ToDirectStringAssembler::TryToSequential(
   return var_result.value();
 }
 
-void CodeStubAssembler::BranchIfCanDerefIndirectString(Node* string,
-                                                       Node* instance_type,
-                                                       Label* can_deref,
-                                                       Label* cannot_deref) {
-  CSA_ASSERT(this, IsString(string));
-  Node* representation =
+void CodeStubAssembler::BranchIfCanDerefIndirectString(
+    TNode<String> string, TNode<Int32T> instance_type, Label* can_deref,
+    Label* cannot_deref) {
+  TNode<Int32T> representation =
       Word32And(instance_type, Int32Constant(kStringRepresentationMask));
   GotoIf(Word32Equal(representation, Int32Constant(kThinStringTag)), can_deref);
   GotoIf(Word32NotEqual(representation, Int32Constant(kConsStringTag)),
          cannot_deref);
   // Cons string.
-  Node* rhs = LoadObjectField(string, ConsString::kSecondOffset);
+  TNode<String> rhs =
+      LoadObjectField<String>(string, ConsString::kSecondOffset);
   GotoIf(IsEmptyString(rhs), can_deref);
   Goto(cannot_deref);
 }
 
-Node* CodeStubAssembler::DerefIndirectString(TNode<String> string,
-                                             TNode<Int32T> instance_type,
-                                             Label* cannot_deref) {
+TNode<String> CodeStubAssembler::DerefIndirectString(
+    TNode<String> string, TNode<Int32T> instance_type, Label* cannot_deref) {
   Label deref(this);
   BranchIfCanDerefIndirectString(string, instance_type, &deref, cannot_deref);
   BIND(&deref);
   STATIC_ASSERT(static_cast<int>(ThinString::kActualOffset) ==
                 static_cast<int>(ConsString::kFirstOffset));
-  return LoadObjectField(string, ThinString::kActualOffset);
+  return LoadObjectField<String>(string, ThinString::kActualOffset);
 }
 
-void CodeStubAssembler::DerefIndirectString(Variable* var_string,
-                                            Node* instance_type) {
+void CodeStubAssembler::DerefIndirectString(TVariable<String>* var_string,
+                                            TNode<Int32T> instance_type) {
 #ifdef DEBUG
   Label can_deref(this), cannot_deref(this);
   BranchIfCanDerefIndirectString(var_string->value(), instance_type, &can_deref,
@@ -1550,12 +1537,12 @@ void CodeStubAssembler::DerefIndirectString(Variable* var_string,
 
   STATIC_ASSERT(static_cast<int>(ThinString::kActualOffset) ==
                 static_cast<int>(ConsString::kFirstOffset));
-  var_string->Bind(
-      LoadObjectField(var_string->value(), ThinString::kActualOffset));
+  *var_string =
+      LoadObjectField<String>(var_string->value(), ThinString::kActualOffset);
 }
 
-void CodeStubAssembler::MaybeDerefIndirectString(Variable* var_string,
-                                                 Node* instance_type,
+void CodeStubAssembler::MaybeDerefIndirectString(TVariable<String>* var_string,
+                                                 TNode<Int32T> instance_type,
                                                  Label* did_deref,
                                                  Label* cannot_deref) {
   Label deref(this);
@@ -1569,11 +1556,10 @@ void CodeStubAssembler::MaybeDerefIndirectString(Variable* var_string,
   }
 }
 
-void CodeStubAssembler::MaybeDerefIndirectStrings(Variable* var_left,
-                                                  Node* left_instance_type,
-                                                  Variable* var_right,
-                                                  Node* right_instance_type,
-                                                  Label* did_something) {
+void CodeStubAssembler::MaybeDerefIndirectStrings(
+    TVariable<String>* var_left, TNode<Int32T> left_instance_type,
+    TVariable<String>* var_right, TNode<Int32T> right_instance_type,
+    Label* did_something) {
   Label did_nothing_left(this), did_something_left(this),
       didnt_do_anything(this);
   MaybeDerefIndirectString(var_left, left_instance_type, &did_something_left,
@@ -1638,13 +1624,13 @@ TNode<String> CodeStubAssembler::StringAdd(Node* context, TNode<String> left,
     BIND(&non_cons);
 
     Comment("Full string concatenate");
-    Node* left_instance_type = LoadInstanceType(var_left.value());
-    Node* right_instance_type = LoadInstanceType(var_right.value());
+    TNode<Int32T> left_instance_type = LoadInstanceType(var_left.value());
+    TNode<Int32T> right_instance_type = LoadInstanceType(var_right.value());
     // Compute intersection and difference of instance types.
 
-    Node* ored_instance_types =
+    TNode<Int32T> ored_instance_types =
         Word32Or(left_instance_type, right_instance_type);
-    Node* xored_instance_types =
+    TNode<Word32T> xored_instance_types =
         Word32Xor(left_instance_type, right_instance_type);
 
     // Check if both strings have the same encoding and both are sequential.
@@ -1660,7 +1646,7 @@ TNode<String> CodeStubAssembler::StringAdd(Node* context, TNode<String> left,
                        Int32Constant(kTwoByteStringTag)),
            &two_byte);
     // One-byte sequential string case
-    result = AllocateSeqOneByteString(context, new_length);
+    result = AllocateSeqOneByteString(new_length);
     CopyStringCharacters(var_left.value(), result.value(), IntPtrConstant(0),
                          IntPtrConstant(0), word_left_length,
                          String::ONE_BYTE_ENCODING, String::ONE_BYTE_ENCODING);
@@ -1672,7 +1658,7 @@ TNode<String> CodeStubAssembler::StringAdd(Node* context, TNode<String> left,
     BIND(&two_byte);
     {
       // Two-byte sequential string case
-      result = AllocateSeqTwoByteString(context, new_length);
+      result = AllocateSeqTwoByteString(new_length);
       CopyStringCharacters(var_left.value(), result.value(), IntPtrConstant(0),
                            IntPtrConstant(0), word_left_length,
                            String::TWO_BYTE_ENCODING,
@@ -1725,7 +1711,7 @@ TNode<String> CodeStubAssembler::StringFromSingleUTF16EncodedCodePoint(
 
   BIND(&if_isword32);
   {
-    Node* value = AllocateSeqTwoByteString(2);
+    TNode<String> value = AllocateSeqTwoByteString(2);
     StoreNoWriteBarrier(
         MachineRepresentation::kWord32, value,
         IntPtrConstant(SeqTwoByteString::kHeaderSize - kHeapObjectTag),
@@ -1771,12 +1757,12 @@ TNode<String> CodeStubAssembler::NumberToString(TNode<Number> input) {
       done(this, &result);
 
   // Load the number string cache.
-  Node* number_string_cache = LoadRoot(RootIndex::kNumberStringCache);
+  TNode<FixedArray> number_string_cache = NumberStringCacheConstant();
 
   // Make the hash mask from the length of the number string cache. It
   // contains two elements (number and string) for each cache entry.
   // TODO(ishell): cleanup mask handling.
-  Node* mask =
+  TNode<IntPtrT> mask =
       BitcastTaggedSignedToWord(LoadFixedArrayBaseLength(number_string_cache));
   TNode<IntPtrT> one = IntPtrConstant(1);
   mask = IntPtrSub(mask, one);
@@ -1787,6 +1773,7 @@ TNode<String> CodeStubAssembler::NumberToString(TNode<Number> input) {
 
   BIND(&if_heap_number);
   {
+    Comment("NumberToString - HeapNumber");
     TNode<HeapNumber> heap_number_input = CAST(input);
     // Try normalizing the HeapNumber.
     TryHeapNumberToSmi(heap_number_input, smi_input, &if_smi);
@@ -1797,42 +1784,44 @@ TNode<String> CodeStubAssembler::NumberToString(TNode<Number> input) {
     TNode<Int32T> high = LoadObjectField<Int32T>(
         heap_number_input, HeapNumber::kValueOffset + kIntSize);
     TNode<Word32T> hash = Word32Xor(low, high);
-    TNode<WordT> word_hash = WordShl(ChangeInt32ToIntPtr(hash), one);
+    TNode<IntPtrT> word_hash = WordShl(ChangeInt32ToIntPtr(hash), one);
     TNode<WordT> index =
         WordAnd(word_hash, WordSar(mask, SmiShiftBitsConstant()));
 
     // Cache entry's key must be a heap number
-    Node* number_key =
-        UnsafeLoadFixedArrayElement(CAST(number_string_cache), index);
+    TNode<Object> number_key =
+        UnsafeLoadFixedArrayElement(number_string_cache, index);
     GotoIf(TaggedIsSmi(number_key), &runtime);
-    GotoIfNot(IsHeapNumber(number_key), &runtime);
+    TNode<HeapObject> number_key_heap_object = CAST(number_key);
+    GotoIfNot(IsHeapNumber(number_key_heap_object), &runtime);
 
     // Cache entry's key must match the heap number value we're looking for.
-    Node* low_compare = LoadObjectField(number_key, HeapNumber::kValueOffset,
-                                        MachineType::Int32());
-    Node* high_compare = LoadObjectField(
-        number_key, HeapNumber::kValueOffset + kIntSize, MachineType::Int32());
+    TNode<Int32T> low_compare = LoadObjectField<Int32T>(
+        number_key_heap_object, HeapNumber::kValueOffset);
+    TNode<Int32T> high_compare = LoadObjectField<Int32T>(
+        number_key_heap_object, HeapNumber::kValueOffset + kIntSize);
     GotoIfNot(Word32Equal(low, low_compare), &runtime);
     GotoIfNot(Word32Equal(high, high_compare), &runtime);
 
     // Heap number match, return value from cache entry.
-    result = CAST(UnsafeLoadFixedArrayElement(CAST(number_string_cache), index,
-                                              kTaggedSize));
+    result = CAST(
+        UnsafeLoadFixedArrayElement(number_string_cache, index, kTaggedSize));
     Goto(&done);
   }
 
   BIND(&if_smi);
   {
+    Comment("NumberToString - Smi");
     // Load the smi key, make sure it matches the smi we're looking for.
-    Node* smi_index = BitcastWordToTagged(WordAnd(
+    TNode<Object> smi_index = BitcastWordToTagged(WordAnd(
         WordShl(BitcastTaggedSignedToWord(smi_input.value()), one), mask));
-    Node* smi_key = UnsafeLoadFixedArrayElement(CAST(number_string_cache),
-                                                smi_index, 0, SMI_PARAMETERS);
-    GotoIf(WordNotEqual(smi_key, smi_input.value()), &runtime);
+    TNode<Object> smi_key = UnsafeLoadFixedArrayElement(
+        number_string_cache, smi_index, 0, SMI_PARAMETERS);
+    GotoIf(TaggedNotEqual(smi_key, smi_input.value()), &runtime);
 
     // Smi match, return value from cache entry.
-    result = CAST(UnsafeLoadFixedArrayElement(
-        CAST(number_string_cache), smi_index, kTaggedSize, SMI_PARAMETERS));
+    result = CAST(UnsafeLoadFixedArrayElement(number_string_cache, smi_index,
+                                              kTaggedSize, SMI_PARAMETERS));
     Goto(&done);
   }
 
@@ -1865,7 +1854,7 @@ Node* CodeStubAssembler::NonNumberToNumberOrNumeric(
     Node* input = var_input.value();
 
     // Dispatch on the {input} instance type.
-    Node* input_instance_type = LoadInstanceType(input);
+    TNode<Uint16T> input_instance_type = LoadInstanceType(input);
     Label if_inputisstring(this), if_inputisoddball(this),
         if_inputisbigint(this), if_inputisreceiver(this, Label::kDeferred),
         if_inputisother(this, Label::kDeferred);
@@ -1912,7 +1901,7 @@ Node* CodeStubAssembler::NonNumberToNumberOrNumeric(
       // using the ToPrimitive type conversion, preferably yielding a Number.
       Callable callable = CodeFactory::NonPrimitiveToPrimitive(
           isolate(), ToPrimitiveHint::kNumber);
-      Node* result = CallStub(callable, context, input);
+      TNode<Object> result = CallStub(callable, context, input);
 
       // Check if the {result} is already a Number/Numeric.
       Label if_done(this), if_notdone(this);
@@ -2074,9 +2063,9 @@ void CodeStubAssembler::TaggedToNumeric(Node* context, Node* value, Label* done,
   var_numeric->Bind(value);
   Label if_smi(this), if_heapnumber(this), if_bigint(this), if_oddball(this);
   GotoIf(TaggedIsSmi(value), &if_smi);
-  Node* map = LoadMap(value);
+  TNode<Map> map = LoadMap(value);
   GotoIf(IsHeapNumberMap(map), &if_heapnumber);
-  Node* instance_type = LoadMapInstanceType(map);
+  TNode<Uint16T> instance_type = LoadMapInstanceType(map);
   GotoIf(IsBigIntInstanceType(instance_type), &if_bigint);
 
   // {value} is not a Numeric yet.
@@ -2106,8 +2095,9 @@ void CodeStubAssembler::TaggedToNumeric(Node* context, Node* value, Label* done,
 // ES#sec-touint32
 TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
                                           SloppyTNode<Object> input) {
-  Node* const float_zero = Float64Constant(0.0);
-  Node* const float_two_32 = Float64Constant(static_cast<double>(1ULL << 32));
+  TNode<Float64T> const float_zero = Float64Constant(0.0);
+  TNode<Float64T> const float_two_32 =
+      Float64Constant(static_cast<double>(1ULL << 32));
 
   Label out(this);
 
@@ -2122,7 +2112,7 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
     BIND(&next);
   }
 
-  Node* const number = ToNumber(context, input);
+  TNode<Number> const number = ToNumber(context, input);
   var_result.Bind(number);
 
   // Perhaps we have a positive smi now.
@@ -2137,8 +2127,8 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
 
   BIND(&if_isnegativesmi);
   {
-    Node* const uint32_value = SmiToInt32(number);
-    Node* float64_value = ChangeUint32ToFloat64(uint32_value);
+    TNode<Int32T> const uint32_value = SmiToInt32(CAST(number));
+    TNode<Float64T> float64_value = ChangeUint32ToFloat64(uint32_value);
     var_result.Bind(AllocateHeapNumberWithValue(float64_value));
     Goto(&out);
   }
@@ -2146,7 +2136,7 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
   BIND(&if_isheapnumber);
   {
     Label return_zero(this);
-    Node* const value = LoadHeapNumberValue(number);
+    TNode<Float64T> const value = LoadHeapNumberValue(CAST(number));
 
     {
       // +-0.
@@ -2165,7 +2155,7 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
     {
       // +Infinity.
       Label next(this);
-      Node* const positive_infinity =
+      TNode<Float64T> const positive_infinity =
           Float64Constant(std::numeric_limits<double>::infinity());
       Branch(Float64Equal(value, positive_infinity), &return_zero, &next);
       BIND(&next);
@@ -2174,7 +2164,7 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
     {
       // -Infinity.
       Label next(this);
-      Node* const negative_infinity =
+      TNode<Float64T> const negative_infinity =
           Float64Constant(-1.0 * std::numeric_limits<double>::infinity());
       Branch(Float64Equal(value, negative_infinity), &return_zero, &next);
       BIND(&next);
@@ -2185,12 +2175,12 @@ TNode<Number> CodeStubAssembler::ToUint32(SloppyTNode<Context> context,
     // * Let int32bit be int modulo 2^32.
     // * Return int32bit.
     {
-      Node* x = Float64Trunc(value);
+      TNode<Float64T> x = Float64Trunc(value);
       x = Float64Mod(x, float_two_32);
       x = Float64Add(x, float_two_32);
       x = Float64Mod(x, float_two_32);
 
-      Node* const result = ChangeFloat64ToTagged(x);
+      TNode<Number> const result = ChangeFloat64ToTagged(x);
       var_result.Bind(result);
       Goto(&out);
     }
@@ -2220,31 +2210,6 @@ TNode<String> CodeStubAssembler::ToString_Inline(SloppyTNode<Context> context,
 
   BIND(&out);
   return CAST(var_result.value());
-}
-
-Node* CodeStubAssembler::JSReceiverToPrimitive(Node* context, Node* input) {
-  Label if_isreceiver(this, Label::kDeferred), if_isnotreceiver(this);
-  VARIABLE(result, MachineRepresentation::kTagged);
-  Label done(this, &result);
-
-  BranchIfJSReceiver(input, &if_isreceiver, &if_isnotreceiver);
-
-  BIND(&if_isreceiver);
-  {
-    // Convert {input} to a primitive first passing Number hint.
-    Callable callable = CodeFactory::NonPrimitiveToPrimitive(isolate());
-    result.Bind(CallStub(callable, context, input));
-    Goto(&done);
-  }
-
-  BIND(&if_isnotreceiver);
-  {
-    result.Bind(input);
-    Goto(&done);
-  }
-
-  BIND(&done);
-  return result.value();
 }
 
 TNode<JSReceiver> CodeStubAssembler::ToObject(SloppyTNode<Context> context,
@@ -2393,7 +2358,7 @@ TNode<Number> CodeStubAssembler::ToInteger(SloppyTNode<Context> context,
     {
       TNode<HeapNumber> arg_hn = CAST(arg);
       // Load the floating-point value of {arg}.
-      Node* arg_value = LoadHeapNumberValue(arg_hn);
+      TNode<Float64T> arg_value = LoadHeapNumberValue(arg_hn);
 
       // Check if {arg} is NaN.
       GotoIfNot(Float64Equal(arg_value, arg_value), &return_zero);
@@ -2455,7 +2420,7 @@ TNode<WordT> CodeStubAssembler::UpdateWord(TNode<WordT> word,
 
 void CodeStubAssembler::SetCounter(StatsCounter* counter, int value) {
   if (FLAG_native_code_counters && counter->Enabled()) {
-    Node* counter_address =
+    TNode<ExternalReference> counter_address =
         ExternalConstant(ExternalReference::Create(counter));
     StoreNoWriteBarrier(MachineRepresentation::kWord32, counter_address,
                         Int32Constant(value));
@@ -2465,7 +2430,7 @@ void CodeStubAssembler::SetCounter(StatsCounter* counter, int value) {
 void CodeStubAssembler::IncrementCounter(StatsCounter* counter, int delta) {
   DCHECK_GT(delta, 0);
   if (FLAG_native_code_counters && counter->Enabled()) {
-    Node* counter_address =
+    TNode<ExternalReference> counter_address =
         ExternalConstant(ExternalReference::Create(counter));
     // This operation has to be exactly 32-bit wide in case the external
     // reference table redirects the counter to a uint32_t dummy_stats_counter_
@@ -2479,7 +2444,7 @@ void CodeStubAssembler::IncrementCounter(StatsCounter* counter, int delta) {
 void CodeStubAssembler::DecrementCounter(StatsCounter* counter, int delta) {
   DCHECK_GT(delta, 0);
   if (FLAG_native_code_counters && counter->Enabled()) {
-    Node* counter_address =
+    TNode<ExternalReference> counter_address =
         ExternalConstant(ExternalReference::Create(counter));
     // This operation has to be exactly 32-bit wide in case the external
     // reference table redirects the counter to a uint32_t dummy_stats_counter_
@@ -2518,17 +2483,17 @@ void CodeStubAssembler::TryToName(Node* key, Label* if_keyisindex,
   Goto(if_keyisindex);
 
   BIND(&if_keyisnotindex);
-  Node* key_map = LoadMap(key);
+  TNode<Map> key_map = LoadMap(key);
   var_unique->Bind(key);
   // Symbols are unique.
   GotoIf(IsSymbolMap(key_map), if_keyisunique);
-  Node* key_instance_type = LoadMapInstanceType(key_map);
+  TNode<Uint16T> key_instance_type = LoadMapInstanceType(key_map);
   // Miss if |key| is not a String.
   STATIC_ASSERT(FIRST_NAME_TYPE == FIRST_TYPE);
   GotoIfNot(IsStringInstanceType(key_instance_type), &if_keyisother);
 
   // |key| is a String. Check if it has a cached array index.
-  Node* hash = LoadNameHashField(key);
+  TNode<Uint32T> hash = LoadNameHashField(key);
   GotoIf(IsClearWord32(hash, Name::kDoesNotContainCachedArrayIndexMask),
          &if_hascachedindex);
   // No cached array index. If the string knows that it contains an index,
@@ -2546,7 +2511,8 @@ void CodeStubAssembler::TryToName(Node* key, Label* if_keyisindex,
   Goto(if_keyisunique);
 
   BIND(&if_thinstring);
-  var_unique->Bind(LoadObjectField(key, ThinString::kActualOffset));
+  var_unique->Bind(
+      LoadObjectField<String>(CAST(key), ThinString::kActualOffset));
   Goto(if_keyisunique);
 
   BIND(&if_hascachedindex);
@@ -2565,9 +2531,9 @@ void CodeStubAssembler::TryInternalizeString(
   DCHECK(var_index->rep() == MachineType::PointerRepresentation());
   DCHECK_EQ(var_internalized->rep(), MachineRepresentation::kTagged);
   CSA_SLOW_ASSERT(this, IsString(string));
-  Node* function =
+  TNode<ExternalReference> function =
       ExternalConstant(ExternalReference::try_internalize_string_function());
-  Node* const isolate_ptr =
+  TNode<ExternalReference> const isolate_ptr =
       ExternalConstant(ExternalReference::isolate_address(isolate()));
   Node* result =
       CallCFunction(function, MachineType::AnyTagged(),
@@ -2575,10 +2541,10 @@ void CodeStubAssembler::TryInternalizeString(
                     std::make_pair(MachineType::AnyTagged(), string));
   Label internalized(this);
   GotoIf(TaggedIsNotSmi(result), &internalized);
-  Node* word_result = SmiUntag(result);
-  GotoIf(WordEqual(word_result, IntPtrConstant(ResultSentinel::kNotFound)),
+  TNode<IntPtrT> word_result = SmiUntag(result);
+  GotoIf(IntPtrEqual(word_result, IntPtrConstant(ResultSentinel::kNotFound)),
          if_not_internalized);
-  GotoIf(WordEqual(word_result, IntPtrConstant(ResultSentinel::kUnsupported)),
+  GotoIf(IntPtrEqual(word_result, IntPtrConstant(ResultSentinel::kUnsupported)),
          if_bailout);
   var_index->Bind(word_result);
   Goto(if_index);
@@ -2702,8 +2668,8 @@ TNode<IntPtrT> CodeStubAssembler::IntPtrMax(SloppyTNode<IntPtrT> left,
                                             SloppyTNode<IntPtrT> right) {
   intptr_t left_constant;
   intptr_t right_constant;
-  if (ToIntPtrConstant(left, left_constant) &&
-      ToIntPtrConstant(right, right_constant)) {
+  if (ToIntPtrConstant(left, &left_constant) &&
+      ToIntPtrConstant(right, &right_constant)) {
     return IntPtrConstant(std::max(left_constant, right_constant));
   }
   return SelectConstant<IntPtrT>(IntPtrGreaterThanOrEqual(left, right), left,
@@ -2714,8 +2680,8 @@ TNode<IntPtrT> CodeStubAssembler::IntPtrMin(SloppyTNode<IntPtrT> left,
                                             SloppyTNode<IntPtrT> right) {
   intptr_t left_constant;
   intptr_t right_constant;
-  if (ToIntPtrConstant(left, left_constant) &&
-      ToIntPtrConstant(right, right_constant)) {
+  if (ToIntPtrConstant(left, &left_constant) &&
+      ToIntPtrConstant(right, &right_constant)) {
     return IntPtrConstant(std::min(left_constant, right_constant));
   }
   return SelectConstant<IntPtrT>(IntPtrLessThanOrEqual(left, right), left,
@@ -2749,13 +2715,13 @@ void CodeStubAssembler::NameDictionaryLookup(
   CSA_ASSERT(this, IsUniqueName(unique_name));
 
   TNode<IntPtrT> capacity = SmiUntag(GetCapacity<Dictionary>(dictionary));
-  TNode<WordT> mask = IntPtrSub(capacity, IntPtrConstant(1));
-  TNode<WordT> hash = ChangeUint32ToWord(LoadNameHash(unique_name));
+  TNode<IntPtrT> mask = IntPtrSub(capacity, IntPtrConstant(1));
+  TNode<UintPtrT> hash = ChangeUint32ToWord(LoadNameHash(unique_name));
 
   // See Dictionary::FirstProbe().
   TNode<IntPtrT> count = IntPtrConstant(0);
   TNode<IntPtrT> entry = Signed(WordAnd(hash, mask));
-  Node* undefined = UndefinedConstant();
+  TNode<Oddball> undefined = UndefinedConstant();
 
   // Appease the variable merging algorithm for "Goto(&loop)" below.
   *var_name_index = IntPtrConstant(0);
@@ -2774,13 +2740,13 @@ void CodeStubAssembler::NameDictionaryLookup(
 
     TNode<HeapObject> current =
         CAST(UnsafeLoadFixedArrayElement(dictionary, index));
-    GotoIf(WordEqual(current, undefined), if_not_found);
+    GotoIf(TaggedEqual(current, undefined), if_not_found);
     if (mode == kFindExisting) {
       current = LoadName<Dictionary>(current);
-      GotoIf(WordEqual(current, unique_name), if_found);
+      GotoIf(TaggedEqual(current, unique_name), if_found);
     } else {
       DCHECK_EQ(kFindInsertionIndex, mode);
-      GotoIf(WordEqual(current, TheHoleConstant()), if_not_found);
+      GotoIf(TaggedEqual(current, TheHoleConstant()), if_not_found);
     }
 
     // See Dictionary::NextProbe().
@@ -2804,7 +2770,7 @@ template V8_EXPORT_PRIVATE void CodeStubAssembler::NameDictionaryLookup<
 
 Node* CodeStubAssembler::ComputeUnseededHash(Node* key) {
   // See v8::internal::ComputeUnseededHash()
-  Node* hash = TruncateIntPtrToInt32(key);
+  TNode<Word32T> hash = TruncateIntPtrToInt32(key);
   hash = Int32Add(Word32Xor(hash, Int32Constant(0xFFFFFFFF)),
                   Word32Shl(hash, Int32Constant(15)));
   hash = Word32Xor(hash, Word32Shr(hash, Int32Constant(12)));
@@ -2816,9 +2782,9 @@ Node* CodeStubAssembler::ComputeUnseededHash(Node* key) {
 }
 
 Node* CodeStubAssembler::ComputeSeededHash(Node* key) {
-  Node* const function_addr =
+  TNode<ExternalReference> const function_addr =
       ExternalConstant(ExternalReference::compute_integer_hash());
-  Node* const isolate_ptr =
+  TNode<ExternalReference> const isolate_ptr =
       ExternalConstant(ExternalReference::isolate_address(isolate()));
 
   MachineType type_ptr = MachineType::Pointer();
@@ -2838,17 +2804,17 @@ void CodeStubAssembler::NumberDictionaryLookup(
   Comment("NumberDictionaryLookup");
 
   TNode<IntPtrT> capacity = SmiUntag(GetCapacity<NumberDictionary>(dictionary));
-  TNode<WordT> mask = IntPtrSub(capacity, IntPtrConstant(1));
+  TNode<IntPtrT> mask = IntPtrSub(capacity, IntPtrConstant(1));
 
-  TNode<WordT> hash = ChangeUint32ToWord(ComputeSeededHash(intptr_index));
+  TNode<UintPtrT> hash = ChangeUint32ToWord(ComputeSeededHash(intptr_index));
   Node* key_as_float64 = RoundIntPtrToFloat64(intptr_index);
 
   // See Dictionary::FirstProbe().
   TNode<IntPtrT> count = IntPtrConstant(0);
   TNode<IntPtrT> entry = Signed(WordAnd(hash, mask));
 
-  Node* undefined = UndefinedConstant();
-  Node* the_hole = TheHoleConstant();
+  TNode<Oddball> undefined = UndefinedConstant();
+  TNode<Oddball> the_hole = TheHoleConstant();
 
   TVARIABLE(IntPtrT, var_count, count);
   Variable* loop_vars[] = {&var_count, var_entry};
@@ -2860,22 +2826,22 @@ void CodeStubAssembler::NumberDictionaryLookup(
     TNode<IntPtrT> entry = var_entry->value();
 
     TNode<IntPtrT> index = EntryToIndex<NumberDictionary>(entry);
-    Node* current = UnsafeLoadFixedArrayElement(dictionary, index);
-    GotoIf(WordEqual(current, undefined), if_not_found);
+    TNode<Object> current = UnsafeLoadFixedArrayElement(dictionary, index);
+    GotoIf(TaggedEqual(current, undefined), if_not_found);
     Label next_probe(this);
     {
       Label if_currentissmi(this), if_currentisnotsmi(this);
       Branch(TaggedIsSmi(current), &if_currentissmi, &if_currentisnotsmi);
       BIND(&if_currentissmi);
       {
-        Node* current_value = SmiUntag(current);
+        TNode<IntPtrT> current_value = SmiUntag(CAST(current));
         Branch(WordEqual(current_value, intptr_index), if_found, &next_probe);
       }
       BIND(&if_currentisnotsmi);
       {
-        GotoIf(WordEqual(current, the_hole), &next_probe);
+        GotoIf(TaggedEqual(current, the_hole), &next_probe);
         // Current must be the Number.
-        Node* current_value = LoadHeapNumberValue(current);
+        TNode<Float64T> current_value = LoadHeapNumberValue(CAST(current));
         Branch(Float64Equal(current_value, key_as_float64), if_found,
                &next_probe);
       }
@@ -3064,7 +3030,7 @@ void CodeStubAssembler::LookupLinear(TNode<Name> unique_name,
             LoadArrayElement(array, Array::kHeaderSize, name_index);
         TNode<Name> candidate_name = CAST(element);
         *var_name_index = name_index;
-        GotoIf(WordEqual(candidate_name, unique_name), if_found);
+        GotoIf(TaggedEqual(candidate_name, unique_name), if_found);
       },
       -Array::kEntrySize, INTPTR_PARAMETERS, IndexAdvanceMode::kPre);
   Goto(if_not_found);
@@ -3209,7 +3175,7 @@ void CodeStubAssembler::LookupBinary(TNode<Name> unique_name,
     TNode<Uint32T> current_hash = LoadNameHashField(current_name);
     GotoIf(Word32NotEqual(current_hash, hash), if_not_found);
     Label next(this);
-    GotoIf(WordNotEqual(current_name, unique_name), &next);
+    GotoIf(TaggedNotEqual(current_name, unique_name), &next);
     GotoIf(Uint32GreaterThanOrEqual(sort_index, number_of_valid_entries),
            if_not_found);
     *var_name_index = ToKeyIndex<Array>(sort_index);
@@ -3225,7 +3191,7 @@ void CodeStubAssembler::ForEachEnumerableOwnProperty(
     TNode<Context> context, TNode<Map> map, TNode<JSObject> object,
     ForEachEnumerationMode mode, const ForEachKeyValueFunction& body,
     Label* bailout) {
-  TNode<Int32T> type = LoadMapInstanceType(map);
+  TNode<Uint16T> type = LoadMapInstanceType(map);
   TNode<Uint32T> bit_field3 = EnsureOnlyHasSimpleProperties(map, type, bailout);
 
   TNode<DescriptorArray> descriptors = LoadMapDescriptors(map);
@@ -3386,7 +3352,7 @@ void CodeStubAssembler::ForEachEnumerableOwnProperty(
             // property details from preloaded |descriptors|.
             var_stable = Select<BoolT>(
                 var_stable.value(),
-                [=] { return WordEqual(LoadMap(object), map); },
+                [=] { return TaggedEqual(LoadMap(object), map); },
                 [=] { return Int32FalseConstant(); });
 
             Goto(&next_iteration);
@@ -3563,7 +3529,7 @@ void CodeStubAssembler::TryHasOwnProperty(Node* object, Node* map,
 Node* CodeStubAssembler::GetMethod(Node* context, Node* object,
                                    Handle<Name> name,
                                    Label* if_null_or_undefined) {
-  Node* method = GetProperty(context, object, name);
+  TNode<Object> method = GetProperty(context, object, name);
 
   GotoIf(IsUndefined(method), if_null_or_undefined);
   GotoIf(IsNull(method), if_null_or_undefined);
@@ -3585,7 +3551,7 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
   DCHECK_EQ(MachineRepresentation::kWord32, var_details->rep());
   DCHECK_EQ(MachineRepresentation::kTagged, var_value->rep());
 
-  Node* details =
+  TNode<Uint32T> details =
       LoadDetailsByKeyIndex(descriptors, UncheckedCast<IntPtrT>(name_index));
   var_details->Bind(details);
 
@@ -3598,21 +3564,22 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
     Node* name_index, Node* details, Variable* var_value) {
   Comment("[ LoadPropertyFromFastObject");
 
-  Node* location = DecodeWord32<PropertyDetails::LocationField>(details);
+  TNode<Uint32T> location =
+      DecodeWord32<PropertyDetails::LocationField>(details);
 
   Label if_in_field(this), if_in_descriptor(this), done(this);
   Branch(Word32Equal(location, Int32Constant(kField)), &if_in_field,
          &if_in_descriptor);
   BIND(&if_in_field);
   {
-    Node* field_index =
-        DecodeWordFromWord32<PropertyDetails::FieldIndexField>(details);
-    Node* representation =
+    TNode<IntPtrT> field_index =
+        Signed(DecodeWordFromWord32<PropertyDetails::FieldIndexField>(details));
+    TNode<Uint32T> representation =
         DecodeWord32<PropertyDetails::RepresentationField>(details);
 
     field_index =
         IntPtrAdd(field_index, LoadMapInobjectPropertiesStartInWords(map));
-    Node* instance_size_in_words = LoadMapInstanceSizeInWords(map);
+    TNode<IntPtrT> instance_size_in_words = LoadMapInstanceSizeInWords(map);
 
     Label if_inobject(this), if_backing_store(this);
     VARIABLE(var_double_value, MachineRepresentation::kFloat64);
@@ -3622,7 +3589,7 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
     BIND(&if_inobject);
     {
       Comment("if_inobject");
-      Node* field_offset = TimesTaggedSize(field_index);
+      TNode<IntPtrT> field_offset = TimesTaggedSize(field_index);
 
       Label if_double(this), if_tagged(this);
       Branch(Word32NotEqual(representation,
@@ -3639,8 +3606,9 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
           var_double_value.Bind(
               LoadObjectField(object, field_offset, MachineType::Float64()));
         } else {
-          Node* mutable_heap_number = LoadObjectField(object, field_offset);
-          var_double_value.Bind(LoadHeapNumberValue(mutable_heap_number));
+          TNode<HeapNumber> heap_number =
+              CAST(LoadObjectField(object, field_offset));
+          var_double_value.Bind(LoadHeapNumberValue(heap_number));
         }
         Goto(&rebox_double);
       }
@@ -3649,8 +3617,9 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
     {
       Comment("if_backing_store");
       TNode<HeapObject> properties = LoadFastProperties(object);
-      field_index = IntPtrSub(field_index, instance_size_in_words);
-      Node* value = LoadPropertyArrayElement(CAST(properties), field_index);
+      field_index = Signed(IntPtrSub(field_index, instance_size_in_words));
+      TNode<Object> value =
+          LoadPropertyArrayElement(CAST(properties), field_index);
 
       Label if_double(this), if_tagged(this);
       Branch(Word32NotEqual(representation,
@@ -3663,14 +3632,15 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
       }
       BIND(&if_double);
       {
-        var_double_value.Bind(LoadHeapNumberValue(value));
+        var_double_value.Bind(LoadHeapNumberValue(CAST(value)));
         Goto(&rebox_double);
       }
     }
     BIND(&rebox_double);
     {
       Comment("rebox_double");
-      Node* heap_number = AllocateHeapNumberWithValue(var_double_value.value());
+      TNode<HeapNumber> heap_number =
+          AllocateHeapNumberWithValue(var_double_value.value());
       var_value->Bind(heap_number);
       Goto(&done);
     }
@@ -3708,15 +3678,16 @@ void CodeStubAssembler::LoadPropertyFromGlobalDictionary(Node* dictionary,
   Comment("[ LoadPropertyFromGlobalDictionary");
   CSA_ASSERT(this, IsGlobalDictionary(dictionary));
 
-  Node* property_cell = LoadFixedArrayElement(CAST(dictionary), name_index);
-  CSA_ASSERT(this, IsPropertyCell(property_cell));
+  TNode<PropertyCell> property_cell =
+      CAST(LoadFixedArrayElement(CAST(dictionary), name_index));
 
-  Node* value = LoadObjectField(property_cell, PropertyCell::kValueOffset);
-  GotoIf(WordEqual(value, TheHoleConstant()), if_deleted);
+  TNode<Object> value =
+      LoadObjectField(property_cell, PropertyCell::kValueOffset);
+  GotoIf(TaggedEqual(value, TheHoleConstant()), if_deleted);
 
   var_value->Bind(value);
 
-  Node* details = LoadAndUntagToWord32ObjectField(
+  TNode<Int32T> details = LoadAndUntagToWord32ObjectField(
       property_cell, PropertyCell::kPropertyDetailsRawOffset);
   var_details->Bind(details);
 
@@ -3732,7 +3703,7 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
   VARIABLE(var_value, MachineRepresentation::kTagged, value);
   Label done(this), if_accessor_info(this, Label::kDeferred);
 
-  Node* kind = DecodeWord32<PropertyDetails::KindField>(details);
+  TNode<Uint32T> kind = DecodeWord32<PropertyDetails::KindField>(details);
   GotoIf(Word32Equal(kind, Int32Constant(kData)), &done);
 
   // Accessor case.
@@ -3742,10 +3713,10 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
   {
     if (mode == kCallJSGetter) {
       Node* accessor_pair = value;
-      Node* getter =
-          LoadObjectField(accessor_pair, AccessorPair::kGetterOffset);
-      Node* getter_map = LoadMap(getter);
-      Node* instance_type = LoadMapInstanceType(getter_map);
+      TNode<HeapObject> getter =
+          CAST(LoadObjectField(accessor_pair, AccessorPair::kGetterOffset));
+      TNode<Map> getter_map = LoadMap(getter);
+      TNode<Uint16T> instance_type = LoadMapInstanceType(getter_map);
       // FunctionTemplateInfo getters are not supported yet.
       GotoIf(InstanceTypeEqual(instance_type, FUNCTION_TEMPLATE_INFO_TYPE),
              if_bailout);
@@ -3771,8 +3742,8 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
     Label if_array(this), if_function(this), if_wrapper(this);
 
     // Dispatch based on {receiver} instance type.
-    Node* receiver_map = LoadMap(receiver);
-    Node* receiver_instance_type = LoadMapInstanceType(receiver_map);
+    TNode<Map> receiver_map = LoadMap(receiver);
+    TNode<Uint16T> receiver_instance_type = LoadMapInstanceType(receiver_map);
     GotoIf(IsJSArrayInstanceType(receiver_instance_type), &if_array);
     GotoIf(IsJSFunctionInstanceType(receiver_instance_type), &if_function);
     Branch(IsJSPrimitiveWrapperInstanceType(receiver_instance_type),
@@ -3797,9 +3768,9 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
                     LoadObjectField(accessor_info, AccessorInfo::kNameOffset)),
                 if_bailout);
 
-      GotoIfPrototypeRequiresRuntimeLookup(CAST(receiver), CAST(receiver_map),
+      GotoIfPrototypeRequiresRuntimeLookup(CAST(receiver), receiver_map,
                                            if_bailout);
-      var_value.Bind(LoadJSFunctionPrototype(receiver, if_bailout));
+      var_value.Bind(LoadJSFunctionPrototype(CAST(receiver), if_bailout));
       Goto(&done);
     }
 
@@ -3858,7 +3829,7 @@ void CodeStubAssembler::TryGetOwnProperty(
   BIND(&if_found_fast);
   {
     TNode<DescriptorArray> descriptors = CAST(var_meta_storage.value());
-    Node* name_index = var_entry.value();
+    TNode<IntPtrT> name_index = var_entry.value();
 
     LoadPropertyFromFastObject(object, map, descriptors, name_index,
                                var_details, var_value);
@@ -3866,15 +3837,15 @@ void CodeStubAssembler::TryGetOwnProperty(
   }
   BIND(&if_found_dict);
   {
-    Node* dictionary = var_meta_storage.value();
-    Node* entry = var_entry.value();
+    TNode<HeapObject> dictionary = var_meta_storage.value();
+    TNode<IntPtrT> entry = var_entry.value();
     LoadPropertyFromNameDictionary(dictionary, entry, var_details, var_value);
     Goto(&if_found);
   }
   BIND(&if_found_global);
   {
-    Node* dictionary = var_meta_storage.value();
-    Node* entry = var_entry.value();
+    TNode<HeapObject> dictionary = var_meta_storage.value();
+    TNode<IntPtrT> entry = var_entry.value();
 
     LoadPropertyFromGlobalDictionary(dictionary, entry, var_details, var_value,
                                      if_not_found);
@@ -3887,8 +3858,9 @@ void CodeStubAssembler::TryGetOwnProperty(
     if (var_raw_value) {
       var_raw_value->Bind(var_value->value());
     }
-    Node* value = CallGetterIfAccessor(var_value->value(), var_details->value(),
-                                       context, receiver, if_bailout, mode);
+    TNode<Object> value =
+        CallGetterIfAccessor(var_value->value(), var_details->value(), context,
+                             receiver, if_bailout, mode);
     var_value->Bind(value);
     Goto(if_found_value);
   }
@@ -3903,7 +3875,7 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
   // Handle special objects in runtime.
   GotoIf(IsSpecialReceiverInstanceType(instance_type), if_bailout);
 
-  Node* elements_kind = LoadMapElementsKind(map);
+  TNode<Int32T> elements_kind = LoadMapElementsKind(map);
 
   // TODO(verwaest): Support other elements kinds as well.
   Label if_isobjectorsmi(this), if_isdouble(this), if_isdictionary(this),
@@ -3913,8 +3885,9 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
   int32_t values[] = {
       // Handled by {if_isobjectorsmi}.
       PACKED_SMI_ELEMENTS, HOLEY_SMI_ELEMENTS, PACKED_ELEMENTS, HOLEY_ELEMENTS,
-      PACKED_SEALED_ELEMENTS, HOLEY_SEALED_ELEMENTS, PACKED_FROZEN_ELEMENTS,
-      HOLEY_FROZEN_ELEMENTS,
+      PACKED_NONEXTENSIBLE_ELEMENTS, PACKED_SEALED_ELEMENTS,
+      HOLEY_NONEXTENSIBLE_ELEMENTS, HOLEY_SEALED_ELEMENTS,
+      PACKED_FROZEN_ELEMENTS, HOLEY_FROZEN_ELEMENTS,
       // Handled by {if_isdouble}.
       PACKED_DOUBLE_ELEMENTS, HOLEY_DOUBLE_ELEMENTS,
       // Handled by {if_isdictionary}.
@@ -3941,7 +3914,8 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
   Label* labels[] = {
       &if_isobjectorsmi, &if_isobjectorsmi, &if_isobjectorsmi,
       &if_isobjectorsmi, &if_isobjectorsmi, &if_isobjectorsmi,
-      &if_isobjectorsmi, &if_isobjectorsmi,
+      &if_isobjectorsmi, &if_isobjectorsmi, &if_isobjectorsmi,
+      &if_isobjectorsmi,
       &if_isdouble, &if_isdouble,
       &if_isdictionary,
       &if_isfaststringwrapper,
@@ -3972,7 +3946,7 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
 
     TNode<Object> element = UnsafeLoadFixedArrayElement(elements, intptr_index);
     TNode<Oddball> the_hole = TheHoleConstant();
-    Branch(WordEqual(element, the_hole), if_not_found, if_found);
+    Branch(TaggedEqual(element, the_hole), if_not_found, if_found);
   }
   BIND(&if_isdouble);
   {
@@ -4002,7 +3976,7 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
     CSA_ASSERT(this, HasInstanceType(object, JS_PRIMITIVE_WRAPPER_TYPE));
     Node* string = LoadJSPrimitiveWrapperValue(object);
     CSA_ASSERT(this, IsString(string));
-    Node* length = LoadStringLengthAsWord(string);
+    TNode<IntPtrT> length = LoadStringLengthAsWord(string);
     GotoIf(UintPtrLessThan(intptr_index, length), if_found);
     Goto(&if_isobjectorsmi);
   }
@@ -4011,7 +3985,7 @@ void CodeStubAssembler::TryLookupElement(Node* object, Node* map,
     CSA_ASSERT(this, HasInstanceType(object, JS_PRIMITIVE_WRAPPER_TYPE));
     Node* string = LoadJSPrimitiveWrapperValue(object);
     CSA_ASSERT(this, IsString(string));
-    Node* length = LoadStringLengthAsWord(string);
+    TNode<IntPtrT> length = LoadStringLengthAsWord(string);
     GotoIf(UintPtrLessThan(intptr_index, length), if_found);
     Goto(&if_isdictionary);
   }
@@ -4070,8 +4044,8 @@ void CodeStubAssembler::TryPrototypeChainLookup(
   GotoIf(TaggedIsSmi(receiver), if_bailout);
   CSA_ASSERT(this, TaggedIsNotSmi(object));
 
-  Node* map = LoadMap(object);
-  Node* instance_type = LoadMapInstanceType(map);
+  TNode<Map> map = LoadMap(object);
+  TNode<Uint16T> instance_type = LoadMapInstanceType(map);
   {
     Label if_objectisreceiver(this);
     STATIC_ASSERT(LAST_JS_RECEIVER_TYPE == LAST_TYPE);
@@ -4092,19 +4066,18 @@ void CodeStubAssembler::TryPrototypeChainLookup(
 
   BIND(&if_iskeyunique);
   {
-    VARIABLE(var_holder, MachineRepresentation::kTagged, object);
-    VARIABLE(var_holder_map, MachineRepresentation::kTagged, map);
-    VARIABLE(var_holder_instance_type, MachineRepresentation::kWord32,
-             instance_type);
+    TVARIABLE(HeapObject, var_holder, CAST(object));
+    TVARIABLE(Map, var_holder_map, map);
+    TVARIABLE(Int32T, var_holder_instance_type, instance_type);
 
-    Variable* merged_variables[] = {&var_holder, &var_holder_map,
-                                    &var_holder_instance_type};
-    Label loop(this, arraysize(merged_variables), merged_variables);
+    VariableList merged_variables(
+        {&var_holder, &var_holder_map, &var_holder_instance_type}, zone());
+    Label loop(this, merged_variables);
     Goto(&loop);
     BIND(&loop);
     {
-      Node* holder_map = var_holder_map.value();
-      Node* holder_instance_type = var_holder_instance_type.value();
+      TNode<Map> holder_map = var_holder_map.value();
+      TNode<Int32T> holder_instance_type = var_holder_instance_type.value();
 
       Label next_proto(this), check_integer_indexed_exotic(this);
       lookup_property_in_holder(receiver, var_holder.value(), holder_map,
@@ -4123,29 +4096,28 @@ void CodeStubAssembler::TryPrototypeChainLookup(
 
       BIND(&next_proto);
 
-      Node* proto = LoadMapPrototype(holder_map);
+      TNode<HeapObject> proto = LoadMapPrototype(holder_map);
 
       GotoIf(IsNull(proto), if_end);
 
-      Node* map = LoadMap(proto);
-      Node* instance_type = LoadMapInstanceType(map);
+      TNode<Map> map = LoadMap(proto);
+      TNode<Uint16T> instance_type = LoadMapInstanceType(map);
 
-      var_holder.Bind(proto);
-      var_holder_map.Bind(map);
-      var_holder_instance_type.Bind(instance_type);
+      var_holder = proto;
+      var_holder_map = map;
+      var_holder_instance_type = instance_type;
       Goto(&loop);
     }
   }
   BIND(&if_keyisindex);
   {
-    VARIABLE(var_holder, MachineRepresentation::kTagged, object);
-    VARIABLE(var_holder_map, MachineRepresentation::kTagged, map);
-    VARIABLE(var_holder_instance_type, MachineRepresentation::kWord32,
-             instance_type);
+    TVARIABLE(HeapObject, var_holder, CAST(object));
+    TVARIABLE(Map, var_holder_map, map);
+    TVARIABLE(Int32T, var_holder_instance_type, instance_type);
 
-    Variable* merged_variables[] = {&var_holder, &var_holder_map,
-                                    &var_holder_instance_type};
-    Label loop(this, arraysize(merged_variables), merged_variables);
+    VariableList merged_variables(
+        {&var_holder, &var_holder_map, &var_holder_instance_type}, zone());
+    Label loop(this, merged_variables);
     Goto(&loop);
     BIND(&loop);
     {
@@ -4156,23 +4128,23 @@ void CodeStubAssembler::TryPrototypeChainLookup(
                                var_index.value(), &next_proto, if_bailout);
       BIND(&next_proto);
 
-      Node* proto = LoadMapPrototype(var_holder_map.value());
+      TNode<HeapObject> proto = LoadMapPrototype(var_holder_map.value());
 
       GotoIf(IsNull(proto), if_end);
 
-      Node* map = LoadMap(proto);
-      Node* instance_type = LoadMapInstanceType(map);
+      TNode<Map> map = LoadMap(proto);
+      TNode<Uint16T> instance_type = LoadMapInstanceType(map);
 
-      var_holder.Bind(proto);
-      var_holder_map.Bind(map);
-      var_holder_instance_type.Bind(instance_type);
+      var_holder = proto;
+      var_holder_map = map;
+      var_holder_instance_type = instance_type;
       Goto(&loop);
     }
   }
 }
 
 Node* CodeStubAssembler::HasInPrototypeChain(Node* context, Node* object,
-                                             Node* prototype) {
+                                             SloppyTNode<Object> prototype) {
   CSA_ASSERT(this, TaggedIsNotSmi(object));
   VARIABLE(var_result, MachineRepresentation::kTagged);
   Label return_false(this), return_true(this),
@@ -4187,7 +4159,7 @@ Node* CodeStubAssembler::HasInPrototypeChain(Node* context, Node* object,
     // Check if we can determine the prototype directly from the {object_map}.
     Label if_objectisdirect(this), if_objectisspecial(this, Label::kDeferred);
     Node* object_map = var_object_map.value();
-    TNode<Int32T> object_instance_type = LoadMapInstanceType(object_map);
+    TNode<Uint16T> object_instance_type = LoadMapInstanceType(object_map);
     Branch(IsSpecialReceiverInstanceType(object_instance_type),
            &if_objectisspecial, &if_objectisdirect);
     BIND(&if_objectisspecial);
@@ -4196,7 +4168,7 @@ Node* CodeStubAssembler::HasInPrototypeChain(Node* context, Node* object,
       // if we need to use the if_objectisspecial path in the runtime.
       GotoIf(InstanceTypeEqual(object_instance_type, JS_PROXY_TYPE),
              &return_runtime);
-      Node* object_bitfield = LoadMapBitField(object_map);
+      TNode<Int32T> object_bitfield = LoadMapBitField(object_map);
       int mask = Map::HasNamedInterceptorBit::kMask |
                  Map::IsAccessCheckNeededBit::kMask;
       Branch(IsSetWord32(object_bitfield, mask), &return_runtime,
@@ -4205,9 +4177,9 @@ Node* CodeStubAssembler::HasInPrototypeChain(Node* context, Node* object,
     BIND(&if_objectisdirect);
 
     // Check the current {object} prototype.
-    Node* object_prototype = LoadMapPrototype(object_map);
+    TNode<HeapObject> object_prototype = LoadMapPrototype(object_map);
     GotoIf(IsNull(object_prototype), &return_false);
-    GotoIf(WordEqual(object_prototype, prototype), &return_true);
+    GotoIf(TaggedEqual(object_prototype, prototype), &return_true);
 
     // Continue with the prototype.
     CSA_ASSERT(this, TaggedIsNotSmi(object_prototype));
@@ -4249,34 +4221,33 @@ Node* CodeStubAssembler::OrdinaryHasInstance(Node* context, Node* callable,
   GotoIf(TaggedIsSmi(callable), &return_runtime);
 
   // Load map of {callable}.
-  Node* callable_map = LoadMap(callable);
+  TNode<Map> callable_map = LoadMap(callable);
 
   // Goto runtime if {callable} is not a JSFunction.
-  Node* callable_instance_type = LoadMapInstanceType(callable_map);
+  TNode<Uint16T> callable_instance_type = LoadMapInstanceType(callable_map);
   GotoIfNot(InstanceTypeEqual(callable_instance_type, JS_FUNCTION_TYPE),
             &return_runtime);
 
-  GotoIfPrototypeRequiresRuntimeLookup(CAST(callable), CAST(callable_map),
+  GotoIfPrototypeRequiresRuntimeLookup(CAST(callable), callable_map,
                                        &return_runtime);
 
   // Get the "prototype" (or initial map) of the {callable}.
-  Node* callable_prototype =
-      LoadObjectField(callable, JSFunction::kPrototypeOrInitialMapOffset);
+  TNode<HeapObject> callable_prototype = LoadObjectField<HeapObject>(
+      CAST(callable), JSFunction::kPrototypeOrInitialMapOffset);
   {
     Label no_initial_map(this), walk_prototype_chain(this);
-    VARIABLE(var_callable_prototype, MachineRepresentation::kTagged,
-             callable_prototype);
+    TVARIABLE(HeapObject, var_callable_prototype, callable_prototype);
 
     // Resolve the "prototype" if the {callable} has an initial map.
     GotoIfNot(IsMap(callable_prototype), &no_initial_map);
-    var_callable_prototype.Bind(
-        LoadObjectField(callable_prototype, Map::kPrototypeOffset));
+    var_callable_prototype =
+        LoadObjectField<HeapObject>(callable_prototype, Map::kPrototypeOffset);
     Goto(&walk_prototype_chain);
 
     BIND(&no_initial_map);
     // {callable_prototype} is the hole if the "prototype" property hasn't been
     // requested so far.
-    Branch(WordEqual(callable_prototype, TheHoleConstant()), &return_runtime,
+    Branch(TaggedEqual(callable_prototype, TheHoleConstant()), &return_runtime,
            &walk_prototype_chain);
 
     BIND(&walk_prototype_chain);
@@ -4318,7 +4289,7 @@ TNode<IntPtrT> CodeStubAssembler::ElementOffsetFromIndex(Node* index_node,
     index_node = BitcastTaggedSignedToWord(index_node);
   } else {
     DCHECK(mode == INTPTR_PARAMETERS);
-    constant_index = ToIntPtrConstant(index_node, index);
+    constant_index = ToIntPtrConstant(index_node, &index);
   }
   if (constant_index) {
     return IntPtrConstant(base_size + element_size * index);
@@ -4348,8 +4319,8 @@ TNode<BoolT> CodeStubAssembler::IsOffsetInBounds(SloppyTNode<IntPtrT> offset,
 TNode<HeapObject> CodeStubAssembler::LoadFeedbackCellValue(
     SloppyTNode<JSFunction> closure) {
   TNode<FeedbackCell> feedback_cell =
-      CAST(LoadObjectField(closure, JSFunction::kFeedbackCellOffset));
-  return CAST(LoadObjectField(feedback_cell, FeedbackCell::kValueOffset));
+      LoadObjectField<FeedbackCell>(closure, JSFunction::kFeedbackCellOffset);
+  return LoadObjectField<HeapObject>(feedback_cell, FeedbackCell::kValueOffset);
 }
 
 TNode<HeapObject> CodeStubAssembler::LoadFeedbackVector(
@@ -4459,26 +4430,23 @@ void CodeStubAssembler::CombineFeedback(Variable* existing_feedback,
       SmiOr(CAST(existing_feedback->value()), CAST(feedback)));
 }
 
-void CodeStubAssembler::CheckForAssociatedProtector(Node* name,
+void CodeStubAssembler::CheckForAssociatedProtector(SloppyTNode<Name> name,
                                                     Label* if_protector) {
   // This list must be kept in sync with LookupIterator::UpdateProtector!
   // TODO(jkummerow): Would it be faster to have a bit in Symbol::flags()?
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kconstructor_string)),
-         if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kiterator_symbol)), if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::knext_string)), if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kspecies_symbol)), if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kis_concat_spreadable_symbol)),
-         if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kresolve_string)), if_protector);
-  GotoIf(WordEqual(name, LoadRoot(RootIndex::kthen_string)), if_protector);
+  GotoIf(TaggedEqual(name, ConstructorStringConstant()), if_protector);
+  GotoIf(TaggedEqual(name, IteratorSymbolConstant()), if_protector);
+  GotoIf(TaggedEqual(name, NextStringConstant()), if_protector);
+  GotoIf(TaggedEqual(name, SpeciesSymbolConstant()), if_protector);
+  GotoIf(TaggedEqual(name, IsConcatSpreadableSymbolConstant()), if_protector);
+  GotoIf(TaggedEqual(name, ResolveStringConstant()), if_protector);
+  GotoIf(TaggedEqual(name, ThenStringConstant()), if_protector);
   // Fall through if no case matched.
 }
 
 TNode<Map> CodeStubAssembler::LoadReceiverMap(SloppyTNode<Object> receiver) {
   return Select<Map>(
-      TaggedIsSmi(receiver),
-      [=] { return CAST(LoadRoot(RootIndex::kHeapNumberMap)); },
+      TaggedIsSmi(receiver), [=] { return HeapNumberMapConstant(); },
       [=] { return LoadMap(UncheckedCast<HeapObject>(receiver)); });
 }
 
@@ -4550,22 +4518,24 @@ Node* CodeStubAssembler::EmitKeyedSloppyArguments(
            access_mode == ArgumentsAccessMode::kHas);
   }
   Label if_mapped(this), if_unmapped(this), end(this, &var_result);
-  Node* intptr_two = IntPtrConstant(2);
-  Node* adjusted_length = IntPtrSub(elements_length, intptr_two);
+  TNode<IntPtrT> intptr_two = IntPtrConstant(2);
+  TNode<WordT> adjusted_length = IntPtrSub(elements_length, intptr_two);
 
   GotoIf(UintPtrGreaterThanOrEqual(key, adjusted_length), &if_unmapped);
 
   TNode<Object> mapped_index =
       LoadFixedArrayElement(elements, IntPtrAdd(key, intptr_two));
-  Branch(WordEqual(mapped_index, TheHoleConstant()), &if_unmapped, &if_mapped);
+  Branch(TaggedEqual(mapped_index, TheHoleConstant()), &if_unmapped,
+         &if_mapped);
 
   BIND(&if_mapped);
   {
     TNode<IntPtrT> mapped_index_intptr = SmiUntag(CAST(mapped_index));
     TNode<Context> the_context = CAST(LoadFixedArrayElement(elements, 0));
     if (access_mode == ArgumentsAccessMode::kLoad) {
-      Node* result = LoadContextElement(the_context, mapped_index_intptr);
-      CSA_ASSERT(this, WordNotEqual(result, TheHoleConstant()));
+      TNode<Object> result =
+          LoadContextElement(the_context, mapped_index_intptr);
+      CSA_ASSERT(this, TaggedNotEqual(result, TheHoleConstant()));
       var_result.Bind(result);
     } else if (access_mode == ArgumentsAccessMode::kHas) {
       CSA_ASSERT(this, Word32BinaryNot(IsTheHole(LoadContextElement(
@@ -4581,7 +4551,7 @@ Node* CodeStubAssembler::EmitKeyedSloppyArguments(
   {
     TNode<HeapObject> backing_store_ho =
         CAST(LoadFixedArrayElement(elements, 1));
-    GotoIf(WordNotEqual(LoadMap(backing_store_ho), FixedArrayMapConstant()),
+    GotoIf(TaggedNotEqual(LoadMap(backing_store_ho), FixedArrayMapConstant()),
            bailout);
     TNode<FixedArray> backing_store = CAST(backing_store_ho);
 
@@ -4591,9 +4561,9 @@ Node* CodeStubAssembler::EmitKeyedSloppyArguments(
       Label out_of_bounds(this);
       GotoIf(UintPtrGreaterThanOrEqual(key, backing_store_length),
              &out_of_bounds);
-      Node* result = LoadFixedArrayElement(backing_store, key);
+      TNode<Object> result = LoadFixedArrayElement(backing_store, key);
       var_result.Bind(
-          SelectBooleanConstant(WordNotEqual(result, TheHoleConstant())));
+          SelectBooleanConstant(TaggedNotEqual(result, TheHoleConstant())));
       Goto(&end);
 
       BIND(&out_of_bounds);
@@ -4604,8 +4574,8 @@ Node* CodeStubAssembler::EmitKeyedSloppyArguments(
 
       // The key falls into unmapped range.
       if (access_mode == ArgumentsAccessMode::kLoad) {
-        Node* result = LoadFixedArrayElement(backing_store, key);
-        GotoIf(WordEqual(result, TheHoleConstant()), bailout);
+        TNode<Object> result = LoadFixedArrayElement(backing_store, key);
+        GotoIf(TaggedEqual(result, TheHoleConstant()), bailout);
         var_result.Bind(result);
       } else {
         StoreFixedArrayElement(backing_store, key, value);
@@ -4620,7 +4590,7 @@ Node* CodeStubAssembler::EmitKeyedSloppyArguments(
 
 TNode<Context> CodeStubAssembler::LoadScriptContext(
     TNode<Context> context, TNode<IntPtrT> context_index) {
-  TNode<Context> native_context = LoadNativeContext(context);
+  TNode<NativeContext> native_context = LoadNativeContext(context);
   TNode<ScriptContextTable> script_context_table = CAST(
       LoadContextElement(native_context, Context::SCRIPT_CONTEXT_TABLE_INDEX));
 
@@ -4686,10 +4656,10 @@ void CodeStubAssembler::StoreElement(Node* elements, ElementsKind kind,
 #endif
   } else if (IsTypedArrayElementsKind(kind)) {
     if (kind == UINT8_CLAMPED_ELEMENTS) {
-      CSA_ASSERT(this,
-                 Word32Equal(value, Word32And(Int32Constant(0xFF), value)));
+      CSA_ASSERT(this, Word32Equal(UncheckedCast<Word32T>(value),
+                                   Word32And(Int32Constant(0xFF), value)));
     }
-    Node* offset = ElementOffsetFromIndex(index, kind, mode, 0);
+    TNode<IntPtrT> offset = ElementOffsetFromIndex(index, kind, mode, 0);
     // TODO(cbruni): Add OOB check once typed.
     MachineRepresentation rep = ElementsKindToMachineRepresentation(kind);
     StoreNoWriteBarrier(rep, elements, offset, value);
@@ -4707,8 +4677,8 @@ void CodeStubAssembler::StoreElement(Node* elements, ElementsKind kind,
 
 Node* CodeStubAssembler::Int32ToUint8Clamped(Node* int32_value) {
   Label done(this);
-  Node* int32_zero = Int32Constant(0);
-  Node* int32_255 = Int32Constant(255);
+  TNode<Int32T> int32_zero = Int32Constant(0);
+  TNode<Int32T> int32_255 = Int32Constant(255);
   VARIABLE(var_value, MachineRepresentation::kWord32, int32_value);
   GotoIf(Uint32LessThanOrEqual(int32_value, int32_255), &done);
   var_value.Bind(int32_zero);
@@ -4726,7 +4696,7 @@ Node* CodeStubAssembler::Float64ToUint8Clamped(Node* float64_value) {
   var_value.Bind(Int32Constant(255));
   GotoIf(Float64LessThanOrEqual(Float64Constant(255.0), float64_value), &done);
   {
-    Node* rounded_value = Float64RoundToEven(float64_value);
+    TNode<Float64T> rounded_value = Float64RoundToEven(float64_value);
     var_value.Bind(TruncateFloat64ToWord32(rounded_value));
     Goto(&done);
   }
@@ -4780,37 +4750,38 @@ Node* CodeStubAssembler::PrepareValueForWriteToTypedArray(
 
   BIND(&if_heapnumber_or_oddball);
   {
-    Node* value = UncheckedCast<Float64T>(LoadObjectField(
+    TNode<Float64T> value = UncheckedCast<Float64T>(LoadObjectField(
         var_input.value(), HeapNumber::kValueOffset, MachineType::Float64()));
     if (rep == MachineRepresentation::kWord32) {
       if (elements_kind == UINT8_CLAMPED_ELEMENTS) {
-        value = Float64ToUint8Clamped(value);
+        var_result.Bind(Float64ToUint8Clamped(value));
       } else {
-        value = TruncateFloat64ToWord32(value);
+        var_result.Bind(TruncateFloat64ToWord32(value));
       }
     } else if (rep == MachineRepresentation::kFloat32) {
-      value = TruncateFloat64ToFloat32(value);
+      var_result.Bind(TruncateFloat64ToFloat32(value));
     } else {
       DCHECK_EQ(MachineRepresentation::kFloat64, rep);
+      var_result.Bind(value);
     }
-    var_result.Bind(value);
     Goto(&done);
   }
 
   BIND(&if_smi);
   {
-    Node* value = SmiToInt32(var_input.value());
+    TNode<Int32T> value = SmiToInt32(var_input.value());
     if (rep == MachineRepresentation::kFloat32) {
-      value = RoundInt32ToFloat32(value);
+      var_result.Bind(RoundInt32ToFloat32(value));
     } else if (rep == MachineRepresentation::kFloat64) {
-      value = ChangeInt32ToFloat64(value);
+      var_result.Bind(ChangeInt32ToFloat64(value));
     } else {
       DCHECK_EQ(MachineRepresentation::kWord32, rep);
       if (elements_kind == UINT8_CLAMPED_ELEMENTS) {
-        value = Int32ToUint8Clamped(value);
+        var_result.Bind(Int32ToUint8Clamped(value));
+      } else {
+        var_result.Bind(value);
       }
     }
-    var_result.Bind(value);
     Goto(&done);
   }
 
@@ -4847,7 +4818,7 @@ void CodeStubAssembler::BigIntToRawBytes(TNode<BigInt> bigint,
   if (!Is64()) {
     *var_high = Unsigned(IntPtrSub(IntPtrConstant(0), var_high->value()));
     Label no_carry(this);
-    GotoIf(WordEqual(var_low->value(), IntPtrConstant(0)), &no_carry);
+    GotoIf(IntPtrEqual(var_low->value(), IntPtrConstant(0)), &no_carry);
     *var_high = Unsigned(IntPtrSub(var_high->value(), IntPtrConstant(1)));
     Goto(&no_carry);
     BIND(&no_carry);
@@ -4864,9 +4835,10 @@ void CodeStubAssembler::EmitElementStore(Node* object, Node* key, Node* value,
                                          Variable* maybe_converted_value) {
   CSA_ASSERT(this, Word32BinaryNot(IsJSProxy(object)));
 
-  Node* elements = LoadElements(object);
+  TNode<FixedArrayBase> elements = LoadElements(object);
   if (!(IsSmiOrObjectElementsKind(elements_kind) ||
-        IsSealedElementsKind(elements_kind))) {
+        IsSealedElementsKind(elements_kind) ||
+        IsNonextensibleElementsKind(elements_kind))) {
     CSA_ASSERT(this, Word32BinaryNot(IsFixedCOWArrayMap(LoadMap(elements))));
   } else if (!IsCOWHandlingStoreMode(store_mode)) {
     GotoIf(IsFixedCOWArrayMap(LoadMap(elements)), bailout);
@@ -4985,7 +4957,8 @@ void CodeStubAssembler::EmitElementStore(Node* object, Node* key, Node* value,
     return;
   }
   DCHECK(IsFastElementsKind(elements_kind) ||
-         IsSealedElementsKind(elements_kind));
+         IsSealedElementsKind(elements_kind) ||
+         IsNonextensibleElementsKind(elements_kind));
 
   Node* length = SelectImpl(
       IsJSArray(object), [=]() { return LoadJSArrayLength(object); },
@@ -5002,15 +4975,19 @@ void CodeStubAssembler::EmitElementStore(Node* object, Node* key, Node* value,
     value = TryTaggedToFloat64(value, bailout);
   }
 
-  if (IsGrowStoreMode(store_mode) && !IsSealedElementsKind(elements_kind)) {
-    elements = CheckForCapacityGrow(object, elements, elements_kind, length,
-                                    intptr_key, parameter_mode, bailout);
+  if (IsGrowStoreMode(store_mode) &&
+      !(IsSealedElementsKind(elements_kind) ||
+        IsNonextensibleElementsKind(elements_kind))) {
+    elements =
+        CAST(CheckForCapacityGrow(object, elements, elements_kind, length,
+                                  intptr_key, parameter_mode, bailout));
   } else {
     GotoIfNot(UintPtrLessThan(intptr_key, length), bailout);
   }
 
   // Cannot store to a hole in holey sealed elements so bailout.
-  if (elements_kind == HOLEY_SEALED_ELEMENTS) {
+  if (elements_kind == HOLEY_SEALED_ELEMENTS ||
+      elements_kind == HOLEY_NONEXTENSIBLE_ELEMENTS) {
     TNode<Object> target_value =
         LoadFixedArrayElement(CAST(elements), intptr_key);
     GotoIf(IsTheHole(target_value), bailout);
@@ -5019,11 +4996,12 @@ void CodeStubAssembler::EmitElementStore(Node* object, Node* key, Node* value,
   // If we didn't grow {elements}, it might still be COW, in which case we
   // copy it now.
   if (!(IsSmiOrObjectElementsKind(elements_kind) ||
-        IsSealedElementsKind(elements_kind))) {
+        IsSealedElementsKind(elements_kind) ||
+        IsNonextensibleElementsKind(elements_kind))) {
     CSA_ASSERT(this, Word32BinaryNot(IsFixedCOWArrayMap(LoadMap(elements))));
   } else if (IsCOWHandlingStoreMode(store_mode)) {
-    elements = CopyElementsOnWrite(object, elements, elements_kind, length,
-                                   parameter_mode, bailout);
+    elements = CAST(CopyElementsOnWrite(object, elements, elements_kind, length,
+                                        parameter_mode, bailout));
   }
 
   CSA_ASSERT(this, Word32BinaryNot(IsFixedCOWArrayMap(LoadMap(elements))));
@@ -5031,8 +5009,10 @@ void CodeStubAssembler::EmitElementStore(Node* object, Node* key, Node* value,
 }
 
 Node* CodeStubAssembler::CheckForCapacityGrow(Node* object, Node* elements,
-                                              ElementsKind kind, Node* length,
-                                              Node* key, ParameterMode mode,
+                                              ElementsKind kind,
+                                              SloppyTNode<UintPtrT> length,
+                                              SloppyTNode<WordT> key,
+                                              ParameterMode mode,
                                               Label* bailout) {
   DCHECK(IsFastElementsKind(kind));
   VARIABLE(checked_elements, MachineRepresentation::kTagged);
@@ -5067,12 +5047,12 @@ Node* CodeStubAssembler::CheckForCapacityGrow(Node* object, Node* elements,
     BIND(&grow_bailout);
     {
       Node* tagged_key = mode == SMI_PARAMETERS
-                             ? key
-                             : ChangeInt32ToTagged(TruncateIntPtrToInt32(key));
-      Node* maybe_elements = CallRuntime(
+                             ? static_cast<Node*>(key)
+                             : ChangeInt32ToTagged(TruncateWordToInt32(key));
+      TNode<Object> maybe_elements = CallRuntime(
           Runtime::kGrowArrayElements, NoContextConstant(), object, tagged_key);
       GotoIf(TaggedIsSmi(maybe_elements), bailout);
-      CSA_ASSERT(this, IsFixedArrayWithKind(maybe_elements, kind));
+      CSA_ASSERT(this, IsFixedArrayWithKind(CAST(maybe_elements), kind));
       checked_elements.Bind(maybe_elements);
       Goto(&fits_capacity);
     }
@@ -5080,7 +5060,7 @@ Node* CodeStubAssembler::CheckForCapacityGrow(Node* object, Node* elements,
     BIND(&fits_capacity);
     GotoIfNot(IsJSArray(object), &done);
 
-    Node* new_length = IntPtrAdd(key, IntPtrOrSmiConstant(1, mode));
+    TNode<WordT> new_length = IntPtrAdd(key, IntPtrOrSmiConstant(1, mode));
     StoreObjectFieldNoWriteBarrier(object, JSArray::kLengthOffset,
                                    ParameterToTagged(new_length, mode));
     Goto(&done);
@@ -5129,14 +5109,15 @@ void CodeStubAssembler::TransitionElementsKind(Node* object, Node* map,
 
   if (!IsSimpleMapChangeTransition(from_kind, to_kind)) {
     Comment("Non-simple map transition");
-    Node* elements = LoadElements(object);
+    TNode<FixedArrayBase> elements = LoadElements(object);
 
     Label done(this);
-    GotoIf(WordEqual(elements, EmptyFixedArrayConstant()), &done);
+    GotoIf(TaggedEqual(elements, EmptyFixedArrayConstant()), &done);
 
     // TODO(ishell): Use OptimalParameterMode().
     ParameterMode mode = INTPTR_PARAMETERS;
-    Node* elements_length = SmiUntag(LoadFixedArrayBaseLength(elements));
+    TNode<IntPtrT> elements_length =
+        SmiUntag(LoadFixedArrayBaseLength(elements));
     Node* array_length = SelectImpl(
         IsJSArray(object),
         [=]() {
@@ -5219,7 +5200,7 @@ void CodeStubAssembler::TrapAllocationMemento(Node* object,
   BIND(&map_check);
   {
     TNode<Object> memento_map = LoadObjectField(object, kMementoMapOffset);
-    Branch(WordEqual(memento_map, LoadRoot(RootIndex::kAllocationMementoMap)),
+    Branch(TaggedEqual(memento_map, AllocationMementoMapConstant()),
            memento_found, &no_memento_found);
   }
   BIND(&no_memento_found);
@@ -5233,7 +5214,7 @@ TNode<IntPtrT> CodeStubAssembler::PageFromAddress(TNode<IntPtrT> address) {
 TNode<AllocationSite> CodeStubAssembler::CreateAllocationSiteInFeedbackVector(
     SloppyTNode<FeedbackVector> feedback_vector, TNode<Smi> slot) {
   TNode<IntPtrT> size = IntPtrConstant(AllocationSite::kSizeWithWeakNext);
-  Node* site = Allocate(size, CodeStubAssembler::kPretenured);
+  TNode<HeapObject> site = Allocate(size, CodeStubAssembler::kPretenured);
   StoreMapNoWriteBarrier(site, RootIndex::kAllocationSiteWithWeakNextMap);
   // Should match AllocationSite::Initialize.
   TNode<WordT> field = UpdateWord<AllocationSite::ElementsKindBits>(
@@ -5338,9 +5319,10 @@ Node* CodeStubAssembler::BuildFastLoop(
   // to force the loop header check at the end of the loop and branch forward to
   // it from the pre-header). The extra branch is slower in the case that the
   // loop actually iterates.
-  Node* first_check = WordEqual(var.value(), end_index);
+  TNode<BoolT> first_check =
+      IntPtrOrSmiEqual(var.value(), end_index, parameter_mode);
   int32_t first_check_val;
-  if (ToInt32Constant(first_check, first_check_val)) {
+  if (ToInt32Constant(first_check, &first_check_val)) {
     if (first_check_val) return var.value();
     Goto(&loop);
   } else {
@@ -5356,7 +5338,8 @@ Node* CodeStubAssembler::BuildFastLoop(
     if (advance_mode == IndexAdvanceMode::kPost) {
       Increment(&var, increment, parameter_mode);
     }
-    Branch(WordNotEqual(var.value(), end_index), &loop, &after_loop);
+    Branch(IntPtrOrSmiNotEqual(var.value(), end_index, parameter_mode), &loop,
+           &after_loop);
   }
   BIND(&after_loop);
   return var.value();
@@ -5373,25 +5356,25 @@ void CodeStubAssembler::BuildFastFixedArrayForEach(
   CSA_SLOW_ASSERT(this, Word32Or(IsFixedArrayWithKind(fixed_array, kind),
                                  IsPropertyArray(fixed_array)));
   int32_t first_val;
-  bool constant_first = ToInt32Constant(first_element_inclusive, first_val);
+  bool constant_first = ToInt32Constant(first_element_inclusive, &first_val);
   int32_t last_val;
-  bool constent_last = ToInt32Constant(last_element_exclusive, last_val);
+  bool constent_last = ToInt32Constant(last_element_exclusive, &last_val);
   if (constant_first && constent_last) {
     int delta = last_val - first_val;
     DCHECK_GE(delta, 0);
     if (delta <= kElementLoopUnrollThreshold) {
       if (direction == ForEachDirection::kForward) {
         for (int i = first_val; i < last_val; ++i) {
-          Node* index = IntPtrConstant(i);
-          Node* offset =
+          TNode<IntPtrT> index = IntPtrConstant(i);
+          TNode<IntPtrT> offset =
               ElementOffsetFromIndex(index, kind, INTPTR_PARAMETERS,
                                      FixedArray::kHeaderSize - kHeapObjectTag);
           body(fixed_array, offset);
         }
       } else {
         for (int i = last_val - 1; i >= first_val; --i) {
-          Node* index = IntPtrConstant(i);
-          Node* offset =
+          TNode<IntPtrT> index = IntPtrConstant(i);
+          TNode<IntPtrT> offset =
               ElementOffsetFromIndex(index, kind, INTPTR_PARAMETERS,
                                      FixedArray::kHeaderSize - kHeapObjectTag);
           body(fixed_array, offset);
@@ -5401,10 +5384,10 @@ void CodeStubAssembler::BuildFastFixedArrayForEach(
     }
   }
 
-  Node* start =
+  TNode<IntPtrT> start =
       ElementOffsetFromIndex(first_element_inclusive, kind, mode,
                              FixedArray::kHeaderSize - kHeapObjectTag);
-  Node* limit =
+  TNode<IntPtrT> limit =
       ElementOffsetFromIndex(last_element_exclusive, kind, mode,
                              FixedArray::kHeaderSize - kHeapObjectTag);
   if (direction == ForEachDirection::kReverse) std::swap(start, limit);
@@ -5432,7 +5415,7 @@ void CodeStubAssembler::InitializeFieldsWithRoot(Node* object,
   CSA_SLOW_ASSERT(this, TaggedIsNotSmi(object));
   start_offset = IntPtrAdd(start_offset, IntPtrConstant(-kHeapObjectTag));
   end_offset = IntPtrAdd(end_offset, IntPtrConstant(-kHeapObjectTag));
-  Node* root_value = LoadRoot(root_index);
+  TNode<Object> root_value = LoadRoot(root_index);
   BuildFastLoop(
       end_offset, start_offset,
       [this, object, root_value](Node* current) {
@@ -5444,7 +5427,8 @@ void CodeStubAssembler::InitializeFieldsWithRoot(Node* object,
 }
 
 void CodeStubAssembler::BranchIfNumberRelationalComparison(
-    Operation op, Node* left, Node* right, Label* if_true, Label* if_false) {
+    Operation op, SloppyTNode<Number> left, SloppyTNode<Number> right,
+    Label* if_true, Label* if_false) {
   CSA_SLOW_ASSERT(this, IsNumber(left));
   CSA_SLOW_ASSERT(this, IsNumber(right));
 
@@ -5487,25 +5471,22 @@ void CodeStubAssembler::BranchIfNumberRelationalComparison(
               }
             },
             [&] {
-              CSA_ASSERT(this, IsHeapNumber(right));
               var_left_float = SmiToFloat64(smi_left);
-              var_right_float = LoadHeapNumberValue(right);
+              var_right_float = LoadHeapNumberValue(CAST(right));
               Goto(&do_float_comparison);
             });
       },
       [&] {
-        CSA_ASSERT(this, IsHeapNumber(left));
-        var_left_float = LoadHeapNumberValue(left);
+        var_left_float = LoadHeapNumberValue(CAST(left));
 
         Branch(
             TaggedIsSmi(right),
             [&] {
-              var_right_float = SmiToFloat64(right);
+              var_right_float = SmiToFloat64(CAST(right));
               Goto(&do_float_comparison);
             },
             [&] {
-              CSA_ASSERT(this, IsHeapNumber(right));
-              var_right_float = LoadHeapNumberValue(right);
+              var_right_float = LoadHeapNumberValue(CAST(right));
               Goto(&do_float_comparison);
             });
       });
@@ -5568,8 +5549,10 @@ Operation Reverse(Operation op) {
 }
 }  // anonymous namespace
 
-Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
-                                              Node* right, Node* context,
+Node* CodeStubAssembler::RelationalComparison(Operation op,
+                                              SloppyTNode<Object> left,
+                                              SloppyTNode<Object> right,
+                                              SloppyTNode<Context> context,
                                               Variable* var_type_feedback) {
   Label return_true(this), return_false(this), do_float_comparison(this),
       end(this);
@@ -5579,8 +5562,8 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
 
   // We might need to loop several times due to ToPrimitive and/or ToNumeric
   // conversions.
-  VARIABLE(var_left, MachineRepresentation::kTagged, left);
-  VARIABLE(var_right, MachineRepresentation::kTagged, right);
+  TVARIABLE(Object, var_left, left);
+  TVARIABLE(Object, var_right, right);
   VariableList loop_variable_list({&var_left, &var_right}, zone());
   if (var_type_feedback != nullptr) {
     // Initialize the type feedback to None. The current feedback is combined
@@ -5605,9 +5588,9 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           if_right_bigint(this, Label::kDeferred),
           if_right_not_numeric(this, Label::kDeferred);
       GotoIf(TaggedIsSmi(right), &if_right_smi);
-      Node* right_map = LoadMap(right);
+      TNode<Map> right_map = LoadMap(CAST(right));
       GotoIf(IsHeapNumberMap(right_map), &if_right_heapnumber);
-      Node* right_instance_type = LoadMapInstanceType(right_map);
+      TNode<Uint16T> right_instance_type = LoadMapInstanceType(right_map);
       Branch(IsBigIntInstanceType(right_instance_type), &if_right_bigint,
              &if_right_not_numeric);
 
@@ -5642,7 +5625,7 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
       {
         CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
         var_left_float = SmiToFloat64(smi_left);
-        var_right_float = LoadHeapNumberValue(right);
+        var_right_float = LoadHeapNumberValue(CAST(right));
         Goto(&do_float_comparison);
       }
 
@@ -5662,15 +5645,14 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
         // dedicated ToPrimitive(right, hint Number) operation, as the
         // ToNumeric(right) will by itself already invoke ToPrimitive with
         // a Number hint.
-        var_right.Bind(
-            CallBuiltin(Builtins::kNonNumberToNumeric, context, right));
+        var_right = CallBuiltin(Builtins::kNonNumberToNumeric, context, right);
         Goto(&loop);
       }
     }
 
     BIND(&if_left_not_smi);
     {
-      Node* left_map = LoadMap(left);
+      TNode<Map> left_map = LoadMap(CAST(left));
 
       Label if_right_smi(this), if_right_not_smi(this);
       Branch(TaggedIsSmi(right), &if_right_smi, &if_right_not_smi);
@@ -5680,15 +5662,15 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
         Label if_left_heapnumber(this), if_left_bigint(this, Label::kDeferred),
             if_left_not_numeric(this, Label::kDeferred);
         GotoIf(IsHeapNumberMap(left_map), &if_left_heapnumber);
-        Node* left_instance_type = LoadMapInstanceType(left_map);
+        TNode<Uint16T> left_instance_type = LoadMapInstanceType(left_map);
         Branch(IsBigIntInstanceType(left_instance_type), &if_left_bigint,
                &if_left_not_numeric);
 
         BIND(&if_left_heapnumber);
         {
           CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
-          var_left_float = LoadHeapNumberValue(left);
-          var_right_float = SmiToFloat64(right);
+          var_left_float = LoadHeapNumberValue(CAST(left));
+          var_right_float = SmiToFloat64(CAST(right));
           Goto(&do_float_comparison);
         }
 
@@ -5708,21 +5690,20 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           // dedicated ToPrimitive(left, hint Number) operation, as the
           // ToNumeric(left) will by itself already invoke ToPrimitive with
           // a Number hint.
-          var_left.Bind(
-              CallBuiltin(Builtins::kNonNumberToNumeric, context, left));
+          var_left = CallBuiltin(Builtins::kNonNumberToNumeric, context, left);
           Goto(&loop);
         }
       }
 
       BIND(&if_right_not_smi);
       {
-        Node* right_map = LoadMap(right);
+        TNode<Map> right_map = LoadMap(CAST(right));
 
         Label if_left_heapnumber(this), if_left_bigint(this, Label::kDeferred),
             if_left_string(this, Label::kDeferred),
             if_left_other(this, Label::kDeferred);
         GotoIf(IsHeapNumberMap(left_map), &if_left_heapnumber);
-        Node* left_instance_type = LoadMapInstanceType(left_map);
+        TNode<Uint16T> left_instance_type = LoadMapInstanceType(left_map);
         GotoIf(IsBigIntInstanceType(left_instance_type), &if_left_bigint);
         Branch(IsStringInstanceType(left_instance_type), &if_left_string,
                &if_left_other);
@@ -5732,8 +5713,8 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           Label if_right_heapnumber(this),
               if_right_bigint(this, Label::kDeferred),
               if_right_not_numeric(this, Label::kDeferred);
-          GotoIf(WordEqual(right_map, left_map), &if_right_heapnumber);
-          Node* right_instance_type = LoadMapInstanceType(right_map);
+          GotoIf(TaggedEqual(right_map, left_map), &if_right_heapnumber);
+          TNode<Uint16T> right_instance_type = LoadMapInstanceType(right_map);
           Branch(IsBigIntInstanceType(right_instance_type), &if_right_bigint,
                  &if_right_not_numeric);
 
@@ -5741,8 +5722,8 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           {
             CombineFeedback(var_type_feedback,
                             CompareOperationFeedback::kNumber);
-            var_left_float = LoadHeapNumberValue(left);
-            var_right_float = LoadHeapNumberValue(right);
+            var_left_float = LoadHeapNumberValue(CAST(left));
+            var_right_float = LoadHeapNumberValue(CAST(right));
             Goto(&do_float_comparison);
           }
 
@@ -5764,8 +5745,8 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
             // dedicated ToPrimitive(right, hint Number) operation, as the
             // ToNumeric(right) will by itself already invoke ToPrimitive with
             // a Number hint.
-            var_right.Bind(
-                CallBuiltin(Builtins::kNonNumberToNumeric, context, right));
+            var_right =
+                CallBuiltin(Builtins::kNonNumberToNumeric, context, right);
             Goto(&loop);
           }
         }
@@ -5775,7 +5756,7 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           Label if_right_heapnumber(this), if_right_bigint(this),
               if_right_string(this), if_right_other(this);
           GotoIf(IsHeapNumberMap(right_map), &if_right_heapnumber);
-          Node* right_instance_type = LoadMapInstanceType(right_map);
+          TNode<Uint16T> right_instance_type = LoadMapInstanceType(right_map);
           GotoIf(IsBigIntInstanceType(right_instance_type), &if_right_bigint);
           Branch(IsStringInstanceType(right_instance_type), &if_right_string,
                  &if_right_other);
@@ -5819,15 +5800,15 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
             // dedicated ToPrimitive(right, hint Number) operation, as the
             // ToNumeric(right) will by itself already invoke ToPrimitive with
             // a Number hint.
-            var_right.Bind(
-                CallBuiltin(Builtins::kNonNumberToNumeric, context, right));
+            var_right =
+                CallBuiltin(Builtins::kNonNumberToNumeric, context, right);
             Goto(&loop);
           }
         }
 
         BIND(&if_left_string);
         {
-          Node* right_instance_type = LoadMapInstanceType(right_map);
+          TNode<Uint16T> right_instance_type = LoadMapInstanceType(right_map);
 
           Label if_right_not_string(this, Label::kDeferred);
           GotoIfNot(IsStringInstanceType(right_instance_type),
@@ -5870,9 +5851,9 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
             GotoIf(IsJSReceiverInstanceType(right_instance_type),
                    &if_right_receiver);
 
-            var_left.Bind(
-                CallBuiltin(Builtins::kNonNumberToNumeric, context, left));
-            var_right.Bind(CallBuiltin(Builtins::kToNumeric, context, right));
+            var_left =
+                CallBuiltin(Builtins::kNonNumberToNumeric, context, left);
+            var_right = CallBuiltin(Builtins::kToNumeric, context, right);
             Goto(&loop);
 
             BIND(&if_right_bigint);
@@ -5887,7 +5868,7 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
             {
               Callable callable = CodeFactory::NonPrimitiveToPrimitive(
                   isolate(), ToPrimitiveHint::kNumber);
-              var_right.Bind(CallStub(callable, context, right));
+              var_right = CallStub(callable, context, right);
               Goto(&loop);
             }
           }
@@ -5906,7 +5887,7 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
                       &collect_any_feedback);
 
             GotoIf(IsHeapNumberMap(right_map), &collect_oddball_feedback);
-            Node* right_instance_type = LoadMapInstanceType(right_map);
+            TNode<Uint16T> right_instance_type = LoadMapInstanceType(right_map);
             Branch(InstanceTypeEqual(right_instance_type, ODDBALL_TYPE),
                    &collect_oddball_feedback, &collect_any_feedback);
 
@@ -5935,16 +5916,15 @@ Node* CodeStubAssembler::RelationalComparison(Operation op, Node* left,
           GotoIf(IsJSReceiverInstanceType(left_instance_type),
                  &if_left_receiver);
 
-          var_right.Bind(CallBuiltin(Builtins::kToNumeric, context, right));
-          var_left.Bind(
-              CallBuiltin(Builtins::kNonNumberToNumeric, context, left));
+          var_right = CallBuiltin(Builtins::kToNumeric, context, right);
+          var_left = CallBuiltin(Builtins::kNonNumberToNumeric, context, left);
           Goto(&loop);
 
           BIND(&if_left_receiver);
           {
             Callable callable = CodeFactory::NonPrimitiveToPrimitive(
                 isolate(), ToPrimitiveHint::kNumber);
-            var_left.Bind(CallStub(callable, context, left));
+            var_left = CallStub(callable, context, left);
             Goto(&loop);
           }
         }
@@ -6006,8 +5986,8 @@ TNode<Smi> CodeStubAssembler::CollectFeedbackForString(
   return feedback;
 }
 
-void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
-                                           Label* if_notequal,
+void CodeStubAssembler::GenerateEqual_Same(SloppyTNode<Object> value,
+                                           Label* if_equal, Label* if_notequal,
                                            Variable* var_type_feedback) {
   // In case of abstract or strict equality checks, we need additional checks
   // for NaN values because they are not considered equal, even if both the
@@ -6016,12 +5996,13 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
   Label if_smi(this), if_heapnumber(this);
   GotoIf(TaggedIsSmi(value), &if_smi);
 
-  Node* value_map = LoadMap(value);
+  TNode<HeapObject> value_heapobject = CAST(value);
+  TNode<Map> value_map = LoadMap(value_heapobject);
   GotoIf(IsHeapNumberMap(value_map), &if_heapnumber);
 
   // For non-HeapNumbers, all we do is collect type feedback.
   if (var_type_feedback != nullptr) {
-    Node* instance_type = LoadMapInstanceType(value_map);
+    TNode<Uint16T> instance_type = LoadMapInstanceType(value_map);
 
     Label if_string(this), if_receiver(this), if_oddball(this), if_symbol(this),
         if_bigint(this);
@@ -6032,7 +6013,7 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
 
     BIND(&if_string);
     {
-      CSA_ASSERT(this, IsString(value));
+      CSA_ASSERT(this, IsString(value_heapobject));
       CombineFeedback(var_type_feedback,
                       CollectFeedbackForString(instance_type));
       Goto(if_equal);
@@ -6040,28 +6021,28 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
 
     BIND(&if_symbol);
     {
-      CSA_ASSERT(this, IsSymbol(value));
+      CSA_ASSERT(this, IsSymbol(value_heapobject));
       CombineFeedback(var_type_feedback, CompareOperationFeedback::kSymbol);
       Goto(if_equal);
     }
 
     BIND(&if_receiver);
     {
-      CSA_ASSERT(this, IsJSReceiver(value));
+      CSA_ASSERT(this, IsJSReceiver(value_heapobject));
       CombineFeedback(var_type_feedback, CompareOperationFeedback::kReceiver);
       Goto(if_equal);
     }
 
     BIND(&if_bigint);
     {
-      CSA_ASSERT(this, IsBigInt(value));
+      CSA_ASSERT(this, IsBigInt(value_heapobject));
       CombineFeedback(var_type_feedback, CompareOperationFeedback::kBigInt);
       Goto(if_equal);
     }
 
     BIND(&if_oddball);
     {
-      CSA_ASSERT(this, IsOddball(value));
+      CSA_ASSERT(this, IsOddball(value_heapobject));
       Label if_boolean(this), if_not_boolean(this);
       Branch(IsBooleanMap(value_map), &if_boolean, &if_not_boolean);
 
@@ -6073,7 +6054,7 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
 
       BIND(&if_not_boolean);
       {
-        CSA_ASSERT(this, IsNullOrUndefined(value));
+        CSA_ASSERT(this, IsNullOrUndefined(value_heapobject));
         CombineFeedback(var_type_feedback,
                         CompareOperationFeedback::kReceiverOrNullOrUndefined);
         Goto(if_equal);
@@ -6086,7 +6067,7 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
   BIND(&if_heapnumber);
   {
     CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
-    Node* number_value = LoadHeapNumberValue(value);
+    TNode<Float64T> number_value = LoadHeapNumberValue(value_heapobject);
     BranchIfFloat64IsNaN(number_value, if_notequal, if_equal);
   }
 
@@ -6098,7 +6079,9 @@ void CodeStubAssembler::GenerateEqual_Same(Node* value, Label* if_equal,
 }
 
 // ES6 section 7.2.12 Abstract Equality Comparison
-Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
+Node* CodeStubAssembler::Equal(SloppyTNode<Object> left,
+                               SloppyTNode<Object> right,
+                               SloppyTNode<Context> context,
                                Variable* var_type_feedback) {
   // This is a slightly optimized version of Object::Equals. Whenever you
   // change something functionality wise in here, remember to update the
@@ -6116,8 +6099,8 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
 
   // We might need to loop several times due to ToPrimitive and/or ToNumber
   // conversions.
-  VARIABLE(var_left, MachineRepresentation::kTagged, left);
-  VARIABLE(var_right, MachineRepresentation::kTagged, right);
+  TVARIABLE(Object, var_left, left);
+  TVARIABLE(Object, var_right, right);
   VariableList loop_variable_list({&var_left, &var_right}, zone());
   if (var_type_feedback != nullptr) {
     // Initialize the type feedback to None. The current feedback will be
@@ -6133,7 +6116,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
     right = var_right.value();
 
     Label if_notsame(this);
-    GotoIf(WordNotEqual(left, right), &if_notsame);
+    GotoIf(TaggedNotEqual(left, right), &if_notsame);
     {
       // {left} and {right} reference the exact same value, yet we need special
       // treatment for HeapNumber, as NaN is not equal to NaN.
@@ -6159,7 +6142,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
       }
 
       BIND(&if_right_not_smi);
-      Node* right_map = LoadMap(right);
+      TNode<Map> right_map = LoadMap(CAST(right));
       Label if_right_heapnumber(this), if_right_boolean(this),
           if_right_bigint(this, Label::kDeferred),
           if_right_receiver(this, Label::kDeferred);
@@ -6169,7 +6152,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
         var_type_feedback->Bind(SmiConstant(CompareOperationFeedback::kAny));
       }
       GotoIf(IsBooleanMap(right_map), &if_right_boolean);
-      Node* right_type = LoadMapInstanceType(right_map);
+      TNode<Uint16T> right_type = LoadMapInstanceType(right_map);
       GotoIf(IsStringInstanceType(right_type), &do_right_stringtonumber);
       GotoIf(IsBigIntInstanceType(right_type), &if_right_bigint);
       Branch(IsJSReceiverInstanceType(right_type), &if_right_receiver,
@@ -6177,15 +6160,15 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
 
       BIND(&if_right_heapnumber);
       {
-        var_left_float = SmiToFloat64(left);
-        var_right_float = LoadHeapNumberValue(right);
+        var_left_float = SmiToFloat64(CAST(left));
+        var_right_float = LoadHeapNumberValue(CAST(right));
         CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
         Goto(&do_float_comparison);
       }
 
       BIND(&if_right_boolean);
       {
-        var_right.Bind(LoadObjectField(right, Oddball::kToNumberOffset));
+        var_right = LoadObjectField(CAST(right), Oddball::kToNumberOffset);
         Goto(&loop);
       }
 
@@ -6199,7 +6182,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
       BIND(&if_right_receiver);
       {
         Callable callable = CodeFactory::NonPrimitiveToPrimitive(isolate());
-        var_right.Bind(CallStub(callable, context, right));
+        var_right = CallStub(callable, context, right);
         Goto(&loop);
       }
     }
@@ -6213,10 +6196,10 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
           if_left_bigint(this, Label::kDeferred), if_left_oddball(this),
           if_left_receiver(this);
 
-      Node* left_map = LoadMap(left);
-      Node* right_map = LoadMap(right);
-      Node* left_type = LoadMapInstanceType(left_map);
-      Node* right_type = LoadMapInstanceType(right_map);
+      TNode<Map> left_map = LoadMap(CAST(left));
+      TNode<Map> right_map = LoadMap(CAST(right));
+      TNode<Uint16T> left_type = LoadMapInstanceType(left_map);
+      TNode<Uint16T> right_type = LoadMapInstanceType(right_map);
 
       GotoIf(IsStringInstanceType(left_type), &if_left_string);
       GotoIf(IsSymbolInstanceType(left_type), &if_left_symbol);
@@ -6240,8 +6223,8 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
         Label if_right_not_number(this);
         GotoIf(Word32NotEqual(left_type, right_type), &if_right_not_number);
 
-        var_left_float = LoadHeapNumberValue(left);
-        var_right_float = LoadHeapNumberValue(right);
+        var_left_float = LoadHeapNumberValue(CAST(left));
+        var_right_float = LoadHeapNumberValue(CAST(right));
         CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
         Goto(&do_float_comparison);
 
@@ -6260,7 +6243,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
 
           BIND(&if_right_boolean);
           {
-            var_right.Bind(LoadObjectField(right, Oddball::kToNumberOffset));
+            var_right = LoadObjectField(CAST(right), Oddball::kToNumberOffset);
             Goto(&loop);
           }
         }
@@ -6284,7 +6267,7 @@ Node* CodeStubAssembler::Equal(Node* left, Node* right, Node* context,
                 SmiConstant(CompareOperationFeedback::kAny));
           }
           result.Bind(CallRuntime(Runtime::kBigIntEqualToNumber,
-NoContextConstant(), left, right));
+                                  NoContextConstant(), left, right));
           Goto(&end);
         }
 
@@ -6313,7 +6296,7 @@ NoContextConstant(), left, right));
             var_type_feedback->Bind(
                 SmiConstant(CompareOperationFeedback::kAny));
           }
-          var_right.Bind(LoadObjectField(right, Oddball::kToNumberOffset));
+          var_right = LoadObjectField(CAST(right), Oddball::kToNumberOffset);
           Goto(&loop);
         }
       }
@@ -6365,10 +6348,10 @@ NoContextConstant(), left, right));
           }
 
           // If {right} is a Boolean too, it must be a different Boolean.
-          GotoIf(WordEqual(right_map, left_map), &if_notequal);
+          GotoIf(TaggedEqual(right_map, left_map), &if_notequal);
 
           // Otherwise, convert {left} to number and try again.
-          var_left.Bind(LoadObjectField(left, Oddball::kToNumberOffset));
+          var_left = LoadObjectField(CAST(left), Oddball::kToNumberOffset);
           Goto(&loop);
         }
       }
@@ -6451,7 +6434,7 @@ NoContextConstant(), left, right));
                   SmiConstant(CompareOperationFeedback::kAny));
             }
             Callable callable = CodeFactory::NonPrimitiveToPrimitive(isolate());
-            var_left.Bind(CallStub(callable, context, left));
+            var_left = CallStub(callable, context, left);
             Goto(&loop);
           }
         }
@@ -6460,14 +6443,14 @@ NoContextConstant(), left, right));
 
     BIND(&do_right_stringtonumber);
     {
-      var_right.Bind(CallBuiltin(Builtins::kStringToNumber, context, right));
+      var_right = CallBuiltin(Builtins::kStringToNumber, context, right);
       Goto(&loop);
     }
 
     BIND(&use_symmetry);
     {
-      var_left.Bind(right);
-      var_right.Bind(left);
+      var_left = right;
+      var_right = left;
       Goto(&loop);
     }
   }
@@ -6554,7 +6537,7 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
 
   // Check if {lhs} and {rhs} refer to the same object.
   Label if_same(this), if_notsame(this);
-  Branch(WordEqual(lhs, rhs), &if_same, &if_notsame);
+  Branch(TaggedEqual(lhs, rhs), &if_same, &if_notsame);
 
   BIND(&if_same);
   {
@@ -6590,8 +6573,8 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
         BIND(&if_rhsissmi);
         {
           // Convert {lhs} and {rhs} to floating point values.
-          Node* lhs_value = LoadHeapNumberValue(CAST(lhs));
-          Node* rhs_value = SmiToFloat64(CAST(rhs));
+          TNode<Float64T> lhs_value = LoadHeapNumberValue(CAST(lhs));
+          TNode<Float64T> rhs_value = SmiToFloat64(CAST(rhs));
 
           CombineFeedback(var_type_feedback, CompareOperationFeedback::kNumber);
 
@@ -6612,8 +6595,8 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
           BIND(&if_rhsisnumber);
           {
             // Convert {lhs} and {rhs} to floating point values.
-            Node* lhs_value = LoadHeapNumberValue(CAST(lhs));
-            Node* rhs_value = LoadHeapNumberValue(CAST(rhs));
+            TNode<Float64T> lhs_value = LoadHeapNumberValue(CAST(lhs));
+            TNode<Float64T> rhs_value = LoadHeapNumberValue(CAST(rhs));
 
             CombineFeedback(var_type_feedback,
                             CompareOperationFeedback::kNumber);
@@ -6639,7 +6622,7 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
         BIND(&if_rhsisnotsmi);
         {
           // Load the instance type of {lhs}.
-          Node* lhs_instance_type = LoadMapInstanceType(lhs_map);
+          TNode<Uint16T> lhs_instance_type = LoadMapInstanceType(lhs_map);
 
           // Check if {lhs} is a String.
           Label if_lhsisstring(this, Label::kDeferred), if_lhsisnotstring(this);
@@ -6649,7 +6632,7 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
           BIND(&if_lhsisstring);
           {
             // Load the instance type of {rhs}.
-            Node* rhs_instance_type = LoadInstanceType(CAST(rhs));
+            TNode<Uint16T> rhs_instance_type = LoadInstanceType(CAST(rhs));
 
             // Check if {rhs} is also a String.
             Label if_rhsisstring(this, Label::kDeferred),
@@ -6832,15 +6815,17 @@ TNode<Oddball> CodeStubAssembler::StrictEqual(SloppyTNode<Object> lhs,
 // ECMA#sec-samevalue
 // This algorithm differs from the Strict Equality Comparison Algorithm in its
 // treatment of signed zeroes and NaNs.
-void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
-                                          Label* if_false, SameValueMode mode) {
+void CodeStubAssembler::BranchIfSameValue(SloppyTNode<Object> lhs,
+                                          SloppyTNode<Object> rhs,
+                                          Label* if_true, Label* if_false,
+                                          SameValueMode mode) {
   VARIABLE(var_lhs_value, MachineRepresentation::kFloat64);
   VARIABLE(var_rhs_value, MachineRepresentation::kFloat64);
   Label do_fcmp(this);
 
   // Immediately jump to {if_true} if {lhs} == {rhs}, because - unlike
   // StrictEqual - SameValue considers two NaNs to be equal.
-  GotoIf(WordEqual(lhs, rhs), if_true);
+  GotoIf(TaggedEqual(lhs, rhs), if_true);
 
   // Check if the {lhs} is a Smi.
   Label if_lhsissmi(this), if_lhsisheapobject(this);
@@ -6851,9 +6836,9 @@ void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
     // Since {lhs} is a Smi, the comparison can only yield true
     // iff the {rhs} is a HeapNumber with the same float64 value.
     Branch(TaggedIsSmi(rhs), if_false, [&] {
-      GotoIfNot(IsHeapNumber(rhs), if_false);
-      var_lhs_value.Bind(SmiToFloat64(lhs));
-      var_rhs_value.Bind(LoadHeapNumberValue(rhs));
+      GotoIfNot(IsHeapNumber(CAST(rhs)), if_false);
+      var_lhs_value.Bind(SmiToFloat64(CAST(lhs)));
+      var_rhs_value.Bind(LoadHeapNumberValue(CAST(rhs)));
       Goto(&do_fcmp);
     });
   }
@@ -6866,9 +6851,9 @@ void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
         [&] {
           // Since {rhs} is a Smi, the comparison can only yield true
           // iff the {lhs} is a HeapNumber with the same float64 value.
-          GotoIfNot(IsHeapNumber(lhs), if_false);
-          var_lhs_value.Bind(LoadHeapNumberValue(lhs));
-          var_rhs_value.Bind(SmiToFloat64(rhs));
+          GotoIfNot(IsHeapNumber(CAST(lhs)), if_false);
+          var_lhs_value.Bind(LoadHeapNumberValue(CAST(lhs)));
+          var_rhs_value.Bind(SmiToFloat64(CAST(rhs)));
           Goto(&do_fcmp);
         },
         [&] {
@@ -6878,10 +6863,11 @@ void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
           // value.
           Label if_lhsisheapnumber(this), if_lhsisstring(this),
               if_lhsisbigint(this);
-          Node* const lhs_map = LoadMap(lhs);
+          TNode<Map> const lhs_map = LoadMap(CAST(lhs));
           GotoIf(IsHeapNumberMap(lhs_map), &if_lhsisheapnumber);
           if (mode != SameValueMode::kNumbersOnly) {
-            Node* const lhs_instance_type = LoadMapInstanceType(lhs_map);
+            TNode<Uint16T> const lhs_instance_type =
+                LoadMapInstanceType(lhs_map);
             GotoIf(IsStringInstanceType(lhs_instance_type), &if_lhsisstring);
             GotoIf(IsBigIntInstanceType(lhs_instance_type), &if_lhsisbigint);
           }
@@ -6889,9 +6875,9 @@ void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
 
           BIND(&if_lhsisheapnumber);
           {
-            GotoIfNot(IsHeapNumber(rhs), if_false);
-            var_lhs_value.Bind(LoadHeapNumberValue(lhs));
-            var_rhs_value.Bind(LoadHeapNumberValue(rhs));
+            GotoIfNot(IsHeapNumber(CAST(rhs)), if_false);
+            var_lhs_value.Bind(LoadHeapNumberValue(CAST(lhs)));
+            var_rhs_value.Bind(LoadHeapNumberValue(CAST(rhs)));
             Goto(&do_fcmp);
           }
 
@@ -6900,17 +6886,17 @@ void CodeStubAssembler::BranchIfSameValue(Node* lhs, Node* rhs, Label* if_true,
             {
               // Now we can only yield true if {rhs} is also a String
               // with the same sequence of characters.
-              GotoIfNot(IsString(rhs), if_false);
-              Node* const result = CallBuiltin(Builtins::kStringEqual,
-                                               NoContextConstant(), lhs, rhs);
+              GotoIfNot(IsString(CAST(rhs)), if_false);
+              TNode<Object> const result = CallBuiltin(
+                  Builtins::kStringEqual, NoContextConstant(), lhs, rhs);
               Branch(IsTrue(result), if_true, if_false);
             }
 
             BIND(&if_lhsisbigint);
             {
-              GotoIfNot(IsBigInt(rhs), if_false);
-              Node* const result = CallRuntime(Runtime::kBigIntEqualToBigInt,
-                                               NoContextConstant(), lhs, rhs);
+              GotoIfNot(IsBigInt(CAST(rhs)), if_false);
+              TNode<Object> const result = CallRuntime(
+                  Runtime::kBigIntEqualToBigInt, NoContextConstant(), lhs, rhs);
               Branch(IsTrue(result), if_true, if_false);
             }
           }
@@ -6937,8 +6923,8 @@ void CodeStubAssembler::BranchIfSameNumberValue(TNode<Float64T> lhs_value,
     // We still need to handle the case when {lhs} and {rhs} are -0.0 and
     // 0.0 (or vice versa). Compare the high word to
     // distinguish between the two.
-    Node* const lhs_hi_word = Float64ExtractHighWord32(lhs_value);
-    Node* const rhs_hi_word = Float64ExtractHighWord32(rhs_value);
+    TNode<Uint32T> const lhs_hi_word = Float64ExtractHighWord32(lhs_value);
+    TNode<Uint32T> const rhs_hi_word = Float64ExtractHighWord32(rhs_value);
 
     // If x is +0 and y is -0, return false.
     // If x is -0 and y is +0, return false.
@@ -7043,15 +7029,15 @@ Node* CodeStubAssembler::Typeof(Node* value) {
 
   GotoIf(TaggedIsSmi(value), &return_number);
 
-  Node* map = LoadMap(value);
+  TNode<Map> map = LoadMap(value);
 
   GotoIf(IsHeapNumberMap(map), &return_number);
 
-  Node* instance_type = LoadMapInstanceType(map);
+  TNode<Uint16T> instance_type = LoadMapInstanceType(map);
 
   GotoIf(InstanceTypeEqual(instance_type, ODDBALL_TYPE), &if_oddball);
 
-  Node* callable_or_undetectable_mask = Word32And(
+  TNode<Int32T> callable_or_undetectable_mask = Word32And(
       LoadMapBitField(map),
       Int32Constant(Map::IsCallableBit::kMask | Map::IsUndetectableBit::kMask));
 
@@ -7080,7 +7066,7 @@ Node* CodeStubAssembler::Typeof(Node* value) {
 
   BIND(&if_oddball);
   {
-    Node* type = LoadObjectField(value, Oddball::kTypeOfOffset);
+    TNode<Object> type = LoadObjectField(value, Oddball::kTypeOfOffset);
     result_var.Bind(type);
     Goto(&return_result);
   }
@@ -7125,8 +7111,8 @@ TNode<Object> CodeStubAssembler::GetSuperConstructor(
   TVARIABLE(Object, result);
 
   TNode<Map> map = LoadMap(active_function);
-  TNode<Object> prototype = LoadMapPrototype(map);
-  TNode<Map> prototype_map = LoadMap(CAST(prototype));
+  TNode<HeapObject> prototype = LoadMapPrototype(map);
+  TNode<Map> prototype_map = LoadMap(prototype);
   GotoIfNot(IsConstructorMap(prototype_map), &is_not_constructor);
 
   result = prototype;
@@ -7159,7 +7145,7 @@ TNode<JSReceiver> CodeStubAssembler::SpeciesConstructor(
 
   // 4. If Type(C) is not Object, throw a TypeError exception.
   ThrowIfNotJSReceiver(context, constructor,
-                       MessageTemplate::kConstructorNotReceiver);
+                       MessageTemplate::kConstructorNotReceiver, "");
 
   // 5. Let S be ? Get(C, @@species).
   TNode<Object> species =
@@ -7183,9 +7169,6 @@ TNode<JSReceiver> CodeStubAssembler::SpeciesConstructor(
   return var_result.value();
 }
 
-//--SECTION1
-
-
 Node* CodeStubAssembler::InstanceOf(Node* object, Node* callable,
                                     Node* context) {
   VARIABLE(var_result, MachineRepresentation::kTagged);
@@ -7199,16 +7182,16 @@ Node* CodeStubAssembler::InstanceOf(Node* object, Node* callable,
   GotoIfNot(IsJSReceiver(callable), &if_notreceiver);
 
   // Load the @@hasInstance property from {callable}.
-  Node* inst_of_handler =
+  TNode<Object> inst_of_handler =
       GetProperty(context, callable, HasInstanceSymbolConstant());
 
   // Optimize for the likely case where {inst_of_handler} is the builtin
   // Function.prototype[@@hasInstance] method, and emit a direct call in
   // that case without any additional checking.
-  Node* native_context = LoadNativeContext(context);
-  Node* function_has_instance =
+  TNode<NativeContext> native_context = LoadNativeContext(context);
+  TNode<Object> function_has_instance =
       LoadContextElement(native_context, Context::FUNCTION_HAS_INSTANCE_INDEX);
-  GotoIfNot(WordEqual(inst_of_handler, function_has_instance),
+  GotoIfNot(TaggedEqual(inst_of_handler, function_has_instance),
             &if_otherhandler);
   {
     // Call to Function.prototype[@@hasInstance] directly.
@@ -7240,7 +7223,7 @@ Node* CodeStubAssembler::InstanceOf(Node* object, Node* callable,
     GotoIfNot(IsCallable(callable), &if_notcallable);
 
     // Use the OrdinaryHasInstance algorithm.
-    Node* result =
+    TNode<Object> result =
         CallBuiltin(Builtins::kOrdinaryHasInstance, context, callable, object);
     var_result.Bind(result);
     Goto(&return_result);
@@ -7439,10 +7422,10 @@ TNode<Number> CodeStubAssembler::BitwiseOp(Node* left32, Node* right32,
 // ES #sec-createarrayiterator
 TNode<JSArrayIterator> CodeStubAssembler::CreateArrayIterator(
     TNode<Context> context, TNode<Object> object, IterationKind kind) {
-  TNode<Context> native_context = LoadNativeContext(context);
+  TNode<NativeContext> native_context = LoadNativeContext(context);
   TNode<Map> iterator_map = CAST(LoadContextElement(
       native_context, Context::INITIAL_ARRAY_ITERATOR_MAP_INDEX));
-  Node* iterator = Allocate(JSArrayIterator::kSize);
+  TNode<HeapObject> iterator = Allocate(JSArrayIterator::kSize);
   StoreMapNoWriteBarrier(iterator, iterator_map);
   StoreObjectFieldRoot(iterator, JSArrayIterator::kPropertiesOrHashOffset,
                        RootIndex::kEmptyFixedArray);
@@ -7462,10 +7445,10 @@ TNode<JSObject> CodeStubAssembler::AllocateJSIteratorResult(
     SloppyTNode<Context> context, SloppyTNode<Object> value,
     SloppyTNode<Oddball> done) {
   CSA_ASSERT(this, IsBoolean(done));
-  Node* native_context = LoadNativeContext(context);
-  Node* map =
+  TNode<NativeContext> native_context = LoadNativeContext(context);
+  TNode<Object> map =
       LoadContextElement(native_context, Context::ITERATOR_RESULT_MAP_INDEX);
-  Node* result = Allocate(JSIteratorResult::kSize);
+  TNode<HeapObject> result = Allocate(JSIteratorResult::kSize);
   StoreMapNoWriteBarrier(result, map);
   StoreObjectFieldRoot(result, JSIteratorResult::kPropertiesOrHashOffset,
                        RootIndex::kEmptyFixedArray);
@@ -7476,13 +7459,11 @@ TNode<JSObject> CodeStubAssembler::AllocateJSIteratorResult(
   return CAST(result);
 }
 
-// SECTION2
-
 Node* CodeStubAssembler::AllocateJSIteratorResultForEntry(Node* context,
                                                           Node* key,
                                                           Node* value) {
-  Node* native_context = LoadNativeContext(context);
-  Node* length = SmiConstant(2);
+  TNode<NativeContext> native_context = LoadNativeContext(context);
+  TNode<Smi> length = SmiConstant(2);
   int const elements_size = FixedArray::SizeFor(2);
   TNode<FixedArray> elements = UncheckedCast<FixedArray>(
       Allocate(elements_size + JSArray::kSize + JSIteratorResult::kSize));
@@ -7491,7 +7472,7 @@ Node* CodeStubAssembler::AllocateJSIteratorResultForEntry(Node* context,
   StoreObjectFieldNoWriteBarrier(elements, FixedArray::kLengthOffset, length);
   StoreFixedArrayElement(elements, 0, key);
   StoreFixedArrayElement(elements, 1, value);
-  Node* array_map = LoadContextElement(
+  TNode<Object> array_map = LoadContextElement(
       native_context, Context::JS_ARRAY_PACKED_ELEMENTS_MAP_INDEX);
   TNode<HeapObject> array = InnerAllocate(elements, elements_size);
   StoreMapNoWriteBarrier(array, array_map);
@@ -7499,7 +7480,7 @@ Node* CodeStubAssembler::AllocateJSIteratorResultForEntry(Node* context,
                        RootIndex::kEmptyFixedArray);
   StoreObjectFieldNoWriteBarrier(array, JSArray::kElementsOffset, elements);
   StoreObjectFieldNoWriteBarrier(array, JSArray::kLengthOffset, length);
-  Node* iterator_map =
+  TNode<Object> iterator_map =
       LoadContextElement(native_context, Context::ITERATOR_RESULT_MAP_INDEX);
   TNode<HeapObject> result = InnerAllocate(array, JSArray::kSize);
   StoreMapNoWriteBarrier(result, iterator_map);
@@ -7586,16 +7567,13 @@ CodeStubArguments::CodeStubArguments(
       argc_(argc),
       base_(),
       fp_(fp != nullptr ? fp : assembler_->LoadFramePointer()) {
-  Node* offset = assembler_->ElementOffsetFromIndex(
+  TNode<IntPtrT> offset = assembler_->ElementOffsetFromIndex(
       argc_, SYSTEM_POINTER_ELEMENTS, param_mode,
       (StandardFrameConstants::kFixedSlotCountAboveFp - 1) *
           kSystemPointerSize);
   base_ =
       assembler_->UncheckedCast<RawPtrT>(assembler_->IntPtrAdd(fp_, offset));
 }
-
-//-----
-
 
 TNode<Object> CodeStubArguments::GetReceiver() const {
   DCHECK_EQ(receiver_mode_, ReceiverMode::kHasReceiver);
@@ -7614,7 +7592,7 @@ TNode<WordT> CodeStubArguments::AtIndexPtr(
   using Node = compiler::Node;
   Node* negated_index = assembler_->IntPtrOrSmiSub(
       assembler_->IntPtrOrSmiConstant(0, mode), index, mode);
-  Node* offset = assembler_->ElementOffsetFromIndex(
+  TNode<IntPtrT> offset = assembler_->ElementOffsetFromIndex(
       negated_index, SYSTEM_POINTER_ELEMENTS, mode, 0);
   return assembler_->IntPtrAdd(assembler_->UncheckedCast<IntPtrT>(base_),
                                offset);
@@ -7633,7 +7611,6 @@ TNode<Object> CodeStubArguments::AtIndex(int index) const {
   return AtIndex(assembler_->IntPtrConstant(index));
 }
 
-//------
 TNode<Object> CodeStubArguments::GetOptionalArgumentValue(
     int index, TNode<Object> default_value) {
   CodeStubAssembler::TVariable<Object> result(assembler_);
@@ -7676,7 +7653,6 @@ TNode<Object> CodeStubArguments::GetOptionalArgumentValue(
   return result.value();
 }
 
-//----
 void CodeStubArguments::PopAndReturn(Node* value) {
   Node* pop_count;
   if (receiver_mode_ == ReceiverMode::kHasReceiver) {
@@ -7733,13 +7709,15 @@ TNode<BoolT> CodeStubAssembler::IsHoleyFastElementsKind(
 
 TNode<BoolT> CodeStubAssembler::IsHoleyFastElementsKindForRead(
     TNode<Int32T> elements_kind) {
-  CSA_ASSERT(this,
-             Uint32LessThanOrEqual(elements_kind,
-                                   Int32Constant(LAST_FROZEN_ELEMENTS_KIND)));
+  CSA_ASSERT(this, Uint32LessThanOrEqual(
+                       elements_kind,
+                       Int32Constant(LAST_ANY_NONEXTENSIBLE_ELEMENTS_KIND)));
 
   STATIC_ASSERT(HOLEY_SMI_ELEMENTS == (PACKED_SMI_ELEMENTS | 1));
   STATIC_ASSERT(HOLEY_ELEMENTS == (PACKED_ELEMENTS | 1));
   STATIC_ASSERT(HOLEY_DOUBLE_ELEMENTS == (PACKED_DOUBLE_ELEMENTS | 1));
+  STATIC_ASSERT(HOLEY_NONEXTENSIBLE_ELEMENTS ==
+                (PACKED_NONEXTENSIBLE_ELEMENTS | 1));
   STATIC_ASSERT(HOLEY_SEALED_ELEMENTS == (PACKED_SEALED_ELEMENTS | 1));
   STATIC_ASSERT(HOLEY_FROZEN_ELEMENTS == (PACKED_FROZEN_ELEMENTS | 1));
   return IsSetWord32(elements_kind, 1);
@@ -7763,43 +7741,36 @@ TNode<BoolT> CodeStubAssembler::IsElementsKindInRange(
       Int32Constant(higher_reference_kind - lower_reference_kind));
 }
 
-
 Node* CodeStubAssembler::IsDebugActive() {
-  Node* is_debug_active = Load(
-      MachineType::Uint8(),
+  TNode<Uint8T> is_debug_active = Load<Uint8T>(
       ExternalConstant(ExternalReference::debug_is_active_address(isolate())));
   return Word32NotEqual(is_debug_active, Int32Constant(0));
 }
 
 Node* CodeStubAssembler::IsPromiseHookEnabled() {
-  Node* const promise_hook = Load(
-      MachineType::Pointer(),
+  TNode<RawPtrT> const promise_hook = Load<RawPtrT>(
       ExternalConstant(ExternalReference::promise_hook_address(isolate())));
   return WordNotEqual(promise_hook, IntPtrConstant(0));
 }
 
 Node* CodeStubAssembler::HasAsyncEventDelegate() {
-  Node* const async_event_delegate =
-      Load(MachineType::Pointer(),
-           ExternalConstant(
-               ExternalReference::async_event_delegate_address(isolate())));
+  TNode<RawPtrT> const async_event_delegate = Load<RawPtrT>(ExternalConstant(
+      ExternalReference::async_event_delegate_address(isolate())));
   return WordNotEqual(async_event_delegate, IntPtrConstant(0));
 }
 
 Node* CodeStubAssembler::IsPromiseHookEnabledOrHasAsyncEventDelegate() {
-  Node* const promise_hook_or_async_event_delegate =
-      Load(MachineType::Uint8(),
-           ExternalConstant(
-               ExternalReference::promise_hook_or_async_event_delegate_address(
-                   isolate())));
+  TNode<Uint8T> const promise_hook_or_async_event_delegate =
+      Load<Uint8T>(ExternalConstant(
+          ExternalReference::promise_hook_or_async_event_delegate_address(
+              isolate())));
   return Word32NotEqual(promise_hook_or_async_event_delegate, Int32Constant(0));
 }
 
 Node* CodeStubAssembler::
     IsPromiseHookEnabledOrDebugIsActiveOrHasAsyncEventDelegate() {
-  Node* const promise_hook_or_debug_is_active_or_async_event_delegate = Load(
-      MachineType::Uint8(),
-      ExternalConstant(
+  TNode<Uint8T> const promise_hook_or_debug_is_active_or_async_event_delegate =
+      Load<Uint8T>(ExternalConstant(
           ExternalReference::
               promise_hook_or_debug_is_active_or_async_event_delegate_address(
                   isolate())));
@@ -7846,7 +7817,7 @@ TNode<Code> CodeStubAssembler::GetSharedFunctionInfoCode(
 
   // Switch on data's instance type.
   BIND(&check_instance_type);
-  TNode<Int32T> data_type = LoadInstanceType(CAST(sfi_data));
+  TNode<Uint16T> data_type = LoadInstanceType(CAST(sfi_data));
 
   int32_t case_values[] = {BYTECODE_ARRAY_TYPE,
                            WASM_EXPORTED_FUNCTION_DATA_TYPE,
@@ -7936,14 +7907,14 @@ Node* CodeStubAssembler::AllocateFunctionWithMapAndContext(Node* map,
                                                            Node* context) {
   CSA_SLOW_ASSERT(this, IsMap(map));
 
-  Node* const code = GetSharedFunctionInfoCode(shared_info);
+  TNode<Code> const code = GetSharedFunctionInfoCode(shared_info);
 
   // TODO(ishell): All the callers of this function pass map loaded from
   // Context::STRICT_FUNCTION_WITHOUT_PROTOTYPE_MAP_INDEX. So we can remove
   // map parameter.
   CSA_ASSERT(this, Word32BinaryNot(IsConstructorMap(map)));
   CSA_ASSERT(this, Word32BinaryNot(IsFunctionWithPrototypeSlotMap(map)));
-  Node* const fun = Allocate(JSFunction::kSizeWithoutPrototype);
+  TNode<HeapObject> const fun = Allocate(JSFunction::kSizeWithoutPrototype);
   STATIC_ASSERT(JSFunction::kSizeWithoutPrototype == 7 * kTaggedSize);
   StoreMapNoWriteBarrier(fun, map);
   StoreObjectFieldRoot(fun, JSObject::kPropertiesOrHashOffset,
@@ -7980,14 +7951,16 @@ void CodeStubAssembler::CheckPrototypeEnumCache(Node* receiver,
     // backing store.
     STATIC_ASSERT(static_cast<int>(JSObject::kElementsOffset) ==
                   static_cast<int>(JSProxy::kTargetOffset));
-    Node* object_elements = LoadObjectField(object, JSObject::kElementsOffset);
+    TNode<Object> object_elements =
+        LoadObjectField(object, JSObject::kElementsOffset);
     GotoIf(IsEmptyFixedArray(object_elements), &if_no_elements);
     GotoIf(IsEmptySlowElementDictionary(object_elements), &if_no_elements);
 
     // It might still be an empty JSArray.
     GotoIfNot(IsJSArrayMap(object_map), if_slow);
-    Node* object_length = LoadJSArrayLength(object);
-    Branch(WordEqual(object_length, SmiConstant(0)), &if_no_elements, if_slow);
+    TNode<Number> object_length = LoadJSArrayLength(object);
+    Branch(TaggedEqual(object_length, SmiConstant(0)), &if_no_elements,
+           if_slow);
 
     // Continue with the {object}s prototype.
     BIND(&if_no_elements);
@@ -7998,7 +7971,7 @@ void CodeStubAssembler::CheckPrototypeEnumCache(Node* receiver,
     var_object.Bind(object);
     object_map = LoadMap(object);
     var_object_map.Bind(object_map);
-    Node* object_enum_length = LoadMapEnumLength(object_map);
+    TNode<WordT> object_enum_length = LoadMapEnumLength(object_map);
     Branch(WordEqual(object_enum_length, IntPtrConstant(0)), &loop, if_slow);
   }
 }
@@ -8006,11 +7979,11 @@ void CodeStubAssembler::CheckPrototypeEnumCache(Node* receiver,
 Node* CodeStubAssembler::CheckEnumCache(Node* receiver, Label* if_empty,
                                         Label* if_runtime) {
   Label if_fast(this), if_cache(this), if_no_cache(this, Label::kDeferred);
-  Node* receiver_map = LoadMap(receiver);
+  TNode<Map> receiver_map = LoadMap(receiver);
 
   // Check if the enum length field of the {receiver} is properly initialized,
   // indicating that there is an enum cache.
-  Node* receiver_enum_length = LoadMapEnumLength(receiver_map);
+  TNode<WordT> receiver_enum_length = LoadMapEnumLength(receiver_map);
   Branch(WordEqual(receiver_enum_length,
                    IntPtrConstant(kInvalidEnumCacheSentinel)),
          &if_no_cache, &if_cache);
@@ -8021,7 +7994,7 @@ Node* CodeStubAssembler::CheckEnumCache(Node* receiver, Label* if_empty,
     GotoIfNot(IsDictionaryMap(receiver_map), if_runtime);
     TNode<NameDictionary> properties = CAST(LoadSlowProperties(receiver));
     TNode<Smi> length = GetNumberOfElements(properties);
-    GotoIfNot(WordEqual(length, SmiConstant(0)), if_runtime);
+    GotoIfNot(TaggedEqual(length, SmiConstant(0)), if_runtime);
     // Check that there are no elements on the {receiver} and its prototype
     // chain. Given that we do not create an EnumCache for dict-mode objects,
     // directly jump to {if_empty} if there are no elements and no properties
@@ -8071,15 +8044,10 @@ void CodeStubAssembler::Print(const char* prefix, Node* tagged_value) {
 void CodeStubAssembler::PerformStackCheck(TNode<Context> context) {
   Label ok(this), stack_check_interrupt(this, Label::kDeferred);
 
-  // The instruction sequence below is carefully crafted to hit our pattern
-  // matcher for stack checks within instruction selection.
-  // See StackCheckMatcher::Matched and JSGenericLowering::LowerJSStackCheck.
-
-  TNode<UintPtrT> sp = UncheckedCast<UintPtrT>(LoadStackPointer());
-  TNode<UintPtrT> stack_limit = UncheckedCast<UintPtrT>(Load(
-      MachineType::Pointer(),
-      ExternalConstant(ExternalReference::address_of_stack_limit(isolate()))));
-  TNode<BoolT> sp_within_limit = UintPtrLessThan(stack_limit, sp);
+  TNode<UintPtrT> stack_limit = UncheckedCast<UintPtrT>(
+      Load(MachineType::Pointer(),
+           ExternalConstant(ExternalReference::address_of_jslimit(isolate()))));
+  TNode<BoolT> sp_within_limit = StackPointerGreaterThan(stack_limit);
 
   Branch(sp_within_limit, &ok, &stack_check_interrupt);
 
@@ -8097,7 +8065,7 @@ void CodeStubAssembler::InitializeFunctionContext(Node* native_context,
   StoreObjectFieldNoWriteBarrier(context, FixedArray::kLengthOffset,
                                  SmiConstant(slots));
 
-  Node* const empty_scope_info =
+  TNode<Object> const empty_scope_info =
       LoadContextElement(native_context, Context::SCOPE_INFO_INDEX);
   StoreContextElementNoWriteBarrier(context, Context::SCOPE_INFO_INDEX,
                                     empty_scope_info);
@@ -8128,7 +8096,7 @@ TNode<JSArray> CodeStubAssembler::ArrayCreate(TNode<Context> context,
 
   BIND(&runtime);
   {
-    TNode<Context> native_context = LoadNativeContext(context);
+    TNode<NativeContext> native_context = LoadNativeContext(context);
     TNode<JSFunction> array_function =
         CAST(LoadContextElement(native_context, Context::ARRAY_FUNCTION_INDEX));
     array = CAST(CallRuntime(Runtime::kNewArray, context, array_function,
@@ -8195,63 +8163,139 @@ void CodeStubAssembler::SetPropertyLength(TNode<Context> context,
   BIND(&done);
 }
 
-void CodeStubAssembler::GotoIfInitialPrototypePropertyModified(
-    TNode<Map> object_map, TNode<Map> initial_prototype_map, int descriptor,
-    RootIndex field_name_root_index, Label* if_modified) {
-  DescriptorIndexAndName index_name{descriptor, field_name_root_index};
-  GotoIfInitialPrototypePropertiesModified(
-      object_map, initial_prototype_map,
-      Vector<DescriptorIndexAndName>(&index_name, 1), if_modified);
-}
-
-void CodeStubAssembler::GotoIfInitialPrototypePropertiesModified(
-    TNode<Map> object_map, TNode<Map> initial_prototype_map,
-    Vector<DescriptorIndexAndName> properties, Label* if_modified) {
-  TNode<Map> prototype_map = LoadMap(LoadMapPrototype(object_map));
-  GotoIfNot(WordEqual(prototype_map, initial_prototype_map), if_modified);
-
-  // We need to make sure that relevant properties in the prototype have
-  // not been tampered with. We do this by checking that their slots
-  // in the prototype's descriptor array are still marked as const.
-  TNode<DescriptorArray> descriptors = LoadMapDescriptors(prototype_map);
-
-  TNode<Uint32T> combined_details;
-  for (int i = 0; i < properties.length(); i++) {
-    // Assert the descriptor index is in-bounds.
-    int descriptor = properties[i].descriptor_index;
-    CSA_ASSERT(this, Int32LessThan(Int32Constant(descriptor),
-                                   LoadNumberOfDescriptors(descriptors)));
-    // Assert that the name is correct. This essentially checks that
-    // the descriptor index corresponds to the insertion order in
-    // the bootstrapper.
-    CSA_ASSERT(this,
-               WordEqual(LoadKeyByDescriptorEntry(descriptors, descriptor),
-                         LoadRoot(properties[i].name_root_index)));
-
-    TNode<Uint32T> details =
-        DescriptorArrayGetDetails(descriptors, Uint32Constant(descriptor));
-    if (i == 0) {
-      combined_details = details;
-    } else {
-      combined_details = Word32And(combined_details, details);
-    }
-  }
-
-  TNode<Uint32T> constness =
-      DecodeWord32<PropertyDetails::ConstnessField>(combined_details);
-
-  GotoIfNot(
-      Word32Equal(constness,
-                  Int32Constant(static_cast<int>(PropertyConstness::kConst))),
-      if_modified);
-}
-
 TNode<String> CodeStubAssembler::TaggedToDirectString(TNode<Object> value,
                                                       Label* fail) {
-  ToDirectStringAssembler to_direct(state(), value);
+  ToDirectStringAssembler to_direct(state(), CAST(value));
   to_direct.TryToDirect(fail);
   to_direct.PointerToData(fail);
   return CAST(value);
+}
+
+PrototypeCheckAssembler::PrototypeCheckAssembler(
+    compiler::CodeAssemblerState* state, Flags flags,
+    TNode<NativeContext> native_context, TNode<Map> initial_prototype_map,
+    Vector<DescriptorIndexNameValue> properties)
+    : CodeStubAssembler(state),
+      flags_(flags),
+      native_context_(native_context),
+      initial_prototype_map_(initial_prototype_map),
+      properties_(properties) {}
+
+void PrototypeCheckAssembler::CheckAndBranch(TNode<HeapObject> prototype,
+                                             Label* if_unmodified,
+                                             Label* if_modified) {
+  TNode<Map> prototype_map = LoadMap(prototype);
+  TNode<DescriptorArray> descriptors = LoadMapDescriptors(prototype_map);
+
+  // The continuation of a failed fast check: if property identity checks are
+  // enabled, we continue there (since they may still classify the prototype as
+  // fast), otherwise we bail out.
+  Label property_identity_check(this, Label::kDeferred);
+  Label* if_fast_check_failed =
+      ((flags_ & kCheckPrototypePropertyIdentity) == 0)
+          ? if_modified
+          : &property_identity_check;
+
+  if ((flags_ & kCheckPrototypePropertyConstness) != 0) {
+    // A simple prototype map identity check. Note that map identity does not
+    // guarantee unmodified properties. It does guarantee that no new properties
+    // have been added, or old properties deleted.
+
+    GotoIfNot(TaggedEqual(prototype_map, initial_prototype_map_),
+              if_fast_check_failed);
+
+    // We need to make sure that relevant properties in the prototype have
+    // not been tampered with. We do this by checking that their slots
+    // in the prototype's descriptor array are still marked as const.
+
+    TNode<Uint32T> combined_details;
+    for (int i = 0; i < properties_.length(); i++) {
+      // Assert the descriptor index is in-bounds.
+      int descriptor = properties_[i].descriptor_index;
+      CSA_ASSERT(this, Int32LessThan(Int32Constant(descriptor),
+                                     LoadNumberOfDescriptors(descriptors)));
+
+      // Assert that the name is correct. This essentially checks that
+      // the descriptor index corresponds to the insertion order in
+      // the bootstrapper.
+      CSA_ASSERT(
+          this,
+          TaggedEqual(LoadKeyByDescriptorEntry(descriptors, descriptor),
+                      CodeAssembler::LoadRoot(properties_[i].name_root_index)));
+
+      TNode<Uint32T> details =
+          DescriptorArrayGetDetails(descriptors, Uint32Constant(descriptor));
+
+      if (i == 0) {
+        combined_details = details;
+      } else {
+        combined_details = Word32And(combined_details, details);
+      }
+    }
+
+    TNode<Uint32T> constness =
+        DecodeWord32<PropertyDetails::ConstnessField>(combined_details);
+
+    Branch(
+        Word32Equal(constness,
+                    Int32Constant(static_cast<int>(PropertyConstness::kConst))),
+        if_unmodified, if_fast_check_failed);
+  }
+
+  if ((flags_ & kCheckPrototypePropertyIdentity) != 0) {
+    // The above checks have failed, for whatever reason (maybe the prototype
+    // map has changed, or a property is no longer const). This block implements
+    // a more thorough check that can also accept maps which 1. do not have the
+    // initial map, 2. have mutable relevant properties, but 3. still match the
+    // expected value for all relevant properties.
+
+    BIND(&property_identity_check);
+
+    int max_descriptor_index = -1;
+    for (int i = 0; i < properties_.length(); i++) {
+      max_descriptor_index =
+          std::max(max_descriptor_index, properties_[i].descriptor_index);
+    }
+
+    // If the greatest descriptor index is out of bounds, the map cannot be
+    // fast.
+    GotoIfNot(Int32LessThan(Int32Constant(max_descriptor_index),
+                            LoadNumberOfDescriptors(descriptors)),
+              if_modified);
+
+    // Logic below only handles maps with fast properties.
+    GotoIfMapHasSlowProperties(prototype_map, if_modified);
+
+    for (int i = 0; i < properties_.length(); i++) {
+      const DescriptorIndexNameValue& p = properties_[i];
+      const int descriptor = p.descriptor_index;
+
+      // Check if the name is correct. This essentially checks that
+      // the descriptor index corresponds to the insertion order in
+      // the bootstrapper.
+      GotoIfNot(TaggedEqual(LoadKeyByDescriptorEntry(descriptors, descriptor),
+                            CodeAssembler::LoadRoot(p.name_root_index)),
+                if_modified);
+
+      // Finally, check whether the actual value equals the expected value.
+      TNode<Uint32T> details =
+          DescriptorArrayGetDetails(descriptors, Uint32Constant(descriptor));
+      TVARIABLE(Uint32T, var_details, details);
+      TVARIABLE(Object, var_value);
+
+      const int key_index = DescriptorArray::ToKeyIndex(descriptor);
+      LoadPropertyFromFastObject(prototype, prototype_map, descriptors,
+                                 IntPtrConstant(key_index), &var_details,
+                                 &var_value);
+
+      TNode<Object> actual_value = var_value.value();
+      TNode<Object> expected_value =
+          LoadContextElement(native_context_, p.expected_value_context_index);
+      GotoIfNot(TaggedEqual(actual_value, expected_value), if_modified);
+    }
+
+    Goto(if_unmodified);
+  }
 }
 
 }  // namespace internal

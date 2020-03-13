@@ -4,7 +4,10 @@
 
 #include "src/codegen/code-stub-assembler.h"
 
+#include "include/v8-internal.h"
+#include "src/base/macros.h"
 #include "src/codegen/code-factory.h"
+#include "src/common/globals.h"
 #include "src/execution/frames-inl.h"
 #include "src/execution/frames.h"
 #include "src/heap/heap-inl.h"  // For Page/MemoryChunk. TODO(jkummerow): Drop.
@@ -28,7 +31,6 @@ using TNode = compiler::TNode<T>;
 template <class T>
 using SloppyTNode = compiler::SloppyTNode<T>;
 
-
 void CodeStubArguments::ForEach(
     const CodeStubAssembler::VariableList& vars,
     const CodeStubArguments::ForEachBodyFunction& body, Node* first, Node* last,
@@ -41,10 +43,10 @@ void CodeStubArguments::ForEach(
     DCHECK_EQ(mode, argc_mode_);
     last = argc_;
   }
-  Node* start = assembler_->IntPtrSub(
+  TNode<IntPtrT> start = assembler_->IntPtrSub(
       assembler_->UncheckedCast<IntPtrT>(base_),
       assembler_->ElementOffsetFromIndex(first, SYSTEM_POINTER_ELEMENTS, mode));
-  Node* end = assembler_->IntPtrSub(
+  TNode<IntPtrT> end = assembler_->IntPtrSub(
       assembler_->UncheckedCast<IntPtrT>(base_),
       assembler_->ElementOffsetFromIndex(last, SYSTEM_POINTER_ELEMENTS, mode));
   assembler_->BuildFastLoop(
@@ -56,7 +58,6 @@ void CodeStubArguments::ForEach(
       -kSystemPointerSize, CodeStubAssembler::INTPTR_PARAMETERS,
       CodeStubAssembler::IndexAdvanceMode::kPost);
 }
-
 
 }  // namespace internal
 }  // namespace v8
