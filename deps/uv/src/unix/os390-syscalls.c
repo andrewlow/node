@@ -392,9 +392,14 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
                          (unsigned int)(CW_CONDVAR | CW_INTRPT),
                          &secrem,
                          &nanorem);
+  assert(rv == -1 && (errno == EAGAIN || errno == EINTR));
+
   if (rv == -1)
-    if (err != EAGAIN && err != EINTR)
-      errno = err;
+    err = errno;
+
+  /* Don't leak EAGAIN, that just means the timeout expired. */
+  if (rv == -1 && err == EAGAIN)
+    errno = 0;
 #else
 
   int rc;
@@ -423,6 +428,10 @@ int nanosleep(const struct timespec* req, struct timespec* rem) {
   if (rem != NULL && (rv == 0 || err == EINTR || err == EAGAIN)) {
     rem->tv_nsec = nanorem;
     rem->tv_sec = secrem;
+  }
+
+  if (rv == -1 && err == EAGAIN) {
+    rv = 0;
   }
 
   return rv;
