@@ -54,6 +54,21 @@ static int shmid_value(void);
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
+// From deps/v8/src/base/macros.h
+// Return the largest multiple of m which is <= x.
+template <typename T>
+static inline T RoundDown(T x, intptr_t m) {
+  // m must be a power of two.
+  assert(m != 0 && ((m & (m - 1)) == 0));
+  return x & -m;
+}
+
+// Return the smallest multiple of m which is >= x.
+template <typename T>
+static inline T RoundUp(T x, intptr_t m) {
+  return RoundDown<T>(static_cast<T>(x + m - 1), m);
+}
+
 static inline void* __convert_one_to_one(const void* table,
                                          void* dst,
                                          size_t size,
@@ -3591,7 +3606,10 @@ extern "C" void* roanon_mmap(void* _, size_t len, int prot, int flags, const cha
     perror("fstat");
     return nullptr;
   }
-  void* memory = anon_mmap(_, len);
+  static const int pgsize = getpagesize();
+  size_t size = RoundUp(len,pgsize);
+
+  void* memory = anon_mmap(_, size);
   if (memory == MAP_FAILED) {
     return memory;
   }
