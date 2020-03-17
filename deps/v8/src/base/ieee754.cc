@@ -1,3 +1,6 @@
+#if V8_TARGET_ARCH_S390X
+#pragma options("-qstrict")
+#endif
 // The following is adapted from fdlibm (http://www.netlib.org/fdlibm).
 //
 // ====================================================
