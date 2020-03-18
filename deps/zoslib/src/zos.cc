@@ -1743,6 +1743,15 @@ static long long __iarv64(void* parm, long long* reason_code_ptr) {
   return rc;
 }
 
+// getipttoken returns the address of the initial process thread library
+// anchor area. This is used to create a user token that associates
+// memory allocations with the LE enclave.
+// See https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.1.0/com.ibm.zos.v2r1.ceev100/mout.htm
+unsigned long getipttoken(void) {
+  return ((unsigned long)((char *__ptr32 *__ptr32 *__ptr32)(1208))[0][82])
+         << 32;
+}
+
 static void* __iarv64_alloc(int segs, const char* token) {
   long long rc, reason;
   struct iarv64parm parm __attribute__((__aligned__(16)));
@@ -1755,6 +1764,7 @@ static void* __iarv64_alloc(int segs, const char* token) {
   parm.xdumppriority = 99;
   parm.xtype_pageable = 1;
   parm.xdump = 32;
+  parm.xusertkn = getipttoken();
   parm.xsadmp_no = 1;
   parm.xpageframesize_pageable1meg = 1;
   parm.xuse2gto64g_yes = 1;
@@ -1793,6 +1803,7 @@ static void* __iarv64_alloc_inorigin(int segs,
   parm.xdumppriority = 99;
   parm.xtype_pageable = 1;
   parm.xdump = 32;
+  parm.xusertkn = getipttoken();
   parm.xsadmp_no = 1;
   parm.xpageframesize_pageable1meg = 1;
   parm.xuse2gto64g_yes = 0;
@@ -1881,6 +1892,8 @@ struct __hash_func {
   }
 };
 
+static int anon_munmap_inner(void* addr, size_t len, bool is_above_bar);
+
 typedef std::unordered_map<key_type, value_type, __hash_func>::const_iterator
     mem_cursor_t;
 
@@ -1899,7 +1912,7 @@ class __Cache {
 #endif
     oktouse =
         (*(int*)(80 + ((char**** __ptr32*)1208)[0][11][1][123]) > 0x040202FF);
-    // LE level is 230 or above
+    // LE level is 220 or above
   }
   void addptr(const void* ptr, size_t v) {
     unsigned long k = (unsigned long)ptr;
@@ -1912,13 +1925,6 @@ class __Cache {
 #if defined(__USE_IARV64)
   void* alloc_seg(int segs) {
     std::lock_guard<std::mutex> guard(access_lock);
-    unsigned short this_asid =
-        ((unsigned short*)(*(char* __ptr32*)(0x224)))[18];
-    if (asid != this_asid) {
-      // a fork occurred
-      asid = this_asid;
-      gettcbtoken(tcbtoken, 3);
-    }
     void* p = __iarv64_alloc(segs, tcbtoken);
     if (p) {
       unsigned long k = (unsigned long)p;
@@ -1934,13 +1940,6 @@ class __Cache {
   int free_seg(void* ptr) {
     unsigned long k = (unsigned long)ptr;
     std::lock_guard<std::mutex> guard(access_lock);
-    unsigned short this_asid =
-        ((unsigned short*)(*(char* __ptr32*)(0x224)))[18];
-    if (asid != this_asid) {
-      // a fork occurred
-      asid = this_asid;
-      gettcbtoken(tcbtoken, 3);
-    }
     int rc = __iarv64_free(ptr, tcbtoken);
     if (rc == 0) {
       mem_cursor_t c = cache.find(k);
@@ -2016,13 +2015,14 @@ class __Cache {
   }
   ~__Cache() {
     std::lock_guard<std::mutex> guard(access_lock);
-    if (mem_account())
+    if (mem_account()) {
       for (mem_cursor_t it = cache.begin(); it != cache.end(); ++it) {
         dprintf(2,
                 "Error: DEBRIS (allocated but never free'd): @%lx size %lu\n",
                 it->first,
                 it->second);
       }
+    }
   }
 };
 
