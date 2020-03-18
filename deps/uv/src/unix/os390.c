@@ -28,6 +28,7 @@
 #include <builtins.h>
 #include <termios.h>
 #include <sys/msg.h>
+#include <sys/resource.h>
 #include "zos.h"
 #include <_Nascii.h>
 #if defined(__clang__)
@@ -256,7 +257,13 @@ uint64_t uv_get_total_memory(void) {
 
 
 uint64_t uv_get_constrained_memory(void) {
-  return 0;  /* Memory constraints are unknown. */
+  struct rlimit rl;
+  int rc = getrlimit(RLIMIT_MEMLIMIT, &rl);
+
+  if (0 == rc) 
+    return rl.rlim_cur;
+  else
+    return 0; // There is no memory limit set
 }
 
 
