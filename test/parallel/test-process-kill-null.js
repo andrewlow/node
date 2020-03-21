@@ -1,9 +1,8 @@
 'use strict';
-const { mustCall } = require('../common');
+const { mustCall, spawnCat } = require('../common');
 const assert = require('assert');
-const { spawn } = require('child_process');
 
-const cat = common.spawnCat();
+const cat = spawnCat();
 
 assert.ok(process.kill(cat.pid, 0));
 
