@@ -812,9 +812,10 @@
                'conditions': [
                  ['OS=="win"', {
                    'defines': ['ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_SHARED'],
-                 }, {
+                 }],
+                 ['OS!="zos"', {
                     'defines': ['ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC'],
-                  }],
+                 }],
                ],
              }],
             ['OS=="win"', {

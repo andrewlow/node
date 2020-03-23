@@ -46,7 +46,9 @@ bool InitializeICUDefaultLocation(const char* exec_path,
     return InitializeICU(icu_data_file);
   }
   char* icu_data_file_default;
-#if defined(V8_TARGET_LITTLE_ENDIAN)
+#if defined(V8_OS_ZOS)
+  base::RelativePath(&icu_data_file_default, exec_path, "icusmdt64.dat");
+#elif defined(V8_TARGET_LITTLE_ENDIAN)
   base::RelativePath(&icu_data_file_default, exec_path, "icudtl.dat");
 #elif defined(V8_TARGET_BIG_ENDIAN)
   base::RelativePath(&icu_data_file_default, exec_path, "icudtb.dat");
