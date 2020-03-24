@@ -133,6 +133,9 @@ def files(action):
   output_file = 'node'
   output_prefix = 'out/Release/'
 
+  if sys.platform.startswith('zos'):
+    action([output_prefix + 'obj/gen/icutmp/icusmdt64.dat'], 'lib/')
+
   if 'false' == variables.get('node_shared'):
     if is_windows:
       output_file += '.exe'
