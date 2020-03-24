@@ -120,7 +120,7 @@ int sem_destroy(sem_t *sem) {
       abort();
   if (pthread_mutex_destroy(&sem->mutex))
       abort();
-  
+  return 0; 
 }
 
 /* sem_wait -- it gets a lock on semaphore and implemented using semop() */
