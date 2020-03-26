@@ -270,6 +270,7 @@ void SamplingEventsProcessor::Run() {
     }
 
     // Schedule next sample.
+    printf("Do Sample1: %d\n", pthread_self().__ & 0x7fffffff);
     sampler_->DoSample();
   }
 

@@ -18,7 +18,7 @@ var ret;
 if (process.platform === 'os390')
     ret = spawnSync(
       process.execPath,
-      ['--stack_size=350', __filename, 'async'],
+      ['--stack_size=550', __filename, 'async'],
       { maxBuffer: Infinity }
     );
 else
