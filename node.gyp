@@ -356,6 +356,9 @@
             # zos only, exclude on other platforms
             'deps/zoslib/src/celquopt.S',
           ],
+          'includes': [ 
+            'node.gypi',
+          ],
         }],
         [ 'node_intermediate_lib_type=="static_library" and '
             'node_shared=="true" and OS=="aix"', {
@@ -1100,10 +1103,6 @@
         'node_dtrace_provider',
       ],
 
-      'includes': [
-        'node.gypi'
-      ],
-
       'include_dirs': [
         'src',
         'tools/msvs/genfiles',
@@ -1153,6 +1152,11 @@
            'defines': [
              'HAVE_INSPECTOR=0',
            ]
+        }],
+        [ 'node_shared!="true" or OS!="zos"', {
+            'includes': [ 
+                'node.gypi',
+             ],
         }],
         ['OS=="solaris"', {
           'ldflags': [ '-I<(SHARED_INTERMEDIATE_DIR)' ]
