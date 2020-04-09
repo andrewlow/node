@@ -1157,6 +1157,16 @@
             'includes': [ 
                 'node.gypi',
              ],
+        }, {
+            'conditions': [
+                [ 'v8_enable_i18n_support==1', {
+                   'defines': [ 'NODE_HAVE_I18N_SUPPORT=1' ],
+                   'conditions': [
+                     [ 'icu_small=="true"', {
+                       'defines': [ 'NODE_HAVE_SMALL_ICU=1' ],
+                   }]],
+                }],
+            ],
         }],
         ['OS=="solaris"', {
           'ldflags': [ '-I<(SHARED_INTERMEDIATE_DIR)' ]
