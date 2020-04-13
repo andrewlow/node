@@ -263,17 +263,25 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
       Address recv = params.receiver->ptr();
       Address** argv = reinterpret_cast<Address**>(params.argv);
       RuntimeCallTimerScope timer(isolate, RuntimeCallCounterId::kJS_Execution);
-#if __MVS__
-      char *__new[1];
-      char **__old;
-      char ***__le_savstack_async_addr = (42 + ((char ****__ptr32 *)1208)[0][11]);
+#if V8_OS_ZOS
+      static int flag = 5;
+      static char **__old;
+      static char ***__le_savstack_async_addr = (42 + ((char ****__ptr32 *)1208)[0][11]);
+      //printf("SAVSTACK: %p\n", __le_savstack_async_addr);
+      //printf("*SAVSTACK: %p\n", *__le_savstack_async_addr);
+      char *sp;
       __old = *__le_savstack_async_addr;
-      *__le_savstack_async_addr = __new;
-      __asm(" lgr %0,4\n" : "=r"(__new[0])::);
+      {
+        char *__new[1];
+        *__le_savstack_async_addr = __new;
+        __asm(" lgr %0,4\n" : "=r"(__new[0])::);
+        sp = (char*)alloca(100*2048);
+      
 #endif
       value = Object(stub_entry.Call(isolate->isolate_data()->isolate_root(),
                                      orig_func, func, recv, params.argc, argv));
-#if __MVS__
+#if V8_OS_ZOS
+      }
       *__le_savstack_async_addr = __old;
 #endif
     } else {

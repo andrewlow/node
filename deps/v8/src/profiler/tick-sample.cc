@@ -190,11 +190,13 @@ DISABLE_ASAN void TickSample::Init(Isolate* v8_isolate,
   this->update_stats = update_stats;
   SampleInfoWithContext info;
   RegisterState regs = reg_state;
+  printf("In TickSample\n");
   if (!GetStackSample(v8_isolate, &regs, record_c_entry_frame, stack,
                       kMaxFramesCount, &info, use_simulator_reg_state,
                       contexts)) {
     // It is executing JS but failed to collect a stack trace.
     // Mark the sample as spoiled.
+    printf("Spoiled Stack Trace\n");
     pc = nullptr;
     return;
   }
@@ -268,6 +270,8 @@ bool TickSample::GetStackSample(Isolate* v8_isolate, RegisterState* regs,
   USE(use_simulator_reg_state);
 #endif
   DCHECK(regs->sp);
+
+  printf("GetStackSample\n");
 
   // Check whether we interrupted setup/teardown of a stack frame in JS code.
   // Avoid this check for C++ code, as that would trigger false positives.
