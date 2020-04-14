@@ -1150,6 +1150,10 @@ class __init {
         *forkcurr = 0;
       }
     }
+    char* tenv = getenv("_EDC_SIG_DFLT");
+    if (!tenv || !*tenv) {
+      setenv("_EDC_SIG_DFLT","1",1);
+    }
     _th = std::get_terminate();
     std::set_terminate(abort);
   }
