@@ -78,6 +78,7 @@ extern int conv_utf16_utf8(char*, size_t, const char*, size_t);
 extern int __console_printf(const char* fmt, ...);
 extern int __indebug(void);
 extern void __setdebug(int);
+extern void __set_autocvt_on_untagged_fd_stream(int fd, unsigned short ccsid, unsigned char txtflag);
 extern char** __getargv(void);
 extern int __getargc(void);
 

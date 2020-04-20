@@ -1555,8 +1555,9 @@ extern "C" int __file_needs_conversion_init(const char* name, int fd) {
     if (cnt > 8) {
       int ccsid;
       int am;
-      unsigned len = strlen_ae((unsigned char*)buf, &ccsid, cnt, &am);
-      if (ccsid == 1047) {
+      unsigned ebcdic_chars = strlen_ae((unsigned char*)buf, &ccsid, cnt, &am);
+      // If the majority of the file has ebcdic content and auto detection was not ambiguous
+      if (ccsid == 1047 && (ebcdic_chars >= cnt/2) && am != 1) {
         if (no_tag_read_behaviour == __NO_TAG_READ_DEFAULT_WITHWARNING) {
           const char* filename = "(null)";
           if (name) {
@@ -1580,6 +1581,20 @@ extern "C" unsigned long __mach_absolute_time(void) {
   unsigned long long value, sec, nsec;
   __stckf(&value);
   return ((value / 512UL) * 125UL) - 2208988800000000000UL;
+}
+
+extern "C" void __set_autocvt_on_untagged_fd_stream(int fd, unsigned short ccsid, unsigned char txtflag) {
+  struct file_tag tag;
+
+  tag.ft_ccsid = ccsid;
+  tag.ft_txtflag = txtflag;
+
+  struct f_cnvrt req = {SETCVTON, 0, (short)ccsid};
+
+  if (!isatty(fd) && 0 == __getfdccsid(fd)) {
+    fcntl(fd, F_CONTROL_CVT, &req);
+    fcntl(fd, F_SETTAG, &tag);
+  }
 }
 
 //------------------------------------------accounting for memory allocation

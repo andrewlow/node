@@ -102,6 +102,7 @@ extern bool linux_at_secure;
 #include <string.h>
 #include <sys/ps.h>
 #include <unistd.h>
+#include <zos.h>
 
 class __setlibpath {
   void *p;
@@ -146,10 +147,16 @@ public:
       dlclose(p);
   }
 };
+
 __setlibpath __zossetup;
 #endif
 
 int main(int argc, char* argv[]) {
+#if defined(__MVS__)
+    __set_autocvt_on_untagged_fd_stream(STDIN_FILENO, 1047, 1);
+    __set_autocvt_on_untagged_fd_stream(STDOUT_FILENO, 1047, 1);
+    __set_autocvt_on_untagged_fd_stream(STDERR_FILENO, 1047, 1);
+#endif
 #if defined(__POSIX__) && defined(NODE_SHARED_MODE)
   // In node::PlatformInit(), we squash all signal handlers for non-shared lib
   // build. In order to run test cases against shared lib build, we also need

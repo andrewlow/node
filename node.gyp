@@ -324,6 +324,7 @@
         'src',
         'deps/v8/include',
         'deps/uv/include',
+        'deps/zoslib/include'
       ],
 
       'sources': [
