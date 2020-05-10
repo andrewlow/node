@@ -742,7 +742,6 @@ class SamplingThread : public base::Thread {
         interval_microseconds_(interval_microseconds) {}
   void Run() override {
     while (sampler_->IsActive()) {
-      printf("Do Sample2: %d\n", pthread_self().__ & 0x7fffffff);
       sampler_->DoSample();
       base::OS::Sleep(
           base::TimeDelta::FromMicroseconds(interval_microseconds_));

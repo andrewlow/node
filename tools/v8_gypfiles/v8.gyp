@@ -1257,9 +1257,6 @@
       'dependencies': [
         'v8_libbase',
       ],
-      'include_dirs': [
-        '<(V8_ROOT)/../zoslib/include',
-      ],
       'sources': [
         '<(V8_ROOT)/src/libsampler/sampler.cc',
         '<(V8_ROOT)/src/libsampler/sampler.h'

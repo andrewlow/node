@@ -1152,7 +1152,6 @@ InitializationResult InitializeOncePerProcess(int argc, char** argv) {
   signalHandlerExit = 0;
   sigset_t set;
   sigfillset(&set);
-  sigdelset(&set, SIGPROF); 
   uv_thread_create(&signalHandlerThread, SignalHandlerThread, NULL);
   CHECK_EQ(0, pthread_sigmask(SIG_BLOCK, &set, NULL));
 #endif
@@ -1275,12 +1274,17 @@ int Start(int argc, char** argv) {
     }
 
 #ifdef __MVS__
-    //static char altstack[SIGSTKSZ];
-    //stack_t ss = {.ss_size = SIGSTKSZ, .ss_sp = altstack};
+    static char altstack[SIGSTKSZ + 4096*1024];
+    stack_t ss = {.ss_size = SIGSTKSZ, .ss_sp = altstack};
     struct sigaction new_action;
     new_action.sa_handler = termination_handler;
-    //int rc = sigaltstack(&ss, 0);
-    new_action.sa_flags = SA_RESETHAND;
+    int rc = sigaltstack(&ss, 0);
+    if (rc == 0) {
+      new_action.sa_flags = SA_RESETHAND | SA_ONSTACK;
+    } else {
+      perror("sigaltstack");
+      new_action.sa_flags = SA_RESETHAND;
+    }
 #if SKIPPING_FOR_SAVSTACK
     for (int i = 0; i < (sizeof(siglist) / sizeof(sig_save)); ++i) {
       sigaction(siglist[i].signum, NULL, &(siglist[i].saved));

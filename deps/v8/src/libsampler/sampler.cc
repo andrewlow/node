@@ -14,9 +14,6 @@
 
 
 #ifdef V8_OS_ZOS
-#include <edcwccwi.h>
-#include <zos.h>
-
 int ThreadKey(pthread_t& thread_id) {
    return (int)(thread_id.__ & 0x7fffffff);
 }
@@ -353,16 +350,11 @@ class SignalHandler {
   static void Install() {
     struct sigaction sa;
     sa.sa_sigaction = &HandleProfilerSignal;
-    static char altstack[SIGSTKSZ+1024*1024*2];
-    printf("ALTSTACK: %p\n", &altstack[0]);
-    printf("ALTSTACK TID: %d\n", pthread_self().__ & 0x7fffffff);
-    stack_t ss = {.ss_size = SIGSTKSZ+1024*1024*2, .ss_sp = altstack};
     sigemptyset(&sa.sa_mask);
-    int rc = sigaltstack(&ss, 0);
 #if V8_OS_QNX
     sa.sa_flags = SA_SIGINFO;
 #else
-    sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK;
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
 #endif
     signal_handler_installed_ =
         (sigaction(SIGPROF, &sa, &old_signal_handler_) == 0);
@@ -395,30 +387,16 @@ void SignalHandler::HandleProfilerSignal(int signal, siginfo_t* info,
                                          void* context) {
   USE(info);
   if (signal != SIGPROF) return;
-  printf("Handling SIGPROF, context: %p\n");
-  unsigned long long sp = 0;
-  __asm volatile(
-             " LGR  %0,4\n"
-             : "=r"(sp)
-             : );
-  
-  printf("SP: %p SP-BIAS: %p\n", sp, sp+2048);
-  // Call Traceback
-  printf("SIGPROF HANDLER TID: %d\n", pthread_self().__ & 0x7fffffff);
   v8::RegisterState state;
   FillRegisterState(context, &state);
-  printf("Ignoring DoSample\n");
-  //SamplerManager::instance()->DoSample(state);
+  SamplerManager::instance()->DoSample(state);
 }
 
 void SignalHandler::FillRegisterState(void* context, RegisterState* state) {
   // Extracting the sample from the context is extremely machine dependent.
   ucontext_t* ucontext = reinterpret_cast<ucontext_t*>(context);
-#if !(V8_OS_ZOS || V8_OS_OPENBSD || (V8_OS_LINUX && (V8_HOST_ARCH_PPC || V8_HOST_ARCH_S390)))
+#if !(V8_OS_OPENBSD || (V8_OS_LINUX && (V8_HOST_ARCH_PPC || V8_HOST_ARCH_S390)))
   mcontext_t& mcontext = ucontext->uc_mcontext;
-#elif V8_OS_ZOS
-  __mcontext_t_* mcontext = (__mcontext_t_*)context;
-#else
 #endif
 #if V8_OS_LINUX
 #if V8_HOST_ARCH_IA32
@@ -486,15 +464,6 @@ void SignalHandler::FillRegisterState(void* context, RegisterState* state) {
   state->fp = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[11]);
   state->lr = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[14]);
 #endif  // V8_HOST_ARCH_*
-#elif V8_OS_ZOS
-  state->pc = reinterpret_cast<void*>(mcontext->__mc_psw);
-  state->sp = reinterpret_cast<void*>(mcontext->__mc_gr[15]);
-  state->fp = reinterpret_cast<void*>(mcontext->__mc_gr[11]);
-  state->lr = reinterpret_cast<void*>(mcontext->__mc_gr[14]);
-  printf("pc: %p\n", state->pc);
-  for (int i = 0; i < 16; i++) {
-    printf("r%d - %p\n", i,  mcontext->__mc_gr[i]);
-  }
 #elif V8_OS_IOS
 
 #if V8_TARGET_ARCH_ARM64
@@ -610,8 +579,6 @@ void Sampler::DoSample() {
   if (!SignalHandler::Installed()) return;
   DCHECK(IsActive());
   SetShouldRecordSample();
-  printf("Do Sample(): %llu\n", pthread_self().__ & 0x7fffffff);
-  printf("SIGPROF sent to tid: %llu", platform_data()->vm_tid().__ & 0x7fffffff);
   pthread_kill(platform_data()->vm_tid(), SIGPROF);
 }
 
